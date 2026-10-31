@@ -81,14 +81,14 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [] } = {
         return route.fulfill(jsonResponse(created, 201));
       }
       if (method === 'PATCH') {
-        const id = url.searchParams.get('id')?.replace(/^eq\\./, '');
+        const id = url.searchParams.get('id')?.replace(/^eq\./, '');
         const input = request.postDataJSON();
         const index = state.informationPosts.findIndex(item => item.id === id);
         if (index >= 0) state.informationPosts[index] = { ...state.informationPosts[index], ...input };
         return route.fulfill(jsonResponse(state.informationPosts[index] || {}, 200));
       }
       if (method === 'DELETE') {
-        const id = url.searchParams.get('id')?.replace(/^eq\\./, '');
+        const id = url.searchParams.get('id')?.replace(/^eq\./, '');
         state.informationPosts = state.informationPosts.filter(item => item.id !== id);
         return route.fulfill(jsonResponse({ id }, 200));
       }
