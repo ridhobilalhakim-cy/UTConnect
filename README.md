@@ -46,27 +46,35 @@ After deployment, set Supabase Auth Site URL and Redirect URLs to the actual HTT
 - The current 9-digit NIM check is inherited from the prototype and must be verified with official UT requirements before public release.
 - Precise location is stored server-side. Do not expose it in client queries. User consent and a separate server-controlled visibility policy must be tested before live map rollout.
 
-## Phase 0 findings
+## Current implementation status
 
-1. Prior pages duplicated Supabase configuration and dynamic CDN bootstrapping. The consolidated source puts auth configuration in one module.
-2. Login/register and dashboard now use one codebase and a shared client/session configuration.
-3. Dashboard data, map markers, matching, chat, forum, groups, information feed, and notifications remain simulated. They are intentionally not described as complete.
-4. The remote database has six applied migrations, but the first five SQL bodies have not yet been reconstructed into local source control. See `docs/STAGING_STATE.md` and `supabase/migrations/REMOTE_MIGRATIONS.md`.
-5. Package installation is still blocked in this execution environment: DNS cannot resolve `registry.npmjs.org`. No lockfile or production bundle was generated here. The remote build bootstrap is documented in `docs/PHASE05_DEPENDENCY_BUILD_GATE.md`.
+1. Login/register and the protected dashboard use one shared Supabase client and persistent browser session.
+2. The administrator role is stored in the non-exposed `private.app_user_roles` table. Three team accounts have been assigned the `admin` role; role lookup is performed server-side and normal users cannot edit role assignments.
+3. **Information UT is connected to Supabase.** The feed is loaded from `public.information_posts`; the three administrator accounts can create, edit, publish, unpublish, and delete posts. Students can read published posts according to the database audience rules. Drafts are visible to admins only.
+4. The Information UT page has database-backed categories, audience selection, source links, and draft/published states. The feed currently contains zero posts; no sample content has been seeded into the live database.
+5. Matching, chat, forum, groups, student map markers, and notifications remain prototypes/simulated and must not be described as operational.
+6. Seven remote migrations are recorded for the staging project. The first five SQL bodies still need to be reconstructed and reviewed in source control; the registration and admin migrations are retained in `supabase/migrations/`. See `docs/STAGING_STATE.md` and `supabase/migrations/REMOTE_MIGRATIONS.md`.
+7. The local execution environment cannot resolve external DNS, but the GitHub-hosted CI runner successfully installed dependencies from the committed lockfile and built the production site.
 
 ## Verification and next acceptance gate
 
-GitHub Actions run #4 passed on 2026-10-31 (commit `4b58e41`): lockfile-based dependency install, source checks, Vite production build, Chromium install, and all five mocked Playwright auth tests. The next gate is Netlify staging deployment, followed by real Supabase auth tests (signup, Google OAuth, profile completion, redirect, reload/session restoration, protected route, and logout) using two separate test accounts. Only after the Auth acceptance gate passes should feature modules begin connecting to the backend.
+GitHub Actions run #21 passed on 2026-10-31 (commit `5c45899`): source checks, Vite production build, Chromium installation, and all seven mocked Playwright tests. The browser suite includes admin and student Information UT flows, including create, edit, unpublish, republish, and delete.
+
+The live Supabase database was separately checked with authenticated SQL role contexts: an assigned administrator resolves as admin and can insert an information post; a non-admin student profile resolves as non-admin and its insert is rejected by RLS. The test insert was rolled back, leaving the Information UT feed empty.
+
+The next acceptance gate is to verify the current GitHub commit has deployed to the Netlify HTTPS site, then test with the team's actual Google accounts. These browser tests mock Supabase and do not prove live Google OAuth, full live CRUD through the browser, email delivery, or the deployed registration Edge Function. The deployment status could not be independently confirmed from this environment.
+
+Student verification remains separate from administrator access. At the last database check, the three administrator roles existed, but one of those accounts had not completed its student profile; all three existing student profiles were still `pending`, and none was `verified`. Do not mark a student verified solely because they used Google login.
 
 ## Browser E2E tests
 
-The project includes Playwright tests for the authentication interface and session lifecycle. They use mocked Supabase HTTP responses and synthetic student data; they do not create accounts or read records in the live Supabase project.
+The project includes Playwright tests for the authentication interface and Information UT client flows. They use mocked Supabase HTTP responses and synthetic test records; they do not create accounts or read/write the live Supabase project.
 
 ```bash
-npm install
+npm ci
 npx playwright install chromium
 npm run build
 npm run test:e2e
 ```
 
-The tests cover separate login/register views, guest access protection for `app.html`, email login, session persistence after reload, logout, the generic forgot-password response, and password recovery/update. Google OAuth, real email delivery, the deployed Edge Function, and live Supabase RLS are not covered by these mocked browser tests and must be verified separately in staging.
+The seven tests cover login/register separation, guest access protection, email login/session restoration/logout, forgot-password, password recovery/update, administrator Information UT CRUD/publication flows, and student public-feed visibility with admin controls hidden. Google OAuth, real email delivery, the deployed Edge Function, the Netlify production deployment, and live Supabase RLS are verified separately rather than inferred from mocked tests.
