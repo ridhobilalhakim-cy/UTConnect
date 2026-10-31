@@ -383,6 +383,7 @@ export function subscribeToGroupWorkspace(groupId, handlers = {}) {
     ["group_materials", handlers.onMaterials],
     ["group_agenda_items", handlers.onAgenda],
     ["group_invites", handlers.onInvites],
+    ["group_members", handlers.onMembers],
   ];
   for (const [table, callback] of tables) {
     if (typeof callback !== "function") continue;
