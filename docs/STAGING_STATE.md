@@ -1,4 +1,4 @@
-# UT Connect — Live Staging State (checked 2026-10-31)
+# UT Connect — Live Staging State (checked 2026-11-01)
 
 Project ref: `hqyusbyndtlfypdbmatw`  
 Project name: `UTConnect Project 1`  
@@ -8,7 +8,7 @@ Project status at inspection: ACTIVE_HEALTHY
 
 ## Remote migration history
 
-The connected staging project reported these twenty-one applied migration entries:
+The connected staging project reported these twenty-seven applied migration entries (latest checked 2026-11-01):
 
 | Version | Name |
 |---|---|
@@ -33,8 +33,12 @@ The connected staging project reported these twenty-one applied migration entrie
 | 20261031134443 | group_poll_realtime_touch |
 | 20261031135852 | group_membership_verification_guard |
 | 20261031140523 | group_materials_verified_delete_guard |
+| 20261031162034 | bugfix_forum_chat_profile_avatars_group_notifications |
+| 20261031163243 | profile_avatar_presets |
+| 20261031164151 | legacy_faculty_code_profile_compatibility |
+| 20261031173449 | normalize_legacy_ut_programme_aliases |
 
-Live introspection found the public application tables with RLS enabled, plus private NIM search and student-verification tables. PostGIS is enabled. The deployed `complete-student-registration` Edge Function was last confirmed as ACTIVE version 4 with JWT verification enabled.
+Live introspection found the public application tables with RLS enabled, plus private NIM search and student-verification tables. PostGIS is enabled. The deployed `complete-student-registration` Edge Function is ACTIVE version 5 with JWT verification enabled.
 
 ## Important source-control caveat
 
@@ -158,3 +162,12 @@ Latest data counts: 0 matching preference rows, 0 profile-course links, 0 connec
 - New remote migration versions: `20261031162034_bugfix_forum_chat_profile_avatars_group_notifications` and `20261031163243_profile_avatar_presets`. Registration Edge Function: version 5, JWT verification ON. The profile editor offers four bundled avatar illustrations or an uploaded personal photo.
 - Live staging remains intentionally free of sample forum/group/chat/notification rows. Multi-account group/chat/realtime delivery still requires a verified second test account; the group workspace UI remains covered by mocked Playwright tests.
 - The active UT course catalogue `public.courses` still contains zero rows. General forum discussions and general study groups work without it; course-specific lists must be populated from an official UT course catalogue rather than synthesised from programme names.
+
+
+## UT programme alias compatibility — checked 2026-11-01
+
+- The linked registration and profile selectors use 36 S1 programmes across FEB, FHISIP, FKIP and FST.
+- Legacy programme labels are normalized to current canonical labels in the browser and in the database profile-edit RPC.
+- Remote migration `20261031173449_normalize_legacy_ut_programme_aliases` is applied. Direct SQL checks confirmed both the legacy `Ilmu Administrasi Negara` label and canonical `Ilmu Administrasi Publik` label validate for FHISIP.
+- Profile identity comparisons use canonical faculty/programme names. A legacy label being normalized does not by itself reset a verified user's student-verification status.
+- No profile rows were mass-updated by this migration.
