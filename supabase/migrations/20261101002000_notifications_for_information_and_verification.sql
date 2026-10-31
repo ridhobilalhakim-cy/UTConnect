@@ -57,8 +57,10 @@ begin
   end if;
 
   -- Notify once when a draft is first published; do not create duplicates for edits.
-  if tg_op = 'UPDATE' and old.is_published then
-    return new;
+  if tg_op = 'UPDATE' then
+    if old.is_published then
+      return new;
+    end if;
   end if;
 
   insert into public.notifications(user_id, notification_type, title, body, reference_id)
