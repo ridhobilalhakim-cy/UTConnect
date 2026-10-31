@@ -35,7 +35,7 @@ Verify that Netlify deployed the latest successful GitHub commit. Then run real-
 
 The 13 browser tests include mocked evidence upload and pending state, admin approval, rejection reason validation, and verified-only forum access/post/comment flows. They do not validate real Storage objects or RPC calls with a real browser identity.
 
-Live database inspection confirmed the private evidence bucket, owner-only upload policy, admin-only read policy, admin-gated review RPC, and the absence of authenticated UPDATE privilege on profiles.verification_status. At the last check four profiles existed: one verified and three pending, with no submitted requests or review events.
+Live database inspection confirmed the private evidence bucket, owner-only upload policy, admin-only read policy, admin-gated review RPC, and the absence of authenticated UPDATE privilege on profiles.verification_status. At the last check four profiles existed: one verified and three pending. The private verification tables contain one approved request and one approved review event, with no requests awaiting review.
 
 The evidence examples in the UI are manual review guidance. There is no official UT API integration. Before public launch, define the acceptable proof of active UT enrollment and an evidence retention/deletion period. CI run #33 passed after the filename-sanitization fix.
 
