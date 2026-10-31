@@ -1970,8 +1970,10 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
 
   function openProfileEditor() {
     const profile = state.profile || {};
-    const faculty = escapeText(profile.faculty || "");
-    const program = escapeText(profile.program || "");
+    const currentFaculty = resolveUTFaculty(profile.faculty) || profile.faculty || "";
+    const currentProgram = resolveUTProgram(currentFaculty, profile.program) || profile.program || "";
+    const faculty = escapeText(currentFaculty);
+    const program = escapeText(currentProgram);
     const verifiedIdentityMayReset = isVerified;
     let selectedAvatarPreset = profile.avatar_path?.startsWith("preset:") ? profile.avatar_path.slice("preset:".length) : null;
     const content = `
@@ -1996,7 +1998,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       const semester = Number($("#profile-edit-semester").value);
       const bio = $("#profile-edit-bio").value.trim();
       const file = $("#profile-avatar-file").files?.[0] || null;
-      const identityChanged = name !== profile.full_name || faculty !== profile.faculty || program !== profile.program || semester !== Number(profile.semester);
+      const identityChanged = name !== profile.full_name || faculty !== currentFaculty || program !== currentProgram || semester !== Number(profile.semester);
       const acknowledge = Boolean($("#profile-reset-verification")?.checked);
       if (identityChanged && verifiedIdentityMayReset && !acknowledge) {
         toast("Centang konfirmasi perubahan identitas terlebih dahulu.");
