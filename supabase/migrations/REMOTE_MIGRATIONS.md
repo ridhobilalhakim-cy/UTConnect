@@ -18,15 +18,13 @@ These migrations have been applied on Supabase project `hqyusbyndtlfypdbmatw` (S
 | 20261031111603 | secure_notifications_workflow |
 | 20261031121632 | home_map_location_workflow |
 | 20261031121933 | home_map_hidden_viewer_search |
-| 20261031135852 | group_membership_verification_guard |
-| 20261031140523 | group_materials_verified_delete_guard |
-| 20261031135852 | group_membership_verification_guard |
 | 20261031124333 | group_workspace_workflows |
 | 20261031124407 | group_invite_inbox_limit |
 | 20261031133930 | group_workspace_realtime_and_invite_notifications |
 | 20261031134014 | group_members_realtime |
 | 20261031134443 | group_poll_realtime_touch |
 | 20261031135852 | group_membership_verification_guard |
+| 20261031140523 | group_materials_verified_delete_guard |
 
 The matching RPC SQL source is retained as `20261030232434_student_registration_profile_location_rpc_v1.sql`, but the file name timestamp is a local artifact name and not the remote migration version. Treat the remote migration history above as authoritative for the existing staging project.
 
