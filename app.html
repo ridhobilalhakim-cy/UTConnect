@@ -55,7 +55,7 @@
       <button class="nav-item" data-page="info"><i data-lucide="megaphone"></i>Informasi UT</button>
     </nav>
     <div class="nav-label" style="margin-top:25px">Personal</div>
-    <nav class="nav-list"><button class="nav-item" data-page="profile"><i data-lucide="user-round"></i>Profil Saya</button></nav>
+    <nav class="nav-list"><button class="nav-item" data-page="profile"><i data-lucide="user-round"></i>Profil Saya</button><button class="nav-item" data-page="verification"><i data-lucide="shield-check"></i>Verifikasi Mahasiswa</button></nav>
     <div class="sidebar-bottom">
       <div class="help-card"><strong>Butuh bantuan menggunakan UT Connect?</strong><p>Pelajari cara menemukan teman belajar, terhubung, dan membuat kelompok.</p><button class="link-btn" data-open-guide>Pelajari panduan <i data-lucide="arrow-up-right" style="width:13px;height:13px"></i></button></div>
       <div class="user-mini"><div class="avatar" id="sideAvatar">UT</div><div><strong id="sideUserName">Mahasiswa UT</strong><small id="sideUserMeta">Akun aktif</small></div></div>
@@ -131,11 +131,25 @@
         <div class="page-head"><div><div class="eyebrow">Ruang personal</div><h1 class="page-title">Profil saya</h1><p class="page-subtitle">Kelola informasi akademik dan preferensi belajar.</p></div><button class="btn btn-secondary" id="edit-profile"><i data-lucide="pencil"></i>Edit profil</button></div>
         <div class="profile-grid"><div class="surface profile-card"><div class="profile-big" id="profileInitials">UT</div><h3 id="profileFullName">Mahasiswa UT</h3><p>Mahasiswa Universitas Terbuka</p><span class="tag" id="profileStatusTag" style="background:#fff3c2;color:#765400">Status: Pending</span></div><div class="surface profile-main"><h2 class="section-title">Informasi akademik</h2><div class="detail-row"><span>NIM</span><strong id="profileNimLabel">Tidak ditampilkan</strong></div><div class="detail-row"><span>Fakultas</span><strong id="profileFaculty">-</strong></div><div class="detail-row"><span>Program studi</span><strong id="profileProgram">-</strong></div><div class="detail-row"><span>Semester</span><strong id="profileSemester">-</strong></div><div class="detail-row"><span>Preferensi belajar</span><strong>Online · Malam hari</strong></div><div class="detail-row"><span>Visibilitas lokasi</span><strong style="color:#287b59">Tampil dengan jarak perkiraan</strong></div><div style="margin-top:16px;padding:12px;border-radius:11px;background:#f7f9fc;color:#718096;font-size:10px;line-height:1.7"><i data-lucide="shield-check" style="width:14px;height:14px;vertical-align:middle;color:#16845b"></i> Lokasi presisi dan informasi pribadi tidak ditampilkan pada profil publik. Pengaturan keamanan final memerlukan backend.</div></div></div>
       </section>
+      
+      <!-- STUDENT VERIFICATION -->
+      <section class="page-section" id="page-verification">
+        <div class="page-head"><div><div class="eyebrow">Keamanan dan kepercayaan komunitas</div><h1 class="page-title">Verifikasi Mahasiswa</h1><p class="page-subtitle">Kirim bukti status mahasiswa UT aktif dan pantau hasil pemeriksaan administrator.</p></div></div>
+        <div class="verification-layout">
+          <section class="surface verification-panel" id="verification-status-panel"><div class="verification-loading">Memuat status verifikasi...</div></section>
+          <section class="surface verification-panel" id="verification-submit-panel"><div class="verification-loading">Memuat formulir...</div></section>
+          <section class="surface verification-panel verification-admin-panel" id="verification-admin-panel" hidden>
+            <div class="verification-admin-head"><div><div class="eyebrow">Khusus administrator</div><h2>Antrean pemeriksaan</h2><p>Tinjau bukti yang dikirim mahasiswa. Jangan menyetujui permohonan hanya berdasarkan data profil atau login.</p></div><div class="verification-admin-tools"><span class="verification-count" id="verification-queue-count">0</span><button type="button" class="btn btn-secondary btn-sm" id="verification-refresh">Muat ulang</button></div></div>
+            <div class="verification-queue" id="verification-queue"><div class="verification-loading">Memuat antrean...</div></div>
+          </section>
+        </div>
+      </section>
+
     </main>
   </div>
 </div>
 
-<nav class="mobile-nav" aria-label="Navigasi mobile"><button class="active" data-page="home"><i data-lucide="map-pinned"></i><span>Beranda</span></button><button data-page="matching"><i data-lucide="users"></i><span>Matching</span></button><button data-page="forum"><i data-lucide="messages-square"></i><span>Forum</span></button><button data-page="groups"><i data-lucide="users-round"></i><span>Grup</span></button><button data-page="profile"><i data-lucide="user-round"></i><span>Profil</span></button></nav>
+<nav class="mobile-nav" aria-label="Navigasi mobile"><button class="active" data-page="home"><i data-lucide="map-pinned"></i><span>Beranda</span></button><button data-page="matching"><i data-lucide="users"></i><span>Matching</span></button><button data-page="forum"><i data-lucide="messages-square"></i><span>Forum</span></button><button data-page="groups"><i data-lucide="users-round"></i><span>Grup</span></button><button data-page="profile"><i data-lucide="user-round"></i><span>Profil</span></button><button data-page="verification"><i data-lucide="shield-check"></i><span>Verifikasi</span></button></nav>
 <button class="help-fab" data-open-guide><i data-lucide="circle-help"></i><span>Panduan</span></button>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
