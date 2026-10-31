@@ -19,7 +19,7 @@ These migrations have been applied on Supabase project `hqyusbyndtlfypdbmatw` (S
 | 20261031121632 | home_map_location_workflow |
 | 20261031121933 | home_map_hidden_viewer_search |
 | 20261031135852 | group_membership_verification_guard |
-| 20261031140027 | group_materials_verified_delete_guard |
+| 20261031140523 | group_materials_verified_delete_guard |
 | 20261031135852 | group_membership_verification_guard |
 | 20261031124333 | group_workspace_workflows |
 | 20261031124407 | group_invite_inbox_limit |
@@ -63,4 +63,4 @@ The `manage-group-invites` Edge Function is deployed as version 1 with JWT verif
 The final Group membership verification guard is retained as `20261031135852_group_membership_verification_guard.sql`. It makes active-member and admin helper checks require the current account to remain a verified student, and hardens the membership decision, poll, invitation inbox, pin, and invitation-cancellation RPCs so previously active membership does not preserve access after verification is revoked.
 
 
-The `20261031140027_group_materials_verified_delete_guard.sql` migration further tightens material deletion: both the metadata row and Storage object deletion now require current verified active group membership, even when the caller uploaded the file. Active group admins/co-admins may still delete any material in their group.
+The `20261031140523_group_materials_verified_delete_guard.sql` migration further tightens material deletion: both the metadata row and Storage object deletion now require current verified active group membership, even when the caller uploaded the file. Active group admins/co-admins may still delete any material in their group.
