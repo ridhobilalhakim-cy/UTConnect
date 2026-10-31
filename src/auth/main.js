@@ -231,7 +231,10 @@ window.L = L;
         alertBox("Password berhasil diperbarui. Sesi belum dapat ditutup otomatis; silakan keluar sebelum menggunakan akun kembali.","success");
         return;
       }
-      window.location.replace("/?passwordUpdated=1");
+      recoveryMode=false;
+      window.history.replaceState(null,"","/?passwordUpdated=1");
+      showView("loginView");
+      alertBox("Password berhasil diperbarui. Silakan masuk dengan password baru.","success");
     }catch(error){alertBox(error.message||"Password belum berhasil diperbarui. Minta tautan pemulihan baru jika tautan telah kedaluwarsa.","error");}
     finally{busy("resetPasswordBtn",false);}
   });
