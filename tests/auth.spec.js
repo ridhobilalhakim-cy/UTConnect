@@ -284,13 +284,16 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
     }
     if (path.endsWith('/rest/v1/group_members') && method === 'GET') {
       const groupFilter = url.searchParams.get('group_id') || '';
+      const userFilter = url.searchParams.get('user_id') || '';
       const requestedIds = groupFilter.startsWith('in.(')
         ? groupFilter.slice(4, -1).split(',')
         : groupFilter.startsWith('eq.')
           ? [groupFilter.slice(3)]
           : null;
+      const requestedUserId = userFilter.startsWith('eq.') ? userFilter.slice(3) : null;
       const rows = state.groupMembers.filter(member => {
         if (requestedIds && !requestedIds.includes(member.group_id)) return false;
+        if (requestedUserId && member.user_id !== requestedUserId) return false;
         const currentUserIsActive = state.groupMembers.some(row =>
           row.group_id === member.group_id && row.user_id === USER.id && row.status === 'active'
         );
