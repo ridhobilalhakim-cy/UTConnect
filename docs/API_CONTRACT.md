@@ -21,17 +21,25 @@ Use the Supabase client with the active user's session. Normal table requests mu
 | Update own profile | `profiles` update | Authenticated owner | Only editable profile columns; verification state cannot be changed by user. |
 | Student review | Admin workflow (to build) | Authorized moderator only | Changes pending/rejected/verified state after approved validation. |
 
-## Nearby map and NIM lookup
+## Home Map, location management, and NIM lookup
 
-**Implemented starter:** `POST /functions/v1/nearby-students`
+The Home Map is connected to two authenticated Edge Functions. The browser never calls the PostGIS search RPC or reads another student's exact location.
 
-Headers:
+### Owner location endpoint
 
-```http
-Authorization: Bearer <user-access-token>
-apikey: <publishable-key>
-Content-Type: application/json
-```
+POST /functions/v1/manage-my-location with a validated Supabase access token.
+
+| action | Additional fields | Behavior |
+|---|---|---|
+| get | none | Returns only the signed-in user's saved latitude/longitude, radar preference, and consent timestamp. |
+| save | lat, lng, consent: true, show_in_radar | Validates coordinates and explicit consent, then creates or updates the caller's own location. |
+| visibility | show_in_radar, and consent: true when enabling | Changes only the caller's radar visibility. Disabling visibility does not prevent the user from browsing other opted-in students. |
+
+The Edge Function derives the user ID from the authenticated session. A caller-supplied user ID is never accepted. The exact location response is owner-only and includes Cache-Control: no-store.
+
+### Nearby student search
+
+POST /functions/v1/nearby-students with a validated access token.
 
 Request body:
 
@@ -42,7 +50,15 @@ Request body:
 }
 ```
 
-`nim` is optional. Supported radius values are exactly `1000`, `3000`, or `5000` metres. The function derives the viewer ID from the validated JWT, HMACs NIM in memory, calls the server-only PostGIS RPC, and returns at most 10 candidates.
+The nim field is optional and, when present, must contain exactly nine digits. Supported radius values are exactly 1000, 3000, or 5000 metres.
+
+The Edge Function:
+1. Validates the JWT and derives the viewer ID from the authenticated session.
+2. Requires profiles.verification_status = 'verified'.
+3. Applies a server-side general-search limit of 30 requests per minute. NIM lookups additionally use the existing database limit of five per minute.
+4. HMACs the submitted NIM in memory using NIM_HMAC_SECRET; plaintext NIM is not written to a table, URL, browser storage, or response.
+5. Calls the service-role-only PostGIS function find_nearby_students.
+6. Returns at most ten results with initials, program, rounded distance, and jittered marker coordinates.
 
 Response shape:
 
@@ -51,7 +67,6 @@ Response shape:
   "radius": 3000,
   "results": [
     {
-      "student_id": "00000000-0000-0000-0000-000000000000",
       "initials": "AB",
       "program": "Sistem Informasi",
       "approx_distance_m": 500,
@@ -63,9 +78,9 @@ Response shape:
 }
 ```
 
-The UUID above is a shape example only, not a real account. Do not use the sample values as real locations. The true coordinates remain on the server. The returned marker coordinates are jittered for map rendering and must never be reused for routing, address lookup, or other precise location functions.
+The coordinates above are examples only, not real student records or places. The Home Map response intentionally omits student IDs. Marker coordinates are jittered by PostGIS for visual display only; they must never be used for routing, address lookup, or precision navigation. Exact coordinates are read by the location owner only through the owner-scoped Edge Function. Students whose show_in_radar preference is off are excluded as candidates, but they may still search from their own saved location.
 
-**Important:** the SQL rate-limit guard is a starter control, not a complete anti-abuse system. Add edge-level rate limits, monitoring, abuse alerts, and tests before public launch.
+Both functions return Cache-Control: no-store. The Home Map does not render synthetic student profiles or guessed markers.
 
 ## Matching and direct messaging
 

@@ -1,22 +1,22 @@
-# Build and verification status — Information UT / Student Verification / Forum Diskusi / Grup Belajar / Matching & Connections / Direct Messaging / Notifications
+# Build and verification status — UT Connect web app integrations
 
 Date: 2026-10-31
 
 ## Latest CI result
 
-Latest previously confirmed GitHub Actions run #50: **SUCCESS** (pre-Grup Belajar integration)  
-Commit: `ec7eacf3b136b29f4887843654cb4c41268ed7bd`  
-Workflow: `Verify UT Connect build`
+Latest confirmed GitHub Actions run #119: **SUCCESS** (2026-10-31).
+Commit: 6801fd15c4ebc4b4ef1fffcc6a206e07ec29d7c1
 
-- Dependency install with committed `package-lock.json` — PASS.
-- `npm run check` — PASS.
-- `npm run build` — PASS; Vite generated the production site in `dist/`.
+- Dependency installation with committed lockfile — PASS.
+- npm run check — PASS (2 HTML pages, local imports, one shared Supabase client, and 13 JS/test modules syntax-checked).
+- npm run build — PASS; Vite generated the production site in dist/.
 - Playwright Chromium installation — PASS.
-- Browser E2E — **13 passed** on that commit.
-- Forum create/comment flows and verified-only access checks included.
-- The current repository now defines 26 Playwright tests: four Grup Belajar, five Matching/Connections, two Direct Messaging, and two Notifications scenarios were added after run #50. The 13 added tests have not yet been confirmed by a successful CI run.
+- Browser end-to-end suite — **30 passed, 0 failed**.
+- Home Map scenarios cover authenticated nearby results, NIM request-body handling, radar opt-out while browsing remains available, and pending-student gating.
 
-Workflow run: https://github.com/ridhobilalhakim-cy/UTConnect/actions/runs/41191070350
+Workflow run: https://github.com/ridhobilalhakim-cy/UTConnect/actions/runs/41201332750
+
+These browser tests use mocked Supabase HTTP responses and synthetic fixtures. A passing run verifies browser wiring and production bundle construction, not the live behavior of two real staging accounts, third-party OAuth/email, or deployment to Netlify.
 
 ## Information UT milestone
 
@@ -54,22 +54,23 @@ At the last database check:
 
 ## What this does and does not prove
 
-The CI browser tests use mocked Supabase HTTP responses and synthetic test data. They prove source integrity, build completion, and client UI behavior under the mocked responses. They do **not** prove live Google OAuth, real email delivery, the deployed Edge Function, end-to-end browser CRUD against the production Supabase API, or successful Netlify deployment.
+The CI browser tests use mocked Supabase HTTP responses and synthetic test data. They prove source integrity, production bundle construction, and client UI behavior under mocked responses. They do **not** prove live Google OAuth, real email delivery, cross-account Realtime, live location privacy behavior between separate accounts, end-to-end CRUD against the production Supabase API, or successful Netlify deployment.
 
 This environment could not independently resolve the public Netlify domain. The Netlify production deployment therefore remains an external acceptance check; do not assume a passing GitHub Actions run proves that the latest commit is already live.
 
 ## Remaining acceptance gates
 
-1. Confirm Netlify has deployed the latest successful commit.
-2. Test Google sign-in and profile completion using each team's actual account.
-3. Test Information UT create/edit/publish/unpublish/delete from a real admin browser session and confirm student read visibility.
-4. Define and publish the evidence acceptance and retention policy before opening Student Verification to the public.
-5. Run and review CI for the new Grup Belajar, Matching/Connections, Direct Messaging, and Notifications integrations, then perform real-account group, preference, connection-request, two-party chat, and notification-trigger acceptance tests. Home-map access remains a future integration milestone.
+1. Confirm Netlify has deployed the latest successful commit; CI success alone does not prove the public site has updated.
+2. Complete two-account Home Map acceptance with synthetic verified staging accounts: explicit consent, own-location access, radar opt-in/out, jittered markers, hidden-viewer search, and NIM lookup.
+3. Complete real-account group, preference, connection-request, two-party chat, notification-trigger, and Realtime acceptance checks.
+4. Test Google sign-in, profile completion, live Information UT admin CRUD, and student read visibility in real browser sessions.
+5. Define and publish the Student Verification evidence acceptance and retention policy before opening that workflow publicly.
+6. Configure explicit allowed-origin CORS values for the deployed app domain on the new Edge Functions before public release.
 
 ## Source-control caveats
 
-- The remote staging project has twelve recorded migrations. The first five original SQL bodies and the student_verification_workflow SQL body still need reconstruction/review in repository source. Do not re-run them blindly against the live staging database.
-- The registration Edge Function mirror in GitHub does not automatically deploy source edits to Supabase.
+- The remote staging project has fourteen recorded migrations. The first five original SQL bodies and the student_verification_workflow SQL body still need reconstruction/review in repository source. Do not re-run them blindly against the live staging database.
+- Edge Function source edits in GitHub do not automatically deploy to Supabase. The Home Map functions were explicitly deployed to staging; the registration Edge Function remains a separately deployed source mirror.
 - Never put the Supabase service-role key, secret keys, or NIM HMAC secret in browser code or public GitHub files.
 
 
@@ -172,13 +173,13 @@ Database and privacy boundary:
 - Authenticated can INSERT but not UPDATE public.connections. The INSERT RLS policy enforces verified sender/recipient, pending status, distinct users, and no block.
 - The respond_connection_request SECURITY DEFINER RPC permits only the recipient of a pending request to accept/reject it; it re-checks verification and block status.
 - The active course catalogue currently has zero courses. Topic, interest, and study-time preferences still work; course selection will become available after the catalogue is populated.
-- Direct messages remain demo/simulated and are not unlocked by accepting a connection in this milestone.
+- Direct Messaging is integrated through src/services/chat.js and public.direct_messages; chat is available only after both users accept a connection and remain verified.
 
 Live staging counts after migration: 0 matching preferences, 0 profile-course links, 0 connections, 0 direct messages, and 0 matching search events. Four profiles exist, with one verified and three pending; all four current location records have radar visibility enabled, but only verified profiles are eligible for matching.
 
-The repository now defines 26 Playwright scenarios in total. Five new mocked tests cover the matching gate, preference save, privacy-limited search and connection request, incoming acceptance, and incoming rejection. Two further mocked tests cover opening an accepted chat, message history, read receipts, message sending, and pending-connection gating. Two Notifications tests cover opening a direct-message notification and marking all notifications read. Run #50 is the latest previously verified passing CI result and predates these latest changes; the 13 new group/matching/chat/notification tests are not counted as passed until a current Actions result confirms them. Real-account flows and the latest Netlify deployment are still external acceptance checks.
+The repository now defines 30 Playwright scenarios in total. Run #119 passed all 30 tests, including the Matching, Direct Messaging, Notifications, and Home Map integration scenarios. Home Map tests use mocked Edge Function responses; live multi-account location and privacy behavior remains an external acceptance check.
 
-The Supabase security advisor intentionally flags the three new SECURITY DEFINER functions because authenticated users can execute them. Their function bodies validate the authenticated caller and constrain results/actions to that caller. The private search-event table has RLS enabled and no public table privileges. The advisor also reports leaked-password protection disabled; this is a separate Auth configuration item.
+The Supabase security advisor previously flagged the Matching-related SECURITY DEFINER functions because authenticated users can execute them; their function bodies validate the authenticated caller and constrain results/actions to that caller. The Home Map location and search RPCs are separately restricted to service_role and are called only through JWT-verified Edge Functions. The private search-event tables have RLS enabled and no public table privileges. The advisor also reports leaked-password protection disabled; this is a separate Auth configuration item.
 
 
 ## Direct Messaging milestone — implementation added 2026-10-31
@@ -216,3 +217,19 @@ Verification:
 - Temporary database transactions verified that all six event types create notifications and that authenticated users see only their own rows. A read receipt update succeeded; direct insert and title update privileges were absent. All synthetic database changes were rolled back.
 - Two mocked Playwright tests cover opening a direct-message notification and marking all notifications read. The current suite defines 26 tests; the two new scenarios are not counted as passing until a current CI run confirms them.
 - Live staging has zero stored notification records, zero connection/message/forum/group test data, one verified student and three pending students. Real cross-account notification and Realtime behavior remains an acceptance test after a second verified test account is available.
+
+## Home Map milestone — integrated 2026-10-31
+
+The Home Map is now connected through src/services/home-map.js to two authenticated Edge Functions:
+
+- manage-my-location: reads only the signed-in user's own exact location, validates explicit consent, saves GPS/manual coordinates, and updates radar visibility.
+- nearby-students: requires a verified student profile, validates 1/3/5 km radius, HMACs an optional NIM in the Edge Function, enforces server-side rate limits, and returns no more than ten jittered markers with initials, program, and rounded distance.
+
+Database functions for exact location and nearby search are executable only by service_role. The user_locations table has RLS enabled and a self-row policy. A student who hides their radar marker can still search for other students; their own profile is excluded from candidate results.
+
+Supabase staging has applied migrations 20261031121632_home_map_location_workflow and 20261031121933_home_map_hidden_viewer_search. Edge Functions manage-my-location v1 and nearby-students v2 are ACTIVE with JWT verification enabled. Exact location responses and nearby results use Cache-Control: no-store.
+
+The dashboard removed its static Bandung center, fabricated student profiles, dummy NIMs, and simulated markers. Students can refresh GPS, choose a map point with confirmation, set radar visibility, select 1/3/5 km, and search a nine-digit NIM. NIM is sent in the authenticated POST body and is not placed in the URL or browser storage.
+
+Outstanding acceptance gates: use two verified synthetic staging accounts to confirm location consent, radar visibility, approximate marker privacy, server-side NIM lookup, and the hidden-viewer search behavior. The current staging project has only one verified profile, so multi-account map behavior has not yet been exercised against live data. Configure a strict CORS origin allowlist before public release. Netlify deployment is not inferred from CI success.
+

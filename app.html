@@ -71,27 +71,31 @@
           <div class="notification-list" id="notification-list" aria-live="polite"><div class="notification-empty">Memuat notifikasi...</div></div>
         </section><button class="icon-btn auth-logout" id="authSignout" type="button" title="Keluar"><i data-lucide="log-out"></i><span>Keluar</span></button><div class="top-profile"><div class="avatar" id="topAvatar">UT</div><div class="who"><strong id="topUserName">Mahasiswa UT</strong><small id="topUserMeta">Akun aktif</small></div></div></div>
     </header>
-    <div class="session-notice" id="sessionNotice">Akun terhubung. Data mahasiswa, forum, matching, dan grup pada dashboard ini masih berupa simulasi UI.</div>
+    <div class="session-notice" id="sessionNotice">Akun terhubung. Informasi UT, verifikasi, forum, grup, matching, chat personal, notifikasi, dan peta sekitar menggunakan layanan Supabase. Chat grup, materi, agenda kelompok, dan beberapa pengaturan profil masih dalam pengembangan.</div>
 
     <main class="page">
       <!-- HOME -->
       <section class="page-section active" id="page-home">
         <div class="page-head"><div><div class="eyebrow">Ruang belajar bersama</div><h1 class="page-title">Selamat datang di UT Connect 👋</h1><p class="page-subtitle">Temukan teman belajar, perluas koneksi, dan tumbuh bersama komunitas UT.</p></div><div class="page-actions"><button class="btn btn-secondary" data-open-guide><i data-lucide="book-open"></i>Panduan</button><button class="btn btn-yellow" data-go="matching"><i data-lucide="users"></i>Cari teman belajar</button></div></div>
         <div class="welcome-strip"><div class="welcome-copy"><div class="hello">Halo! Siap belajar hari ini?</div><h2>Belajar lebih terarah,<br>bersama komunitas yang mendukung.</h2><p>Mulai dari satu koneksi kecil menuju pengalaman belajar yang lebih bermakna.</p></div><div class="welcome-actions"><button class="btn btn-yellow" data-go="groups"><i data-lucide="plus-circle"></i>Temukan kelompok</button><button class="btn btn-secondary" data-go="forum">Jelajahi forum</button><button class="btn btn-quiet" data-go="info">Informasi UT <i data-lucide="arrow-up-right"></i></button></div></div>
-        <div class="stats-grid">
-          <div class="surface stat-card"><div class="stat-icon"><i data-lucide="users"></i></div><div><div class="stat-value">10</div><div class="stat-label">Teman di sekitar · data demo</div></div></div>
-          <div class="surface stat-card"><div class="stat-icon"><i data-lucide="book-open-check"></i></div><div><div class="stat-value">6</div><div class="stat-label">Kelompok belajar aktif · data demo</div></div></div>
-          <div class="surface stat-card"><div class="stat-icon"><i data-lucide="messages-square"></i></div><div><div class="stat-value">12</div><div class="stat-label">Diskusi baru minggu ini · data demo</div></div></div>
-        </div>
         <div class="home-grid">
           <div class="surface map-card">
-            <div class="section-head"><div><h2 class="section-title">Temukan mahasiswa di sekitarmu</h2><p class="section-note">Jelajahi koneksi belajar berdasarkan area, tanpa menampilkan alamat pribadi.</p></div><span class="tag" style="background:#edf6f1;color:#34785a">● Area aktif</span></div>
-            <div class="map-tools"><div class="searchbox"><i data-lucide="search"></i><input id="nim-search" type="search" placeholder="Cari mahasiswa berdasarkan NIM" aria-label="Cari berdasarkan NIM"><button id="clear-search" class="link-btn" style="display:none">Hapus</button></div><div class="radius-control" aria-label="Pilih radius"><button class="radius-btn" data-radius="1">1 km</button><button class="radius-btn active" data-radius="3">3 km</button><button class="radius-btn" data-radius="5">5 km</button></div><button class="btn btn-secondary btn-sm" id="locate-btn"><i data-lucide="locate-fixed"></i>Lokasi saya</button></div>
-            <div id="map" role="img" aria-label="Peta interaktif area sekitar dengan lokasi mahasiswa simulasi"></div>
+            <div class="section-head"><div><h2 class="section-title">Temukan mahasiswa di sekitarmu</h2><p class="section-note">Jelajahi koneksi belajar berdasarkan area, tanpa menampilkan alamat pribadi.</p></div><span class="tag" id="map-status-pill">Memeriksa lokasi</span></div>
+            <div class="map-tools">
+              <div class="searchbox"><i data-lucide="search"></i><input id="nim-search" type="search" inputmode="numeric" maxlength="9" placeholder="Cari mahasiswa dengan NIM (9 digit)" aria-label="Cari mahasiswa berdasarkan NIM"><button id="clear-search" class="link-btn" style="display:none">Hapus</button></div>
+              <div class="radius-control" aria-label="Pilih radius pencarian"><button class="radius-btn" data-radius="1000">1 km</button><button class="radius-btn active" data-radius="3000">3 km</button><button class="radius-btn" data-radius="5000">5 km</button></div>
+              <button class="btn btn-secondary btn-sm" id="locate-btn" type="button"><i data-lucide="locate-fixed"></i>Perbarui lokasi</button>
+            </div>
+            <div class="map-privacy-controls">
+              <label class="map-consent-option"><input id="map-location-consent" type="checkbox"><span>Saya setuju menyimpan titik lokasi ini untuk menghitung jarak mahasiswa terdekat. Lokasi presisi hanya digunakan oleh server.</span></label>
+              <label class="map-radar-option"><input id="map-radar-toggle" type="checkbox" disabled><span><strong>Tampilkan pin saya di radar</strong><small>Jika aktif, mahasiswa terverifikasi dapat melihat pin perkiraan (bukan alamat atau koordinat presisi).</small></span></label>
+              <span class="map-location-status" id="map-location-status" role="status">Memeriksa lokasi akun...</span>
+            </div>
+            <div id="map" role="img" aria-label="Peta interaktif untuk mencari mahasiswa UT terverifikasi berdasarkan lokasi perkiraan"></div>
             <div class="map-foot"><div class="privacy-note"><i data-lucide="shield-check"></i>Pin ditampilkan secara perkiraan. Alamat lengkap tidak ditampilkan.</div><div class="map-legend"><span><i class="legend-dot me"></i>Kamu</span><span><i class="legend-dot"></i>Mahasiswa</span></div></div>
-            <div id="map-result" class="tiny muted" style="margin-top:8px">Menampilkan mahasiswa dalam radius 3 km · data simulasi.</div>
+            <div id="map-result" class="tiny muted" style="margin-top:8px" role="status" aria-live="polite">Peta akan menampilkan mahasiswa terverifikasi yang mengaktifkan radar.</div>
           </div>
-          <aside class="surface nearby-panel"><div class="section-head"><div><h2 class="section-title">Mahasiswa terdekat</h2><p class="section-note">Teman belajar di sekitar lokasimu.</p></div><button class="btn btn-quiet btn-sm" data-go="matching">Lihat semua</button></div><div class="nearby-list" id="nearby-list"></div><div class="list-footer"><span class="tiny muted">Data contoh untuk preview</span><button class="link-btn" data-go="matching">Buka matching <i data-lucide="arrow-right" style="width:13px;height:13px"></i></button></div></aside>
+          <aside class="surface nearby-panel"><div class="section-head"><div><h2 class="section-title">Mahasiswa terdekat</h2><p class="section-note">Teman belajar di sekitar lokasimu.</p></div><button class="btn btn-quiet btn-sm" data-go="matching">Lihat semua</button></div><div class="nearby-list" id="nearby-list"></div><div class="list-footer"><span class="tiny muted" id="nearby-list-count">Hasil dari pencarian lokasi</span><button class="link-btn" data-go="matching">Buka matching <i data-lucide="arrow-right" style="width:13px;height:13px"></i></button></div></aside>
         </div>
       </section>
 

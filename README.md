@@ -1,4 +1,4 @@
-# UT Connect — Main Codebase (Phase 0 + 0.5 + 04 readiness)
+# UT Connect — Main Codebase
 
 This is the official consolidated source tree for the current UT Connect staging application. It combines the approved Clean Academic Premium UI, separate login/registration entry page, protected dashboard page, one shared Supabase client/session configuration, and the current registration Edge Function source mirror.
 
@@ -14,9 +14,9 @@ This is the official consolidated source tree for the current UT Connect staging
 
 - `src/auth/main.js`: email/password, Google OAuth entry, password reset, registration profile form, map pin selection, and session restore.
 - `src/app/main.js`: protected route, session and profile check, profile header hydration, logout.
-- `src/app/dashboard.js`: Information UT, Student Verification, Forum Diskusi, Grup Belajar, Matching/Connections, Direct Messaging, and Notifications now use Supabase services. Home map markers, group messages/materials/agenda, and several other V2.2 interactions remain **DEMO/SIMULATED**.
+- `src/app/dashboard.js`: Home Map, Information UT, Student Verification, Forum Diskusi, Grup Belajar, Matching/Connections, Direct Messaging, and Notifications now use Supabase-backed services. Group messages/materials/agenda and several other V2.2 interactions remain **DEMO/SIMULATED**.
 - `src/lib/supabase.js`: the single browser client and storage key shared by both pages. Only the Supabase publishable key belongs here.
-- `supabase/functions/complete-student-registration/index.ts`: source mirror of deployed function v4; editing the repository file does not automatically deploy the function to Supabase.
+- `supabase/functions/complete-student-registration/index.ts`: source mirror of deployed function v4.\n- `supabase/functions/manage-my-location/index.ts` and `nearby-students/index.ts`: source for the owner-scoped location and privacy-preserving nearby-search Edge Functions; staging versions are active with JWT verification.
 
 ## Developer environment (not required by website visitors)
 
@@ -44,7 +44,7 @@ After deployment, set Supabase Auth Site URL and Redirect URLs to the actual HTT
 - Google OAuth must be explicitly configured in Google Cloud and Supabase Auth Provider. It cannot work before provider setup.
 - Student verification is separate. Newly registered profiles remain `pending`; email/Google identity does not verify UT student status.
 - The current 9-digit NIM check is inherited from the prototype and must be verified with official UT requirements before public release.
-- Precise location is stored server-side. Do not expose it in client queries. User consent and a separate server-controlled visibility policy must be tested before live map rollout.
+- Exact location is stored server-side and returned only to its owner through the authenticated location Edge Function. Other students receive jittered map pins, initials, program, and rounded distance only. Radar visibility is explicit and separate from the ability to search nearby peers. Real two-account location acceptance is still required before public rollout.
 
 ## Current implementation status
 
@@ -59,22 +59,22 @@ After deployment, set Supabase Auth Site URL and Redirect URLs to the actual HTT
 9. **Matching & Connections is connected to Supabase.** Verified students can save their own topic, interest, study-time, and active-course preferences; search up to ten nearby verified students within 1/3/5 km; send connection requests; and accept/reject incoming requests. Matching only returns initials, program, rounded distance, and learning tags—not full names, NIMs, or coordinates. The server filters by radar consent, verification, and mutual block status and rate-limits matching searches.
 10. **Direct Messaging is connected to Supabase.** Verified students can open a private conversation only after a connection is accepted, load recent messages, send messages (up to 5,000 characters), and mark incoming messages as read. Realtime listens only to the active connection's message rows; manual refresh is available as a fallback. Database policies require both participants to remain verified, the connection to remain accepted, and no mutual block. Authenticated users can update only `read_at`, not message contents or sender identity.
 11. **Notifications are connected to Supabase.** The header bell shows an unread count and a recent-notification panel. Database triggers create notifications for connection requests/decisions, direct messages, comments on the user's own forum posts, group join requests to admins/co-admins, and group join decisions. Students can mark one or all as read; Realtime is filtered to the signed-in user's notification rows. RLS restricts each user to their own notifications; browser clients cannot create notifications or modify notification content/ownership.
-12. Twelve remote migrations are recorded for the staging project. The first five SQL bodies and the remote student_verification_workflow SQL body still need to be reconstructed and reviewed in source control; registration, admin, group, matching, direct-message, and notification migration sources are retained in supabase/migrations/. See docs/STAGING_STATE.md and supabase/migrations/REMOTE_MIGRATIONS.md.
-11. The local execution environment cannot resolve external DNS, but the GitHub-hosted CI runner successfully installed dependencies from the committed lockfile and built the production site.
+13. Fourteen remote migrations are recorded for staging, including Home Map location management and hidden-viewer search. The first five SQL bodies and the remote student_verification_workflow SQL body still need to be reconstructed and reviewed in source control; later feature migration sources are retained in supabase/migrations/. See docs/STAGING_STATE.md and supabase/migrations/REMOTE_MIGRATIONS.md.
+14. The local execution environment cannot resolve external DNS, but the GitHub-hosted CI runner successfully installed dependencies from the committed lockfile and built the production site.
 
 ## Verification and next acceptance gate
 
-Latest confirmed GitHub Actions result in this record is run #50 on 2026-10-31 (commit `ec7eacf`): source checks, Vite production build, Chromium installation, and 13 mocked Playwright tests passed. The current repository defines 26 tests: the 13 previously verified, four Grup Belajar scenarios, five Matching/Connections scenarios, two Direct Messaging scenarios, and two Notifications scenarios. The 13 tests added after run #50 have not yet been independently confirmed by a successful run for the latest commit.
+Latest confirmed GitHub Actions result for Home Map integration is run #119 on 2026-10-31 (commit `6801fd15`): source checks passed, Vite production build passed, Chromium installed, and all 30 mocked Playwright tests passed. Run: https://github.com/ridhobilalhakim-cy/UTConnect/actions/runs/41201332750.
 
 The live Supabase database was separately checked with authenticated SQL role contexts: an assigned administrator resolves as admin and can insert an information post; a non-admin student profile resolves as non-admin and its insert is rejected by RLS. The test insert was rolled back, leaving the Information UT feed empty.
 
-The next acceptance gate is to verify the latest GitHub commit has deployed to the Netlify HTTPS site, then test with real student/admin accounts. These browser tests mock Supabase and do not prove live Google OAuth, actual file upload/download/review, live forum posts, live group/connection/chat writes across separate accounts, email delivery, or the deployed registration Edge Function. Current staging has no accepted connections or direct messages, and only one verified profile, so real two-party chat acceptance still requires a second verified test account. The deployment status could not be independently confirmed from this environment.
+The next acceptance gate is real-account acceptance for Home Map (two verified synthetic staging accounts with explicit location consent), two-party connections/chat/notifications, and final Netlify deployment verification. Playwright tests mock Supabase and do not prove live Google OAuth, email delivery, real Storage upload/download/review, cross-account Realtime behavior, or the deployed Netlify URL. Staging currently has only one verified profile, so a second verified synthetic account is required before live map and two-party messaging acceptance. The Edge Functions currently allow wildcard CORS; configure an explicit app-origin allowlist before public release.
 
 Student verification remains separate from administrator access. At the latest database check, four profiles existed: one was verified and three were pending. The private verification tables contain one approved request and one corresponding approved review event. Forum Diskusi and Information UT tables remain empty; no test data has been inserted into those live tables. Administrators should compare the uploaded document with the student's profile details and check that it demonstrates current UT student status before approving. The Forum implementation did not alter verification statuses; the verified profile and approved review record were already present during the latest live inspection.
 
 ## Browser E2E tests
 
-The project includes Playwright tests for authentication, Information UT, Student Verification, Forum Diskusi, Grup Belajar, Matching/Connections, Direct Messaging, and Notifications client flows. They use mocked Supabase HTTP responses, mocked Storage, and synthetic test records; they do not create accounts or read/write the live Supabase project.
+The project includes Playwright tests for authentication, Information UT, Student Verification, Forum Diskusi, Grup Belajar, Matching/Connections, Direct Messaging, Notifications, and Home Map client flows. They use mocked Supabase HTTP responses, mocked Storage, and synthetic test records; they do not create accounts or read/write the live Supabase project.
 
 ```bash
 npm ci
@@ -83,7 +83,7 @@ npm run build
 npm run test:e2e
 ```
 
-The 24 test definitions cover login/register separation, guest access protection, email login/session restoration/logout, forgot-password, password recovery/update, administrator Information UT CRUD/publication flows, student public-feed visibility, Student Verification submission/review and rejection-reason validation, verified-only Forum Diskusi access, post publication and comments, Grup Belajar access/creation/join/admin review, Matching/Connections access gating and connection decisions, and Direct Messaging message history, read receipts, message sending, and pending-connection gating. The 11 group/matching/chat scenarios added after run #50 are not described as passed until a CI run confirms them. Google OAuth, real email delivery, the deployed Edge Function, the Netlify production deployment, and live Supabase RLS are verified separately rather than inferred from mocked tests.
+The 30 test definitions cover login/register, session/recovery, Information UT, Student Verification, Forum Diskusi, Grup Belajar, Matching/Connections, Direct Messaging, Notifications, and Home Map. Home Map tests cover the authenticated nearby endpoint, NIM lookup in the request body, radar opt-out behavior, and pending-student gating. Run #119 passed all 30 tests. Google OAuth, real email delivery, live cross-account Edge Function behavior, Netlify deployment, and real Supabase RLS are verified separately rather than inferred from mocked tests.
 
 
 ## Notifications state (checked 2026-10-31)

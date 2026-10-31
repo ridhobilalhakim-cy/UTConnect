@@ -55,25 +55,18 @@ import {
   markAllMyNotificationsRead,
   subscribeToMyNotifications,
 } from "../services/notifications.js";
+import {
+  getMyLocation,
+  saveMyLocation,
+  setMyLocationVisibility,
+  findNearbyStudents,
+} from "../services/home-map.js";
 
 export function initDashboard({ isAdmin = false, isVerified = false, verificationStatus = "pending", currentUserId = null, currentUserName = "Mahasiswa UT" } = {}) {
   window.L = L;
   const lucide = window.lucide;
 const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root.querySelectorAll(s)];
-  const state={page:'home',radius:3,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,center:[-6.9175,107.6191],connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumCourses:[],groups:[],groupCourses:[],groupMemberships:new Map(),groupMembers:[],matchingCourses:[],matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredCourseIds:[],matchRadius:3000};
-  const students=[
-    {id:1,nim:'049100101',initial:'RA',name:'Rina Amelia',prodi:'Manajemen',distance:.55,courses:['Pengantar Manajemen','Statistika'],topics:['Manajemen waktu'],times:['Malam hari'],mode:'Online'},
-    {id:2,nim:'049100102',initial:'DP',name:'Dimas Prakoso',prodi:'Sistem Informasi',distance:1.2,courses:['Algoritma & Pemrograman','Sistem Operasi'],topics:['Struktur data','Perulangan'],times:['Akhir pekan','Malam hari'],mode:'Online'},
-    {id:3,nim:'049100103',initial:'SN',name:'Siti Nurhaliza',prodi:'PGSD',distance:1.65,courses:['Psikologi Pendidikan'],topics:['Manajemen waktu'],times:['Akhir pekan'],mode:'Offline'},
-    {id:4,nim:'049100104',initial:'AW',name:'Agus Wirawan',prodi:'Ilmu Administrasi Publik',distance:2.1,courses:['Pengantar Ilmu Administrasi'],topics:['Analisis data'],times:['Pagi hari'],mode:'Offline'},
-    {id:5,nim:'049100105',initial:'PM',name:'Putri Maharani',prodi:'Akuntansi',distance:2.45,courses:['Pengantar Manajemen','Statistika'],topics:['Analisis data'],times:['Malam hari'],mode:'Online'},
-    {id:6,nim:'049100106',initial:'FN',name:'Fajar Nugraha',prodi:'Statistika',distance:2.4,courses:['Statistika','Algoritma & Pemrograman'],topics:['Analisis data'],times:['Akhir pekan'],mode:'Online'},
-    {id:7,nim:'049100107',initial:'LD',name:'Lestari Dewi',prodi:'Ilmu Komunikasi',distance:2.6,courses:['Bahasa Inggris'],topics:['Manajemen waktu'],times:['Malam hari'],mode:'Offline'},
-    {id:8,nim:'049100108',initial:'BS',name:'Budi Santoso',prodi:'Pendidikan Bahasa Inggris',distance:2.9,courses:['Bahasa Inggris'],topics:['Struktur data'],times:['Pagi hari'],mode:'Online'},
-    {id:9,nim:'049100109',initial:'AR',name:'Anisa Rahma',prodi:'Manajemen',distance:2.8,courses:['Pengantar Manajemen'],topics:['Manajemen waktu'],times:['Akhir pekan'],mode:'Online'},
-    {id:10,nim:'049100110',initial:'RP',name:'Reza Pratama',prodi:'Agribisnis',distance:1.9,courses:['Statistika'],topics:['Analisis data'],times:['Malam hari'],mode:'Offline'}
-  ];
-
+  const state={page:'home',radius:3000,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,myMarker:null,center:null,myLocation:null,nearbyStudents:[],homeMapRequestId:0,connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumCourses:[],groups:[],groupCourses:[],groupMemberships:new Map(),groupMembers:[],matchingCourses:[],matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredCourseIds:[],matchRadius:3000};
   const NOTIFICATION_META = {
     connection_request: { icon: "user-plus", page: "matching" },
     connection_accepted: { icon: "user-check", page: "matching" },
@@ -243,12 +236,377 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   function icons(){if(window.lucide)lucide.createIcons()}
   function navigate(page){state.page=page;$$('.page-section').forEach(s=>s.classList.toggle('active',s.id==='page-'+page));$$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));const labels={home:'Beranda',matching:'Matching',forum:'Forum',groups:'Grup Belajar',info:'Informasi UT',profile:'Profil Saya',verification:'Verifikasi Mahasiswa'};$('#crumb-current').textContent=labels[page]||'Beranda';window.scrollTo({top:0,behavior:'smooth'});if(page==='home'&&state.map)setTimeout(()=>state.map.invalidateSize(),80);let pageLoad=null;if(page==='verification')pageLoad=loadVerification();if(page==='forum')pageLoad=loadForum();if(page==='groups')pageLoad=loadGroups();if(page==='matching')pageLoad=loadMatching();icons();return pageLoad}
   $$('[data-page]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));$$('[data-go]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.go)));
-  function visibleStudents(){return students.filter(s=>s.distance<=state.radius&&(!state.search||s.nim.includes(state.search)))}
-  function renderNearby(){const list=$('#nearby-list');const items=visibleStudents().slice(0,5);list.innerHTML=items.length?items.map(s=>`<div class="person-row"><div class="person-avatar">${s.initial}</div><div class="person-meta"><strong>${state.connected.has(s.id)?escapeText(s.name):`Mahasiswa ${s.initial}`}</strong><span>${s.prodi}</span></div><span class="distance">~${Math.round(s.distance*10)/10} km</span></div>`).join(''):`<div class="empty-state"><div class="empty-icon"><i data-lucide="user-search"></i></div><h3>Belum ada hasil</h3><p>Tidak ditemukan mahasiswa dalam radius atau pencarian yang dipilih.</p></div>`;icons()}
-  function initMap(){if(!window.L)return;const map=L.map('map',{zoomControl:true,scrollWheelZoom:false}).setView(state.center,14);state.map=map;L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);state.circle=L.circle(state.center,{radius:state.radius*1000,color:'#0a4a86',weight:1.5,fillColor:'#8cb7de',fillOpacity:.10,dashArray:'5 6'}).addTo(map);L.marker(state.center,{icon:L.divIcon({className:'',html:'<div class="map-marker me">AB</div>',iconSize:[36,36],iconAnchor:[18,18]})}).addTo(map).bindPopup('<b>Lokasi kamu</b><br><small>Pin demonstrasi, bukan alamat rumah.</small>');renderMapMarkers()}
-  function renderMapMarkers(){if(!state.map)return;state.markers.forEach(m=>state.map.removeLayer(m));state.markers=[];visibleStudents().forEach((s,i)=>{const bearing=(s.id*137.5)*Math.PI/180;const latOffset=(Math.cos(bearing)*s.distance)/111.32;const lngOffset=(Math.sin(bearing)*s.distance)/(111.32*Math.cos(state.center[0]*Math.PI/180));const marker=L.marker([state.center[0]+latOffset,state.center[1]+lngOffset],{icon:L.divIcon({className:'',html:`<div class="map-marker"><span>${s.initial}</span></div>`,iconSize:[31,31],iconAnchor:[15,15]})}).addTo(state.map).bindPopup(`<b>${s.initial}</b><br><small>${s.prodi} · sekitar ${s.distance.toFixed(1)} km</small>`);state.markers.push(marker)});if(state.circle)state.circle.setRadius(state.radius*1000);$('#map-result').textContent=`Menampilkan ${visibleStudents().length} mahasiswa dalam radius ${state.radius} km · data simulasi.`;renderNearby()}
-  $$('[data-radius]').forEach(b=>b.addEventListener('click',()=>{state.radius=Number(b.dataset.radius);$$('[data-radius]').forEach(x=>x.classList.toggle('active',x===b));renderMapMarkers()}));
-  $('#nim-search').addEventListener('input',e=>{state.search=e.target.value.replace(/\D/g,'').slice(0,9);$('#clear-search').style.display=state.search?'inline-flex':'none';renderMapMarkers();if(state.search.length===9){const found=visibleStudents().find(s=>s.nim===state.search);if(found){toast(`Mahasiswa ditemukan: ${found.initial}`);if(state.map){const bearing=(found.id*137.5)*Math.PI/180;const latOffset=(Math.cos(bearing)*found.distance)/111.32;const lngOffset=(Math.sin(bearing)*found.distance)/(111.32*Math.cos(state.center[0]*Math.PI/180));state.map.setView([state.center[0]+latOffset,state.center[1]+lngOffset],16);if(state.markers[0])state.markers[0].openPopup()}}else toast(`NIM tidak ditemukan dalam radius ${state.radius} km`)} });$('#clear-search').addEventListener('click',()=>{$('#nim-search').value='';state.search='';$('#clear-search').style.display='none';renderMapMarkers()});$('#locate-btn').addEventListener('click',()=>toast('Lokasi demo digunakan. GPS belum diaktifkan pada prototype ini.'));
+  function setMapStatus(message, status = "idle") {
+    const statusText = $("#map-location-status");
+    const statusPill = $("#map-status-pill");
+    if (statusText) {
+      statusText.textContent = message;
+      statusText.dataset.state = status;
+    }
+    if (statusPill) {
+      statusPill.textContent = status === "success" ? "Lokasi tersambung" : status === "error" ? "Perlu perhatian" : status === "loading" ? "Memuat lokasi" : "Peta sekitar";
+    }
+  }
+
+  function mapCoordinates(location) {
+    const lat = Number(location?.latitude);
+    const lng = Number(location?.longitude);
+    return Number.isFinite(lat) && lat >= -90 && lat <= 90
+      && Number.isFinite(lng) && lng >= -180 && lng <= 180
+      ? [lat, lng]
+      : null;
+  }
+
+  function renderNearby() {
+    const list = $("#nearby-list");
+    const count = $("#nearby-list-count");
+    if (!list) return;
+    const items = state.nearbyStudents || [];
+    if (count) count.textContent = items.length ? `${items.length} mahasiswa ditemukan` : "Hasil pencarian area";
+    if (!state.myLocation) {
+      list.innerHTML = '<div class="map-nearby-empty">Tentukan lokasi belajar untuk mulai mencari mahasiswa terdekat.</div>';
+      return;
+    }
+    if (!isVerified) {
+      list.innerHTML = '<div class="map-nearby-empty">Peta sekitar tersedia setelah status mahasiswa kamu terverifikasi.</div>';
+      return;
+    }
+    if (!items.length) {
+      const message = state.search.length === 9
+        ? "NIM tidak ditemukan dalam radius aktif."
+        : "Belum ada mahasiswa terverifikasi yang memilih tampil di radar pada radius ini.";
+      list.innerHTML = `<div class="map-nearby-empty">${escapeText(message)}</div>`;
+      return;
+    }
+    list.innerHTML = items.slice(0, 5).map(student => {
+      const distance = Number(student.approx_distance_m);
+      const distanceLabel = Number.isFinite(distance) ? `~${(distance / 1000).toFixed(1)} km` : "Jarak perkiraan";
+      return `
+        <div class="map-nearby-row">
+          <div class="person-avatar">${escapeText(student.initials || "UT")}</div>
+          <div class="person-meta"><strong>Mahasiswa ${escapeText(student.initials || "UT")}</strong><span>${escapeText(student.program || "Program studi tidak tersedia")}</span></div>
+          <span class="distance">${distanceLabel}</span>
+        </div>`;
+    }).join("");
+  }
+
+  function initMap() {
+    if (!window.L || state.map) return;
+    const fallbackCenter = [-2.5, 118];
+    const map = L.map("map", { zoomControl: true, scrollWheelZoom: false }).setView(fallbackCenter, 4);
+    state.map = map;
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors",
+    }).addTo(map);
+    map.on("click", event => {
+      const consent = $("#map-location-consent");
+      if (!state.myLocation?.consented_at && !consent?.checked) {
+        toast("Setujui penggunaan lokasi sebelum memilih titik pada peta.");
+        return;
+      }
+      openModal(
+        "Simpan titik lokasi belajar?",
+        "<p class='section-note'>Titik yang dipilih akan disimpan sebagai lokasi presisi milik akunmu. Mahasiswa lain hanya dapat melihat pin perkiraan jika kamu mengaktifkan radar.</p>",
+        "Simpan titik",
+        async () => saveSelectedMapPoint(event.latlng.lat, event.latlng.lng),
+        "Titik lokasi berhasil disimpan.",
+      );
+    });
+  }
+
+  function renderMapMarkers() {
+    if (!state.map) return;
+    state.markers.forEach(marker => state.map.removeLayer(marker));
+    state.markers = [];
+    if (state.myMarker) {
+      state.map.removeLayer(state.myMarker);
+      state.myMarker = null;
+    }
+    if (state.circle) {
+      state.map.removeLayer(state.circle);
+      state.circle = null;
+    }
+
+    const ownCoordinates = mapCoordinates(state.myLocation);
+    if (ownCoordinates) {
+      state.center = ownCoordinates;
+      state.circle = L.circle(ownCoordinates, {
+        radius: state.radius,
+        color: "#0a4a86",
+        weight: 1.5,
+        fillColor: "#8cb7de",
+        fillOpacity: 0.08,
+        dashArray: "5 6",
+      }).addTo(state.map);
+      state.myMarker = L.marker(ownCoordinates, {
+        icon: L.divIcon({
+          className: "",
+          html: '<div class="map-marker me">Saya</div>',
+          iconSize: [38, 38],
+          iconAnchor: [19, 19],
+        }),
+      }).addTo(state.map).bindPopup("<b>Lokasi belajarmu</b><br><small>Pin ini hanya terlihat oleh akunmu.</small>");
+    }
+
+    (state.nearbyStudents || []).forEach(student => {
+      const lat = Number(student.marker_lat);
+      const lng = Number(student.marker_lng);
+      if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180) return;
+      const initialsLabel = escapeText(student.initials || "UT");
+      const programLabel = escapeText(student.program || "Program studi tidak tersedia");
+      const distance = Number(student.approx_distance_m);
+      const distanceLabel = Number.isFinite(distance) ? `sekitar ${(distance / 1000).toFixed(1)} km` : "jarak perkiraan";
+      const marker = L.marker([lat, lng], {
+        icon: L.divIcon({
+          className: "",
+          html: `<div class="map-marker">${initialsLabel}</div>`,
+          iconSize: [31, 31],
+          iconAnchor: [15, 15],
+        }),
+      }).addTo(state.map).bindPopup(`<b>Mahasiswa ${initialsLabel}</b><br><small>${programLabel} · ${distanceLabel}</small>`);
+      state.markers.push(marker);
+    });
+
+    if (state.circle) state.circle.setRadius(state.radius);
+    const result = $("#map-result");
+    if (result) {
+      if (!ownCoordinates) {
+        result.textContent = "Pilih atau perbarui lokasi belajar untuk memulai pencarian.";
+      } else if (!isVerified) {
+        result.textContent = "Pencarian mahasiswa sekitar akan tersedia setelah verifikasi mahasiswa.";
+      } else {
+        result.textContent = `${state.nearbyStudents.length} mahasiswa terverifikasi dalam radius ${state.radius / 1000} km · pin perkiraan.`;
+      }
+    }
+    renderNearby();
+  }
+
+  async function refreshNearbyStudents() {
+    if (!state.myLocation || !mapCoordinates(state.myLocation) || !isVerified) {
+      state.nearbyStudents = [];
+      renderMapMarkers();
+      return;
+    }
+    const requestId = ++state.homeMapRequestId;
+    const result = $("#map-result");
+    if (result) result.textContent = state.search.length === 9 ? "Mencari NIM dalam radius aktif..." : "Memuat mahasiswa terdekat...";
+    try {
+      const students = await findNearbyStudents(state.radius, state.search);
+      if (requestId !== state.homeMapRequestId) return;
+      state.nearbyStudents = students;
+      renderMapMarkers();
+      if (state.search.length === 9 && !students.length) {
+        if (result) result.textContent = "NIM tidak ditemukan dalam radius aktif.";
+      }
+    } catch (error) {
+      if (requestId !== state.homeMapRequestId) return;
+      state.nearbyStudents = [];
+      renderMapMarkers();
+      console.error("Nearby students load failed:", error);
+      if (result) result.textContent = error?.message || "Mahasiswa sekitar belum dapat dimuat.";
+      setMapStatus(error?.message || "Pencarian mahasiswa belum tersedia.", "error");
+    }
+  }
+
+  async function loadHomeMap() {
+    setMapStatus("Memeriksa lokasi akun...", "loading");
+    try {
+      state.myLocation = await getMyLocation();
+      const ownCoordinates = mapCoordinates(state.myLocation);
+      const consent = $("#map-location-consent");
+      const radarToggle = $("#map-radar-toggle");
+      if (consent) {
+        const hasSavedConsent = Boolean(state.myLocation?.consented_at);
+        consent.checked = hasSavedConsent;
+        consent.disabled = hasSavedConsent;
+        consent.closest("label")?.toggleAttribute("hidden", hasSavedConsent);
+      }
+      if (radarToggle) {
+        radarToggle.checked = state.myLocation?.show_in_radar === true;
+        radarToggle.disabled = !ownCoordinates;
+      }
+      if (ownCoordinates) {
+        state.center = ownCoordinates;
+        state.map?.setView(ownCoordinates, 14);
+        setMapStatus(
+          state.myLocation.show_in_radar
+            ? "Lokasi tersimpan. Pin perkiraanmu sedang ditampilkan kepada mahasiswa terverifikasi."
+            : "Lokasi tersimpan dan disembunyikan dari radar. Kamu tetap dapat mencari mahasiswa sekitar.",
+          "success",
+        );
+      } else {
+        state.center = null;
+        setMapStatus("Belum ada titik lokasi. Gunakan GPS atau klik peta setelah memberi persetujuan.", "idle");
+        state.map?.setView([-2.5, 118], 4);
+      }
+      renderMapMarkers();
+      await refreshNearbyStudents();
+    } catch (error) {
+      state.myLocation = null;
+      console.error("Home Map location load failed:", error);
+      setMapStatus(error?.message || "Lokasi akun belum dapat dimuat.", "error");
+      renderMapMarkers();
+    }
+  }
+
+  async function saveSelectedMapPoint(lat, lng) {
+    const existingConsent = Boolean(state.myLocation?.consented_at);
+    const consent = $("#map-location-consent");
+    if (!existingConsent && !consent?.checked) {
+      toast("Centang persetujuan penggunaan lokasi sebelum menyimpan titik.");
+      return;
+    }
+    try {
+      const showInRadar = state.myLocation?.show_in_radar === true;
+      await saveMyLocation({ lat, lng, consent: true, showInRadar });
+      state.myLocation = await getMyLocation();
+      if (consent) {
+        consent.checked = true;
+        consent.disabled = true;
+        consent.closest("label")?.toggleAttribute("hidden", true);
+      }
+      const radarToggle = $("#map-radar-toggle");
+      if (radarToggle) {
+        radarToggle.checked = state.myLocation?.show_in_radar === true;
+        radarToggle.disabled = false;
+      }
+      state.center = [lat, lng];
+      state.map?.setView(state.center, 14);
+      setMapStatus("Titik lokasi berhasil disimpan. Kamu dapat mengatur visibilitas radar.", "success");
+      await refreshNearbyStudents();
+    } catch (error) {
+      console.error("Home Map point save failed:", error);
+      setMapStatus(error?.message || "Titik lokasi belum berhasil disimpan.", "error");
+      throw error;
+    }
+  }
+
+  async function locateHomeMap() {
+    if (!navigator.geolocation) {
+      toast("Browser ini tidak mendukung akses lokasi. Klik peta untuk menentukan titik secara manual.");
+      return;
+    }
+    if (!state.myLocation?.consented_at && !$("#map-location-consent")?.checked) {
+      toast("Beri persetujuan penggunaan lokasi sebelum mengambil titik GPS.");
+      return;
+    }
+    const button = $("#locate-btn");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Mengambil lokasi...";
+    }
+    setMapStatus("Meminta lokasi perangkat...", "loading");
+    navigator.geolocation.getCurrentPosition(async position => {
+      try {
+        const showInRadar = state.myLocation?.show_in_radar === true;
+        await saveMyLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          consent: true,
+          showInRadar,
+        });
+        state.myLocation = await getMyLocation();
+        const consent = $("#map-location-consent");
+        if (consent) {
+          consent.checked = true;
+          consent.disabled = true;
+          consent.closest("label")?.toggleAttribute("hidden", true);
+        }
+        const radarToggle = $("#map-radar-toggle");
+        if (radarToggle) {
+          radarToggle.checked = state.myLocation?.show_in_radar === true;
+          radarToggle.disabled = false;
+        }
+        const coordinates = mapCoordinates(state.myLocation);
+        if (coordinates) {
+          state.center = coordinates;
+          state.map?.setView(coordinates, 14);
+        }
+        setMapStatus("Lokasi perangkat berhasil diperbarui dan disimpan.", "success");
+        await refreshNearbyStudents();
+      } catch (error) {
+        console.error("Home Map GPS save failed:", error);
+        setMapStatus(error?.message || "Lokasi GPS belum berhasil disimpan.", "error");
+        toast(error?.message || "Lokasi GPS belum berhasil disimpan.");
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.innerHTML = '<i data-lucide="locate-fixed"></i>Perbarui lokasi';
+          icons();
+        }
+      }
+    }, error => {
+      const messages = {
+        1: "Izin lokasi ditolak. Kamu dapat memilih titik secara manual pada peta.",
+        2: "Lokasi perangkat belum tersedia. Coba lagi atau pilih titik pada peta.",
+        3: "Permintaan lokasi terlalu lama. Coba kembali.",
+      };
+      const message = messages[error.code] || "Lokasi perangkat belum dapat diakses.";
+      setMapStatus(message, "error");
+      toast(message);
+      if (button) {
+        button.disabled = false;
+        button.innerHTML = '<i data-lucide="locate-fixed"></i>Perbarui lokasi';
+        icons();
+      }
+    }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 });
+  }
+
+  async function updateHomeMapVisibility() {
+    const toggle = $("#map-radar-toggle");
+    if (!toggle || !state.myLocation) return;
+    const showInRadar = toggle.checked;
+    toggle.disabled = true;
+    try {
+      await setMyLocationVisibility(showInRadar, { consent: showInRadar });
+      state.myLocation.show_in_radar = showInRadar;
+      setMapStatus(
+        showInRadar
+          ? "Pin perkiraanmu aktif untuk mahasiswa terverifikasi."
+          : "Pin kamu disembunyikan dari radar. Kamu tetap dapat mencari mahasiswa sekitar.",
+        "success",
+      );
+    } catch (error) {
+      toggle.checked = !showInRadar;
+      setMapStatus(error?.message || "Pengaturan visibilitas belum berhasil disimpan.", "error");
+      toast(error?.message || "Pengaturan visibilitas belum berhasil disimpan.");
+    } finally {
+      toggle.disabled = false;
+    }
+  }
+
+  function bindHomeMapControls() {
+    $$("[data-radius]").forEach(button => button.addEventListener("click", async () => {
+      state.radius = Number(button.dataset.radius);
+      $$("[data-radius]").forEach(item => item.classList.toggle("active", item === button));
+      if (state.circle) state.circle.setRadius(state.radius);
+      await refreshNearbyStudents();
+    }));
+
+    $("#nim-search").addEventListener("input", event => {
+      state.search = event.target.value.replace(/\D/g, "").slice(0, 9);
+      $("#clear-search").style.display = state.search ? "inline-flex" : "none";
+      if (!state.search || state.search.length === 9) refreshNearbyStudents();
+      else {
+        state.nearbyStudents = [];
+        renderMapMarkers();
+        const result = $("#map-result");
+        if (result) result.textContent = "Masukkan 9 digit NIM untuk melakukan pencarian.";
+      }
+    });
+
+    $("#clear-search").addEventListener("click", () => {
+      $("#nim-search").value = "";
+      state.search = "";
+      $("#clear-search").style.display = "none";
+      refreshNearbyStudents();
+    });
+    $("#locate-btn").addEventListener("click", locateHomeMap);
+    $("#map-radar-toggle").addEventListener("change", updateHomeMapVisibility);
+  }
+
+  bindHomeMapControls();
     function renderMatchingAccess() {
     const notice = $("#match-access-notice");
     const layout = $("#match-layout");
@@ -1436,7 +1794,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     $('#modal-backdrop').classList.remove('open');
     if(activeVerificationPreviewUrl){URL.revokeObjectURL(activeVerificationPreviewUrl);activeVerificationPreviewUrl=null}
   }
-  const guide=`<div style="display:grid;gap:14px"><div><b style="font-size:11px">01 · Lengkapi profil</b><p class="section-note">Daftar dengan data akademik yang diperlukan. Verifikasi identitas harus dilakukan melalui layanan yang sah pada versi produksi.</p></div><div><b style="font-size:11px">02 · Atur lokasi secara sadar</b><p class="section-note">Pilih lokasi perkiraan dan tentukan apakah ingin tampil di radar. Jangan tampilkan alamat rumah atau koordinat presisi kepada pengguna lain.</p></div><div><b style="font-size:11px">03 · Temukan teman belajar</b><p class="section-note">Gunakan radius dan preferensi mata kuliah untuk melihat rekomendasi yang relevan.</p></div><div><b style="font-size:11px">04 · Bangun koneksi</b><p class="section-note">Kirim permintaan connect. Chat hanya tersedia setelah kedua pihak menyetujui koneksi.</p></div><div><b style="font-size:11px">05 · Belajar bersama</b><p class="section-note">Gunakan forum untuk peer help atau bergabung dan membuat kelompok belajar.</p></div><p class="tiny muted" style="padding:10px;background:#f7f9fc;border-radius:9px">Catatan: Matching, koneksi, dan chat langsung tersedia untuk mahasiswa terverifikasi. Peta lokasi pada beranda masih menggunakan data simulasi.</p></div>`;
+  const guide=`<div style="display:grid;gap:14px"><div><b style="font-size:11px">01 · Lengkapi profil</b><p class="section-note">Daftar dengan data akademik yang diperlukan. Verifikasi identitas harus dilakukan melalui layanan yang sah pada versi produksi.</p></div><div><b style="font-size:11px">02 · Atur lokasi secara sadar</b><p class="section-note">Pilih lokasi perkiraan dan tentukan apakah ingin tampil di radar. Jangan tampilkan alamat rumah atau koordinat presisi kepada pengguna lain.</p></div><div><b style="font-size:11px">03 · Temukan teman belajar</b><p class="section-note">Gunakan radius dan preferensi mata kuliah untuk melihat rekomendasi yang relevan.</p></div><div><b style="font-size:11px">04 · Bangun koneksi</b><p class="section-note">Kirim permintaan connect. Chat hanya tersedia setelah kedua pihak menyetujui koneksi.</p></div><div><b style="font-size:11px">05 · Belajar bersama</b><p class="section-note">Gunakan forum untuk peer help atau bergabung dan membuat kelompok belajar.</p></div><p class="tiny muted" style="padding:10px;background:#f7f9fc;border-radius:9px">Catatan: Peta sekitar, matching, koneksi, dan chat personal memakai layanan Supabase dan hanya tersedia sesuai status verifikasi. Pin lokasi mahasiswa lain adalah perkiraan dan hanya tampil jika pemilik mengaktifkan radar.</p></div>`;
   $$('[data-open-guide]').forEach(b=>b.addEventListener('click',()=>openModal('Panduan UT Connect',guide)));$('#modal-close').addEventListener('click',closeModal);$('#modal-cancel').addEventListener('click',closeModal);$('#modal-confirm').addEventListener('click',async()=>{if(modalAction){const confirmButton=$('#modal-confirm');confirmButton.disabled=true;try{const result=await modalAction();if(result===false)return;modalAction=null;closeModal();toast(modalSuccessMessage)}catch(error){console.error('Modal action failed:',error);toast(error.message||'Tindakan gagal. Silakan coba lagi.')}finally{confirmButton.disabled=false}return}closeModal();toast('Panduan ditutup.')});$('#modal-backdrop').addEventListener('click',e=>{if(e.target.id==='modal-backdrop')closeModal()});document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();$('#notification-panel').hidden=true;$('#notif-btn').setAttribute('aria-expanded','false')}});$('#edit-profile').addEventListener('click',()=>openModal('Edit profil',`<p class="section-note">Form edit profil ditampilkan sebagai rancangan UI. Penyimpanan dan verifikasi perubahan belum terhubung ke backend.</p><div class="field"><label>Nama tampilan</label><input class="text-input" value="Andi Bintang"></div><div class="field"><label>Program studi</label><input class="text-input" value="Sistem Informasi" disabled></div><div class="field"><label>Preferensi belajar</label><select class="select"><option>Online · Malam hari</option><option>Online · Akhir pekan</option><option>Offline</option></select></div>`,`Tutup`));
-  renderNearby();loadForum();loadGroups();loadInformation();loadVerification();initMap();loadNotifications().catch(()=>{});initNotificationRealtime();icons();
+  initMap();loadHomeMap();loadForum();loadGroups();loadInformation();loadVerification();loadNotifications().catch(()=>{});initNotificationRealtime();icons();
 }
