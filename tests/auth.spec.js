@@ -85,6 +85,11 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
     }
     if (path.endsWith('/rest/v1/rpc/update_my_student_profile') && method === 'POST') {
       const input = request.postDataJSON();
+      const identityChanged =
+        state.profile.full_name !== input.p_full_name ||
+        state.profile.faculty !== input.p_faculty ||
+        state.profile.program !== input.p_program ||
+        Number(state.profile.semester) !== Number(input.p_semester);
       const updated = {
         ...state.profile,
         full_name: input.p_full_name,
@@ -92,24 +97,12 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
         program: input.p_program,
         semester: input.p_semester,
         bio: input.p_bio,
-        verification_status: state.profile.verification_status === 'verified' && (
-          state.profile.full_name !== input.p_full_name ||
-          state.profile.faculty !== input.p_faculty ||
-          state.profile.program !== input.p_program ||
-          Number(state.profile.semester) !== Number(input.p_semester)
-        ) ? 'pending' : state.profile.verification_status,
+        verification_status: state.profile.verification_status === 'verified' && identityChanged
+          ? 'pending' : state.profile.verification_status,
       };
       state.profileUpdateCalls.push(input);
       state.profile = updated;
-      return route.fulfill(jsonResponse({
-        ...updated,
-        identity_changed: Boolean(
-          state.profile.full_name !== input.p_full_name ||
-          state.profile.faculty !== input.p_faculty ||
-          state.profile.program !== input.p_program ||
-          Number(state.profile.semester) !== Number(input.p_semester)
-        ),
-      }));
+      return route.fulfill(jsonResponse({ ...updated, identity_changed: identityChanged }));
     }
     if (path.endsWith('/rest/v1/rpc/update_my_profile_avatar') && method === 'POST') {
       const input = request.postDataJSON();
@@ -661,6 +654,12 @@ test('login and registration are separate views', async ({ page }) => {
   await page.getByRole('button', { name: 'Daftar sekarang' }).click();
   await expect(page.getByRole('heading', { name: 'Buat akun UT Connect' })).toBeVisible();
   await expect(page.getByLabel('NIM')).toBeVisible();
+  await expect(page.locator('#faculty')).toHaveJSProperty('tagName', 'SELECT');
+  await expect(page.locator('#program')).toBeDisabled();
+  await page.locator('#faculty').selectOption({ label: 'Fakultas Sains dan Teknologi (FST)' });
+  await expect(page.locator('#program')).toBeEnabled();
+  await expect(page.locator('#program')).toContainText('Sistem Informasi');
+  await page.locator('#program').selectOption({ label: 'Sistem Informasi' });
 
   await page.getByRole('button', { name: 'Masuk', exact: true }).last().click();
   await expect(page.getByRole('heading', { name: 'Selamat datang kembali' })).toBeVisible();
@@ -1713,6 +1712,27 @@ test('student can edit profile using the save action instead of a close-only mod
   await expect(page.locator('#profileFullName')).toHaveText('Mahasiswa Uji Diperbarui');
   expect(state.profileUpdateCalls).toHaveLength(1);
   expect(state.profileUpdateCalls[0].p_full_name).toBe('Mahasiswa Uji Diperbarui');
+});
+
+test('student can upload a profile photo from the profile editor', async ({ page }) => {
+  const state = await mockSupabase(page, { profile: { ...PROFILE, verification_status: 'pending' } });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+  await page.locator('[data-page="profile"]').first().click();
+  await page.locator('#edit-profile').click();
+  await page.locator('#profile-avatar-file').setInputFiles({
+    name: 'avatar.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('test-image-bytes'),
+  });
+  await expect(page.locator('#profile-edit-avatar-preview img')).toBeVisible();
+  await page.locator('#modal-confirm').click();
+  await expect(page.locator('#profileInitials img')).toBeVisible();
+  expect(state.profileUpdateCalls).toHaveLength(1);
+  expect(state.avatarUpdateCalls).toHaveLength(1);
+  expect(state.avatarUpdateCalls[0].p_avatar_path).toMatch(new RegExp('^' + USER.id + '/'));
 });
 
 test('student can mark all notifications as read and clear the unread counter', async ({ page }) => {
