@@ -2,7 +2,7 @@ import {
   listGroupMessages,
   sendGroupMessage,
   setGroupMessagePinned,
-  subscribeToGroupMessages,
+  subscribeToGroupWorkspace,
   unsubscribeFromGroupMessages,
   respondGroupJoinRequest,
   listGroupMaterials,
@@ -478,8 +478,44 @@ export async function openGroupWorkspace(options) {
   openModalHandler("Ruang kelompok belajar", workspaceShell(), "Tutup");
   await loadWorkspaceData();
   render();
-  activeChannel = subscribeToGroupMessages(activeGroup.id, () => {
-    if (activeTab === "chat") reloadMessages().catch(error => toastHandler(error.message));
+  activeChannel = subscribeToGroupWorkspace(activeGroup.id, {
+    onMessages: () => {
+      if (activeTab === "chat") reloadMessages().catch(error => toastHandler(error.message));
+    },
+    onMaterials: async () => {
+      try {
+        groupMaterials = await listGroupMaterials(activeGroup.id);
+        if (activeTab === "materials") render();
+      } catch (error) {
+        toastHandler(error?.message || "Perubahan materi belum dapat dimuat.");
+      }
+    },
+    onAgenda: async () => {
+      try {
+        await reloadAgenda();
+        if (activeTab === "agenda") render();
+      } catch (error) {
+        toastHandler(error?.message || "Perubahan agenda belum dapat dimuat.");
+      }
+    },
+    onInvites: async () => {
+      if (!canInvite()) return;
+      try {
+        groupInvites = await listGroupInvites(activeGroup.id);
+        if (activeTab === "invites") render();
+      } catch (error) {
+        toastHandler(error?.message || "Perubahan undangan belum dapat dimuat.");
+      }
+    },
+    onMembers: async () => {
+      try {
+        const refreshed = await refreshHandler();
+        if (Array.isArray(refreshed)) groupMembers = refreshed.filter(member => member.group_id === activeGroup.id);
+        if (activeTab === "members") render();
+      } catch (error) {
+        toastHandler(error?.message || "Perubahan anggota belum dapat dimuat.");
+      }
+    },
   });
 }
 
