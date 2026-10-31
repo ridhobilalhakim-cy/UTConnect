@@ -28,7 +28,7 @@ Live introspection found the public application tables with RLS enabled, plus pr
 
 ## Important source-control caveat
 
-The remote database has a full migration history, but this repository currently contains only the registration/location RPC migration source plus a mirror of the deployed Edge Function. The SQL bodies of the first five remote migrations have not yet been reconstructed into a reviewed local migration chain. Do not run the included SQL migration blindly against the existing staging project, and do not run an old initial schema dump on staging.
+The remote database has a full migration history. This repository retains SQL sources for the registration/location RPC, administrator and Information UT policies, group workflow RPCs, Matching & Connections, and Direct Messaging, plus a mirror of the deployed Edge Function. The SQL bodies of the first five remote migrations and the remote student_verification_workflow migration have not yet been reconstructed into a reviewed local migration chain. Do not run the included SQL migrations blindly against the existing staging project, and do not run an old initial schema dump on staging.
 
 Next database-maintenance task: create a reviewed, reproducible schema snapshot/migration baseline that matches the live database, compare it against the remote migration history, and document a clean new-project bootstrap path.
 
