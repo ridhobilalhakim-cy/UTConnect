@@ -134,3 +134,10 @@ Notification coverage now includes student-verification approval/rejection and n
 - Netlify production deployment remains paused due to the operational-credit notice; the existing published site remains live. No production deploy was performed.
 - Migration `20261031174525_notifications_for_information_and_verification` adds notifications for verification decisions and first publication of Information UT posts.
 - Mocked Playwright tests are not proof of real OAuth/email delivery, two-account Realtime or cross-account Storage permissions. Those checks remain required before production.
+
+
+## Staging handoff
+
+Cloudflare Pages staging preparation is documented in [docs/CLOUDFLARE_PAGES_STAGING.md](docs/CLOUDFLARE_PAGES_STAGING.md). The repository includes `wrangler.toml`, Cloudflare Pages headers, and a rollback-only two-account Supabase acceptance script at [supabase/tests/two_account_acceptance.rollback.sql](supabase/tests/two_account_acceptance.rollback.sql).
+
+The database-level two-account acceptance flow passed in a transaction that was rolled back. This does not prove real browser Auth sessions, WebSocket Realtime, OAuth/email, or private Storage access. Cloudflare project creation and GitHub authorization have not been completed; the existing Netlify production deployment remains unchanged.
