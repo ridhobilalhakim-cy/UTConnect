@@ -8,7 +8,7 @@ Project status at inspection: ACTIVE_HEALTHY
 
 ## Remote migration history
 
-The connected staging project reported these six applied migration entries:
+The connected staging project reported these eight applied migration entries:
 
 | Version | Name |
 |---|---|
@@ -18,8 +18,10 @@ The connected staging project reported these six applied migration entries:
 | 20261030181115 | utconnect_private_search_and_realtime_setup_v1 |
 | 20261030181323 | utconnect_group_material_path_constraint_v1 |
 | 20261030232434 | student_registration_profile_location_rpc_v1 |
+| 20261031052849 | add_admin_roles_and_information_post_management |
+| 20261031071140 | student_verification_workflow |
 
-Live introspection found 19 public application tables with RLS enabled, plus the private NIM search event table. PostGIS is enabled. The deployed `complete-student-registration` Edge Function was last confirmed as ACTIVE version 4 with JWT verification enabled.
+Live introspection found the public application tables with RLS enabled, plus private NIM search and student-verification tables. PostGIS is enabled. The deployed `complete-student-registration` Edge Function was last confirmed as ACTIVE version 4 with JWT verification enabled.
 
 ## Important source-control caveat
 
@@ -38,3 +40,15 @@ The live introspection returned one row in `profiles` and one in `user_locations
 - Dashboard interaction code is still a demonstration shell; live data integrations are pending.
 - Google OAuth provider setup has not been verified end-to-end in this audit.
 - Do not use real student NIM/location until registration and access-control tests have passed.
+
+
+## Student Verification state (checked 2026-10-31)
+
+- The remote migration history includes 20261031071140_student_verification_workflow.
+- Private tables: private.student_verification_requests and private.student_verification_review_events; direct authenticated table access is not granted.
+- Private Storage bucket: student-verification-evidence, 5 MB limit, PDF/JPEG/PNG only.
+- Student upload is restricted to the caller's own folder and pending/rejected profiles without an outstanding request.
+- Admin queue/review functions check the signed-in user and administrator role. Review decisions update profiles.verification_status and add a review event.
+- Authenticated role cannot directly UPDATE profiles.verification_status.
+- Counts at inspection: 3 profiles pending, 0 verified, 0 rejected; 0 submitted verification requests; 0 review events.
+- The UI now integrates these existing services. Actual browser upload/download with real accounts still needs acceptance testing. Evidence acceptance and retention rules remain a project policy decision.
