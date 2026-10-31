@@ -13,6 +13,7 @@ These migrations have been applied on Supabase project `hqyusbyndtlfypdbmatw` (S
 | 20261031052849 | add_admin_roles_and_information_post_management |
 | 20261031071140 | student_verification_workflow |
 | 20261031101336 | secure_enable_group_join_workflow_rpcs |
+| 20261031102733 | secure_matching_and_connection_workflows |
 
 The matching RPC SQL source is retained as `20261030232434_student_registration_profile_location_rpc_v1.sql`, but the file name timestamp is a local artifact name and not the remote migration version. Treat the remote migration history above as authoritative for the existing staging project.
 
@@ -24,3 +25,6 @@ The student_verification_workflow migration is confirmed in the remote migration
 
 
 The group workflow RPC migration hardens `join_study_group` and `respond_group_join_request`: each verifies that its actor parameter matches `auth.uid()`. EXECUTE is granted to `authenticated` for these two verified-student operations and revoked from `PUBLIC` and `anon`; table writes remain mediated by the SECURITY DEFINER functions and existing RLS rules.
+
+
+The Matching & Connections migration adds private search-event logging and guarded public RPCs for nearby matching, per-user connection summaries, and recipient-only request decisions. It grants INSERT (not UPDATE) on public.connections to authenticated; the existing RLS insert policy remains the authorization boundary. Matching results omit full names and precise coordinates; the service checks auth.uid() and student verification. See 20261031102733_secure_matching_and_connection_workflows.sql.
