@@ -26,8 +26,8 @@ function jsonResponse(body, status = 200) {
   return { status, contentType: 'application/json', body: JSON.stringify(body) };
 }
 
-async function mockSupabase(page, { isAdmin = false, informationPosts = [], verificationStatus = { profile_status: 'pending', latest_request: null }, verificationQueue = [], profile = PROFILE, forumPosts = [], forumComments = [], courses = [] } = {}) {
-  const state = { loginCalls: 0, recoveryCalls: 0, passwordUpdates: 0, logoutCalls: 0, informationPosts: [...informationPosts], informationCreateCalls: 0, verificationStatus: structuredClone(verificationStatus), verificationQueue: [...verificationQueue], verificationUploadCalls: 0, verificationSubmitCalls: 0, verificationReviewCalls: [], profile, forumPosts: [...forumPosts], forumComments: [...forumComments], courses: [...courses], forumPostCreateCalls: 0, forumCommentCreateCalls: 0 };
+async function mockSupabase(page, { isAdmin = false, informationPosts = [], verificationStatus = { profile_status: 'pending', latest_request: null }, verificationQueue = [], profile = PROFILE, forumPosts = [], forumComments = [], courses = [], studyGroups = [], groupMembers = [] } = {}) {
+  const state = { loginCalls: 0, recoveryCalls: 0, passwordUpdates: 0, logoutCalls: 0, informationPosts: [...informationPosts], informationCreateCalls: 0, verificationStatus: structuredClone(verificationStatus), verificationQueue: [...verificationQueue], verificationUploadCalls: 0, verificationSubmitCalls: 0, verificationReviewCalls: [], profile, forumPosts: [...forumPosts], forumComments: [...forumComments], courses: [...courses], studyGroups: [...studyGroups], groupMembers: [...groupMembers], groupCreateCalls: 0, groupJoinCalls: [], groupReviewCalls: [], forumPostCreateCalls: 0, forumCommentCreateCalls: 0 };
   for (const pattern of [
     /^https:\/\/fonts\.googleapis\.com\//,
     /^https:\/\/fonts\.gstatic\.com\//,
@@ -98,6 +98,70 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
     }
     if (path.endsWith('/rest/v1/courses') && method === 'GET') {
       return route.fulfill(jsonResponse(state.courses));
+    }
+    if (path.endsWith('/rest/v1/study_groups')) {
+      if (method === 'GET') return route.fulfill(jsonResponse(state.studyGroups.filter(group => !group.is_archived)));
+      if (method === 'POST') {
+        const input = request.postDataJSON();
+        if (input.created_by !== USER.id) return route.fulfill(jsonResponse({ message: 'creator mismatch' }, 403));
+        const created = {
+          id: 'group-e2e-001',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          course: state.courses.find(course => course.id === input.course_id) || null,
+          is_archived: false,
+          ...input,
+        };
+        state.groupCreateCalls += 1;
+        state.studyGroups.unshift(created);
+        state.groupMembers.push({
+          group_id: created.id,
+          user_id: USER.id,
+          role: 'admin',
+          status: 'active',
+          created_at: created.created_at,
+          joined_at: created.created_at,
+        });
+        return route.fulfill(jsonResponse(created, 201));
+      }
+    }
+    if (path.endsWith('/rest/v1/group_members') && method === 'GET') {
+      const groupFilter = url.searchParams.get('group_id') || '';
+      const requestedIds = groupFilter.startsWith('in.(')
+        ? groupFilter.slice(4, -1).split(',')
+        : groupFilter.startsWith('eq.')
+          ? [groupFilter.slice(3)]
+          : null;
+      const rows = state.groupMembers.filter(member => {
+        if (requestedIds && !requestedIds.includes(member.group_id)) return false;
+        const currentUserIsActive = state.groupMembers.some(row =>
+          row.group_id === member.group_id && row.user_id === USER.id && row.status === 'active'
+        );
+        return member.user_id === USER.id || currentUserIsActive;
+      });
+      return route.fulfill(jsonResponse(rows));
+    }
+    if (path.endsWith('/rest/v1/rpc/join_study_group') && method === 'POST') {
+      const input = request.postDataJSON();
+      state.groupJoinCalls.push(input);
+      if (input.p_actor_id !== USER.id) return route.fulfill(jsonResponse({ message: 'actor mismatch' }, 403));
+      const group = state.studyGroups.find(item => item.id === input.p_group_id);
+      if (!group) return route.fulfill(jsonResponse({ message: 'group not found' }, 404));
+      const status = group.access_type === 'approval' ? 'pending' : 'active';
+      const existing = state.groupMembers.find(member => member.group_id === group.id && member.user_id === USER.id);
+      if (existing) Object.assign(existing, { status, role: 'member', joined_at: status === 'active' ? new Date().toISOString() : null });
+      else state.groupMembers.push({ group_id: group.id, user_id: USER.id, role: 'member', status, created_at: new Date().toISOString(), joined_at: status === 'active' ? new Date().toISOString() : null });
+      return route.fulfill(jsonResponse(status));
+    }
+    if (path.endsWith('/rest/v1/rpc/respond_group_join_request') && method === 'POST') {
+      const input = request.postDataJSON();
+      state.groupReviewCalls.push(input);
+      if (input.p_actor_id !== USER.id) return route.fulfill(jsonResponse({ message: 'actor mismatch' }, 403));
+      const member = state.groupMembers.find(item => item.group_id === input.p_group_id && item.user_id === input.p_user_id && item.status === 'pending');
+      if (!member || member.role === 'admin') return route.fulfill(jsonResponse({ message: 'request not found' }, 400));
+      member.status = input.p_accept ? 'active' : 'rejected';
+      member.joined_at = input.p_accept ? new Date().toISOString() : null;
+      return route.fulfill(jsonResponse(member.status));
     }
     if (path.endsWith('/rest/v1/forum_posts')) {
       if (method === 'GET') return route.fulfill(jsonResponse([...state.forumPosts].reverse()));
@@ -483,4 +547,135 @@ test('verified student can read a live forum post without exposing another profi
   await expect(page.locator('.forum-post-title')).toHaveText('Belajar mandiri di UT');
   await expect(page.locator('.post-author')).toContainText('Mahasiswa UT');
   expect(state.forumPosts).toHaveLength(1);
+});
+
+
+test('unverified student cannot discover or create study groups', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'pending' },
+    studyGroups: [{ id: 'group-hidden-001', name: 'Grup Terbatas', access_type: 'open', mode: 'online', capacity: 10, is_archived: false }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="groups"]').first().click();
+  await expect(page.locator('#group-access-notice')).toContainText('Verifikasi mahasiswa diperlukan');
+  await expect(page.locator('#group-toolbar')).toBeHidden();
+  await expect(page.locator('#create-group')).toBeHidden();
+  await expect(page.locator('.group-card')).toHaveCount(0);
+  expect(state.groupCreateCalls).toBe(0);
+  expect(state.groupJoinCalls).toHaveLength(0);
+});
+
+test('verified student can create a persisted general study group', async ({ page }) => {
+  const state = await mockSupabase(page, { profile: { ...PROFILE, verification_status: 'verified' } });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="groups"]').first().click();
+  await page.locator('#create-group').click();
+  await page.locator('#new-group-name').fill('Kelompok Belajar Sistem Informasi');
+  await page.locator('#new-group-description').fill('Belajar bersama dan membahas materi perkuliahan.');
+  await page.locator('#new-group-course').selectOption('');
+  await page.locator('#new-group-mode').selectOption('online');
+  await page.locator('#new-group-access').selectOption('open');
+  await page.locator('#new-group-capacity').fill('12');
+  await page.locator('#new-group-schedule').fill('Sabtu, 19.00 WIB');
+  await page.locator('#modal-confirm').click();
+
+  await expect(page.locator('.group-card')).toContainText('Kelompok Belajar Sistem Informasi');
+  await expect(page.locator('.group-card')).toContainText('Kelompok umum');
+  expect(state.groupCreateCalls).toBe(1);
+  expect(state.studyGroups[0].created_by).toBe(USER.id);
+  expect(state.studyGroups[0].access_type).toBe('open');
+  expect(state.groupMembers.some(member => member.group_id === 'group-e2e-001' && member.user_id === USER.id && member.role === 'admin')).toBe(true);
+});
+
+test('verified student can request to join an approval-based study group', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+    studyGroups: [{
+      id: 'group-approval-001',
+      created_by: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      name: 'Kelompok Persiapan UAS',
+      description: 'Diskusi persiapan ujian.',
+      course_id: null,
+      course: null,
+      mode: 'online',
+      capacity: 10,
+      access_type: 'approval',
+      schedule_text: 'Minggu malam',
+      online_url: null,
+      offline_area_label: null,
+      is_archived: false,
+      created_at: '2026-10-30T10:00:00.000Z',
+    }],
+    groupMembers: [{
+      group_id: 'group-approval-001',
+      user_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      role: 'admin',
+      status: 'active',
+      created_at: '2026-10-01T10:00:00.000Z',
+      joined_at: '2026-10-01T10:00:00.000Z',
+    }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="groups"]').first().click();
+  await expect(page.locator('.group-card')).toContainText('Kelompok Persiapan UAS');
+  await page.locator('[data-group-join="group-approval-001"]').click();
+
+  await expect(page.locator('.group-card')).toContainText('Menunggu persetujuan');
+  expect(state.groupJoinCalls).toHaveLength(1);
+  expect(state.groupJoinCalls[0].p_actor_id).toBe(USER.id);
+  expect(state.groupMembers.some(member => member.group_id === 'group-approval-001' && member.user_id === USER.id && member.status === 'pending')).toBe(true);
+});
+
+test('group admin can approve a pending membership request', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+    studyGroups: [{
+      id: 'group-admin-001',
+      created_by: USER.id,
+      name: 'Ruang Belajar UT',
+      description: 'Kelompok belajar bersama.',
+      course_id: null,
+      course: null,
+      mode: 'offline',
+      capacity: 12,
+      access_type: 'approval',
+      schedule_text: 'Sabtu pagi',
+      online_url: null,
+      offline_area_label: 'Bandung',
+      is_archived: false,
+      created_at: '2026-10-30T10:00:00.000Z',
+    }],
+    groupMembers: [
+      { group_id: 'group-admin-001', user_id: USER.id, role: 'admin', status: 'active', created_at: '2026-10-01T10:00:00.000Z', joined_at: '2026-10-01T10:00:00.000Z' },
+      { group_id: 'group-admin-001', user_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', role: 'member', status: 'pending', created_at: '2026-10-30T11:00:00.000Z', joined_at: null },
+    ],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="groups"]').first().click();
+  await page.locator('[data-group-open="group-admin-001"]').click();
+  await expect(page.locator('#modal-content')).toContainText('Permohonan bergabung (1)');
+  await page.locator('[data-group-review="approve"]').click();
+  await page.locator('#modal-confirm').click();
+
+  expect(state.groupReviewCalls).toHaveLength(1);
+  expect(state.groupReviewCalls[0].p_actor_id).toBe(USER.id);
+  expect(state.groupReviewCalls[0].p_user_id).toBe('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+  expect(state.groupReviewCalls[0].p_accept).toBe(true);
+  expect(state.groupMembers.find(member => member.user_id === 'cccccccc-cccc-4ccc-8ccc-cccccccccccc').status).toBe('active');
 });
