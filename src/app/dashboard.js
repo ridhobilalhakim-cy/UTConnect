@@ -22,12 +22,21 @@ import {
   createForumComment,
   deleteForumComment,
 } from "../services/forum.js";
+import {
+  listActiveStudyCourses,
+  listStudyGroups,
+  listMyGroupMemberships,
+  listVisibleGroupMembers,
+  createStudyGroup,
+  joinStudyGroup,
+  respondGroupJoinRequest,
+} from "../services/groups.js";
 
 export function initDashboard({ isAdmin = false, isVerified = false, verificationStatus = "pending", currentUserId = null, currentUserName = "Mahasiswa UT" } = {}) {
   window.L = L;
   const lucide = window.lucide;
 const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root.querySelectorAll(s)];
-  const state={page:'home',radius:3,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,center:[-6.9175,107.6191],connected:new Set(),pending:new Set(),joined:new Set(),messages:{},infoItems:[],forumPosts:[],forumCourses:[]};
+  const state={page:'home',radius:3,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,center:[-6.9175,107.6191],connected:new Set(),pending:new Set(),messages:{},infoItems:[],forumPosts:[],forumCourses:[],groups:[],groupCourses:[],groupMemberships:new Map(),groupMembers:[]};
   const students=[
     {id:1,nim:'049100101',initial:'RA',name:'Rina Amelia',prodi:'Manajemen',distance:.55,courses:['Pengantar Manajemen','Statistika'],topics:['Manajemen waktu'],times:['Malam hari'],mode:'Online'},
     {id:2,nim:'049100102',initial:'DP',name:'Dimas Prakoso',prodi:'Sistem Informasi',distance:1.2,courses:['Algoritma & Pemrograman','Sistem Operasi'],topics:['Struktur data','Perulangan'],times:['Akhir pekan','Malam hari'],mode:'Online'},
@@ -40,16 +49,9 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     {id:9,nim:'049100109',initial:'AR',name:'Anisa Rahma',prodi:'Manajemen',distance:2.8,courses:['Pengantar Manajemen'],topics:['Manajemen waktu'],times:['Akhir pekan'],mode:'Online'},
     {id:10,nim:'049100110',initial:'RP',name:'Reza Pratama',prodi:'Agribisnis',distance:1.9,courses:['Statistika'],topics:['Analisis data'],times:['Malam hari'],mode:'Offline'}
   ];
-  const groups=[
-    {id:1,name:'Ruang Belajar Algoritma',course:'Algoritma & Pemrograman',mode:'Online',when:'Kamis, 19.30 WIB',place:'Google Meet',members:14,capacity:20,open:true},
-    {id:2,name:'Teman Diskusi Statistika',course:'Statistika',mode:'Offline',when:'Sabtu, 10.00 WIB',place:'Bandung',members:8,capacity:10,open:true},
-    {id:3,name:'Sistem Operasi — Study Circle',course:'Sistem Operasi',mode:'Online',when:'Rabu, 20.00 WIB',place:'Zoom',members:20,capacity:20,open:false},
-    {id:4,name:'English Practice Corner',course:'Bahasa Inggris',mode:'Online',when:'Minggu, 09.00 WIB',place:'Google Meet',members:9,capacity:15,open:true}
-  ];
-
   function toast(message){const el=$('#toast');el.textContent=message;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),2500)}
   function icons(){if(window.lucide)lucide.createIcons()}
-  function navigate(page){state.page=page;$$('.page-section').forEach(s=>s.classList.toggle('active',s.id==='page-'+page));$$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));const labels={home:'Beranda',matching:'Matching',forum:'Forum',groups:'Grup Belajar',info:'Informasi UT',profile:'Profil Saya',verification:'Verifikasi Mahasiswa'};$('#crumb-current').textContent=labels[page]||'Beranda';window.scrollTo({top:0,behavior:'smooth'});if(page==='home'&&state.map)setTimeout(()=>state.map.invalidateSize(),80);if(page==='verification')loadVerification();if(page==='forum')loadForum();icons()}
+  function navigate(page){state.page=page;$$('.page-section').forEach(s=>s.classList.toggle('active',s.id==='page-'+page));$$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));const labels={home:'Beranda',matching:'Matching',forum:'Forum',groups:'Grup Belajar',info:'Informasi UT',profile:'Profil Saya',verification:'Verifikasi Mahasiswa'};$('#crumb-current').textContent=labels[page]||'Beranda';window.scrollTo({top:0,behavior:'smooth'});if(page==='home'&&state.map)setTimeout(()=>state.map.invalidateSize(),80);if(page==='verification')loadVerification();if(page==='forum')loadForum();if(page==='groups')loadGroups();icons()}
   $$('[data-page]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));$$('[data-go]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.go)));
   function visibleStudents(){return students.filter(s=>s.distance<=state.radius&&(!state.search||s.nim.includes(state.search)))}
   function renderNearby(){const list=$('#nearby-list');const items=visibleStudents().slice(0,5);list.innerHTML=items.length?items.map(s=>`<div class="person-row"><div class="person-avatar">${s.initial}</div><div class="person-meta"><strong>${state.connected.has(s.id)?escapeText(s.name):`Mahasiswa ${s.initial}`}</strong><span>${s.prodi}</span></div><span class="distance">~${Math.round(s.distance*10)/10} km</span></div>`).join(''):`<div class="empty-state"><div class="empty-icon"><i data-lucide="user-search"></i></div><h3>Belum ada hasil</h3><p>Tidak ditemukan mahasiswa dalam radius atau pencarian yang dipilih.</p></div>`;icons()}
@@ -242,8 +244,261 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       }
     }, "Diskusi berhasil dihapus.");
   }
-  function renderGroups(){const q=$('#group-search').value.toLowerCase();const filtered=groups.filter(g=>(state.groupFilter==='Semua'||g.mode===state.groupFilter)&&(`${g.name} ${g.course}`.toLowerCase().includes(q)));$('#group-list').innerHTML=filtered.map(g=>`<article class="surface group-card"><div class="group-head"><div><h3>${escapeText(g.name)}</h3><div class="group-sub">${escapeText(g.course)}</div></div><span class="mode ${g.mode.toLowerCase()}">${g.mode}</span></div><div class="group-sub" style="margin-top:11px"><i data-lucide="calendar-days" style="width:12px;height:12px;vertical-align:middle"></i> ${escapeText(g.when)} · ${escapeText(g.place)}</div><div class="capacity"><span style="width:${g.members/g.capacity*100}%"></span></div><div class="group-sub">${g.members} dari ${g.capacity} anggota</div><div class="group-foot"><span class="tiny" style="color:${g.open?'#287b59':'#b7791f'}">${g.open?'Pendaftaran dibuka':'Kapasitas penuh'}</span><button class="btn ${state.joined.has(g.id)?'btn-secondary':'btn-primary'} btn-sm" data-join="${g.id}" ${!g.open&&!state.joined.has(g.id)?'disabled':''}>${state.joined.has(g.id)?'Tergabung':g.open?'Lihat grup':'Penuh'}</button></div></article>`).join('')||'<div class="empty-state" style="grid-column:1/-1"><h3>Kelompok tidak ditemukan</h3><p>Coba kata kunci atau filter lain.</p></div>';$$('[data-join]').forEach(b=>b.addEventListener('click',()=>{const id=Number(b.dataset.join);state.joined.add(id);renderGroups();toast('Status bergabung demo diperbarui.')}));icons()}
-  $('#group-search').addEventListener('input',renderGroups);$$('[data-group-filter]').forEach(b=>b.addEventListener('click',()=>{state.groupFilter=b.dataset.groupFilter;$$('[data-group-filter]').forEach(x=>x.classList.toggle('active',x===b));renderGroups()}));$('#create-group').addEventListener('click',()=>openModal('Buat kelompok belajar',`<p class="section-note">Kelompok baru akan ditambahkan ke sesi preview ini. Penyimpanan bersama memerlukan backend.</p><div class="field"><label for="new-group-name">Nama kelompok</label><input id="new-group-name" class="text-input" placeholder="Contoh: Belajar Algoritma Bersama" maxlength="70"></div><div class="field"><label for="new-group-course">Mata kuliah</label><select id="new-group-course" class="select"><option>Algoritma & Pemrograman</option><option>Statistika</option><option>Sistem Operasi</option><option>Pengantar Manajemen</option><option>Bahasa Inggris</option></select></div><div class="field"><label for="new-group-mode">Mode pertemuan</label><select id="new-group-mode" class="select"><option>Online</option><option>Offline</option></select></div><div class="field"><label for="new-group-cap">Kapasitas (2–100)</label><input id="new-group-cap" class="text-input" type="number" min="2" max="100" value="10"></div><div class="field"><label for="new-group-when">Jadwal</label><input id="new-group-when" class="text-input" placeholder="Contoh: Sabtu, 19.00 WIB"></div>`,`Buat kelompok (demo)`,()=>{const name=$('#new-group-name').value.trim(),capacity=Number($('#new-group-cap').value),when=$('#new-group-when').value.trim();if(!name||!when||!Number.isInteger(capacity)||capacity<2||capacity>100){toast('Lengkapi nama, jadwal, dan kapasitas 2–100.');return false}groups.unshift({id:Date.now(),name,course:$('#new-group-course').value,mode:$('#new-group-mode').value,when,place:$('#new-group-mode').value==='Online'?'Platform online':'Lokasi menyusul',members:1,capacity,open:true});renderGroups();return true}));
+  function renderGroupAccess() {
+    const notice = $("#group-access-notice");
+    const toolbar = $("#group-toolbar");
+    const list = $("#group-list");
+    const createButton = $("#create-group");
+    if (!notice || !toolbar || !list || !createButton) return;
+
+    if (!isVerified) {
+      notice.hidden = false;
+      notice.innerHTML = `
+        <div class="group-access-content">
+          <div class="group-access-icon"><i data-lucide="shield-check"></i></div>
+          <div><strong>Verifikasi mahasiswa diperlukan</strong><p>Daftar dan aktivitas grup belajar hanya tersedia untuk akun mahasiswa UT yang sudah terverifikasi.</p><button type="button" class="link-btn" id="group-verification-link">Buka halaman verifikasi</button></div>
+        </div>`;
+      toolbar.hidden = true;
+      list.hidden = true;
+      createButton.hidden = true;
+      $("#group-verification-link")?.addEventListener("click", () => navigate("verification"));
+      icons();
+      return;
+    }
+
+    notice.hidden = true;
+    notice.innerHTML = "";
+    toolbar.hidden = false;
+    list.hidden = false;
+    createButton.hidden = false;
+  }
+
+  function renderGroups() {
+    const search = $("#group-search")?.value.trim().toLowerCase() || "";
+    const filtered = state.groups.filter(group => {
+      const courseName = group.course?.course_name || "Kelompok umum";
+      const matchesMode = state.groupFilter === "Semua" || group.mode === state.groupFilter.toLowerCase();
+      const matchesSearch = !search || `${group.name} ${courseName}`.toLowerCase().includes(search);
+      return matchesMode && matchesSearch;
+    });
+
+    $("#group-list").innerHTML = filtered.map(group => {
+      const courseName = group.course?.course_name || "Kelompok umum";
+      const membership = state.groupMemberships.get(group.id);
+      const isActiveMember = membership?.status === "active";
+      const isPending = membership?.status === "pending";
+      const isManager = isActiveMember && ["admin", "co_admin"].includes(membership.role);
+      const activeCount = isActiveMember
+        ? state.groupMembers.filter(member => member.group_id === group.id && member.status === "active").length
+        : null;
+      const pendingCount = isManager
+        ? state.groupMembers.filter(member => member.group_id === group.id && member.status === "pending").length
+        : 0;
+      const accessLabels = { open: "Terbuka", approval: "Perlu persetujuan", private: "Undangan pribadi" };
+      const accessLabel = accessLabels[group.access_type] || "Akses terbatas";
+      const capacityText = activeCount === null
+        ? `Maksimal ${group.capacity} anggota`
+        : `${activeCount} anggota aktif dari ${group.capacity}`;
+      const progress = activeCount === null ? "" : `<div class="capacity"><span style="width:${Math.min(100, activeCount / group.capacity * 100)}%"></span></div>`;
+      const schedule = group.schedule_text ? escapeText(group.schedule_text) : "Jadwal belum ditentukan";
+      const place = group.mode === "online"
+        ? (group.online_url ? `<a href="${escapeText(group.online_url)}" target="_blank" rel="noopener noreferrer">Buka tautan pertemuan</a>` : "Pertemuan online")
+        : (group.offline_area_label ? escapeText(group.offline_area_label) : "Lokasi belum ditentukan");
+      const status = isActiveMember
+        ? (isManager ? "Admin grup" : "Anggota")
+        : isPending
+          ? "Menunggu persetujuan"
+          : group.access_type === "approval"
+            ? "Gabung setelah disetujui admin"
+            : group.access_type === "private"
+              ? "Undangan diperlukan"
+              : "Pendaftaran terbuka";
+      const action = isActiveMember
+        ? `<button type="button" class="btn btn-secondary btn-sm" data-group-open="${escapeText(group.id)}">${isManager ? "Kelola grup" : "Buka grup"}</button>`
+        : isPending
+          ? '<button type="button" class="btn btn-secondary btn-sm" disabled>Menunggu persetujuan</button>'
+          : `<button type="button" class="btn btn-primary btn-sm" data-group-join="${escapeText(group.id)}">${group.access_type === "approval" ? "Minta bergabung" : group.access_type === "private" ? "Terima undangan" : "Gabung grup"}</button>`;
+      return `
+        <article class="surface group-card">
+          <div class="group-head"><div><h3>${escapeText(group.name)}</h3><div class="group-sub">${escapeText(courseName)}</div></div><span class="mode ${escapeText(group.mode)}">${group.mode === "online" ? "Online" : "Offline"}</span></div>
+          <p class="group-card-description">${escapeText(group.description || "Belum ada deskripsi kelompok.")}</p>
+          <div class="group-sub group-detail-line"><i data-lucide="calendar-days"></i>${schedule}</div>
+          <div class="group-sub group-detail-line"><i data-lucide="${group.mode === "online" ? "video" : "map-pin"}"></i>${place}</div>
+          <div class="group-status-row"><span class="group-access-label">${escapeText(accessLabel)}</span><span class="group-member-status">${escapeText(status)}</span></div>
+          ${progress}
+          <div class="group-sub">${capacityText}</div>
+          <div class="group-foot"><span class="tiny group-pending-count">${pendingCount ? `${pendingCount} permohonan masuk` : ""}</span>${action}</div>
+        </article>`;
+    }).join("") || '<div class="empty-state" style="grid-column:1/-1"><h3>Belum ada kelompok belajar</h3><p>Buat kelompok baru atau coba kata kunci dan filter lain.</p></div>';
+
+    $$("[data-group-join]").forEach(button => button.addEventListener("click", () => requestGroupJoin(button.dataset.groupJoin, button)));
+    $$("[data-group-open]").forEach(button => button.addEventListener("click", () => openGroupDetails(button.dataset.groupOpen)));
+    icons();
+  }
+
+  async function loadGroups({ showLoading = true } = {}) {
+    renderGroupAccess();
+    if (!isVerified) {
+      state.groups = [];
+      state.groupCourses = [];
+      state.groupMemberships = new Map();
+      state.groupMembers = [];
+      $("#group-list").innerHTML = "";
+      return;
+    }
+
+    if (showLoading) $("#group-list").innerHTML = '<div class="verification-loading">Memuat grup belajar...</div>';
+    try {
+      const [groups, courses, memberships] = await Promise.all([
+        listStudyGroups(),
+        listActiveStudyCourses(),
+        listMyGroupMemberships(currentUserId),
+      ]);
+      state.groups = groups;
+      state.groupCourses = courses;
+      state.groupMemberships = new Map(memberships.map(item => [item.group_id, item]));
+      state.groupMembers = await listVisibleGroupMembers(groups.map(group => group.id));
+      renderGroups();
+    } catch (error) {
+      console.error("Study group load failed:", error);
+      $("#group-list").innerHTML = `<div class="empty-state"><div class="empty-icon"><i data-lucide="alert-circle"></i></div><h3>Grup belajar belum dapat dimuat</h3><p>${escapeText(error?.message || "Periksa koneksi lalu coba kembali.")}</p><button class="btn btn-secondary btn-sm" id="group-retry">Coba lagi</button></div>`;
+      $("#group-retry")?.addEventListener("click", () => loadGroups());
+      icons();
+    }
+  }
+
+  async function requestGroupJoin(groupId, button) {
+    if (!isVerified) { toast("Verifikasi mahasiswa diperlukan untuk bergabung."); return; }
+    if (button) { button.disabled = true; button.textContent = "Memproses..."; }
+    try {
+      const status = await joinStudyGroup(groupId);
+      await loadGroups({ showLoading: false });
+      toast(status === "pending" ? "Permintaan bergabung dikirim. Tunggu persetujuan admin." : "Kamu berhasil bergabung ke kelompok.");
+      if (status === "active") openGroupDetails(groupId);
+    } catch (error) {
+      console.error("Study group join failed:", error);
+      toast(error?.message || "Permintaan bergabung gagal. Periksa status verifikasi atau kapasitas grup.");
+      if (button) { button.disabled = false; button.textContent = "Coba lagi"; }
+    }
+  }
+
+  function groupDate(value) {
+    if (!value) return "-";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+      ? "-"
+      : date.toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+  }
+
+  function openGroupDetails(groupId) {
+    const group = state.groups.find(item => item.id === groupId);
+    if (!group) return;
+    const membership = state.groupMemberships.get(group.id);
+    if (membership?.status !== "active") return;
+    const isManager = ["admin", "co_admin"].includes(membership.role);
+    const members = state.groupMembers.filter(item => item.group_id === group.id);
+    const activeMembers = members.filter(item => item.status === "active");
+    const pendingMembers = isManager ? members.filter(item => item.status === "pending") : [];
+    const courseName = group.course?.course_name || "Kelompok umum";
+    const location = group.mode === "online"
+      ? (group.online_url ? `<a href="${escapeText(group.online_url)}" target="_blank" rel="noopener noreferrer">Buka tautan pertemuan</a>` : "Tautan belum ditambahkan")
+      : escapeText(group.offline_area_label || "Lokasi belum ditentukan");
+    const pendingHtml = pendingMembers.length
+      ? pendingMembers.map((member, index) => `
+          <div class="group-request-row">
+            <div><strong>Permohonan #${index + 1}</strong><small>Dikirim ${escapeText(groupDate(member.created_at))} · Mahasiswa terverifikasi</small></div>
+            <div class="group-request-actions"><button type="button" class="btn btn-primary btn-sm" data-group-review="approve" data-group-user="${escapeText(member.user_id)}">Setujui</button><button type="button" class="btn btn-secondary btn-sm" data-group-review="reject" data-group-user="${escapeText(member.user_id)}">Tolak</button></div>
+          </div>`).join("")
+      : '<p class="section-note">Belum ada permohonan yang menunggu persetujuan.</p>';
+    const content = `
+      <div class="group-modal-details">
+        <div class="group-modal-meta"><span class="mode ${escapeText(group.mode)}">${group.mode === "online" ? "Online" : "Offline"}</span><span class="group-access-label">${escapeText(group.access_type === "approval" ? "Perlu persetujuan" : group.access_type === "private" ? "Undangan pribadi" : "Terbuka")}</span></div>
+        <p class="section-note">${escapeText(group.description || "Belum ada deskripsi kelompok.")}</p>
+        <div class="group-modal-facts"><div><span>Mata kuliah</span><strong>${escapeText(courseName)}</strong></div><div><span>Jadwal</span><strong>${escapeText(group.schedule_text || "Belum ditentukan")}</strong></div><div><span>Pertemuan</span><strong>${location}</strong></div><div><span>Anggota aktif</span><strong>${activeMembers.length} / ${group.capacity}</strong></div><div><span>Peran kamu</span><strong>${isManager ? "Admin grup" : "Anggota"}</strong></div></div>
+        ${isManager ? `<section class="group-requests"><h3>Permohonan bergabung (${pendingMembers.length})</h3>${pendingHtml}<p class="group-privacy-note">Nama anggota lain tidak ditampilkan karena pengaturan privasi profil.</p></section>` : ""}
+      </div>`;
+    openModal("Ruang kelompok belajar", content, "Tutup");
+    $$("[data-group-review]").forEach(button => button.addEventListener("click", () => confirmGroupJoinReview(group.id, button.dataset.groupUser, button.dataset.groupReview === "approve")));
+    icons();
+  }
+
+  function confirmGroupJoinReview(groupId, userId, accept) {
+    const decision = accept ? "Setujui" : "Tolak";
+    openModal(
+      `${decision} permohonan anggota?`,
+      `<p class="section-note">${decision} permohonan masuk #${escapeText(userId.slice(0, 8))}? Status keanggotaan akan diperbarui.</p>`,
+      decision,
+      async () => {
+        await respondGroupJoinRequest(groupId, userId, accept);
+        await loadGroups({ showLoading: false });
+        return true;
+      },
+      accept ? "Mahasiswa berhasil ditambahkan ke kelompok." : "Permohonan bergabung ditolak."
+    );
+  }
+
+  function openCreateGroupForm() {
+    if (!isVerified) { toast("Verifikasi mahasiswa diperlukan untuk membuat kelompok."); return; }
+    const courseOptions = state.groupCourses.map(course =>
+      `<option value="${escapeText(course.id)}">${escapeText(course.course_code ? `${course.course_code} · ${course.course_name}` : course.course_name)}</option>`
+    ).join("");
+    const content = `
+      <p class="section-note">Kelompok akan tersimpan di UT Connect. Pembuat otomatis menjadi admin pertama.</p>
+      <div class="field"><label for="new-group-name">Nama kelompok</label><input id="new-group-name" class="text-input" minlength="3" maxlength="100" placeholder="Contoh: Belajar Sistem Operasi Bersama"></div>
+      <div class="field"><label for="new-group-description">Deskripsi (opsional)</label><textarea id="new-group-description" class="text-input" rows="3" maxlength="1500" placeholder="Tujuan dan fokus belajar kelompok"></textarea></div>
+      <div class="field"><label for="new-group-course">Mata kuliah</label><select id="new-group-course" class="select"><option value="">Kelompok umum${state.groupCourses.length ? "" : " · katalog mata kuliah belum tersedia"}</option>${courseOptions}</select></div>
+      <div class="field"><label for="new-group-mode">Mode pertemuan</label><select id="new-group-mode" class="select"><option value="online">Online</option><option value="offline">Offline</option></select></div>
+      <div class="field"><label for="new-group-access">Akses kelompok</label><select id="new-group-access" class="select"><option value="open">Terbuka · langsung bergabung</option><option value="approval">Persetujuan admin · perlu ditinjau</option></select></div>
+      <div class="field"><label for="new-group-capacity">Kapasitas (2–100 anggota)</label><input id="new-group-capacity" class="text-input" type="number" min="2" max="100" value="10"></div>
+      <div class="field"><label for="new-group-schedule">Jadwal (opsional)</label><input id="new-group-schedule" class="text-input" maxlength="300" placeholder="Contoh: Sabtu, 19.00 WIB"></div>
+      <div class="field"><label for="new-group-online-url">Tautan online (opsional)</label><input id="new-group-online-url" class="text-input" type="url" maxlength="500" placeholder="https://meet.google.com/..."></div>
+      <div class="field"><label for="new-group-offline-area">Area pertemuan offline (opsional)</label><input id="new-group-offline-area" class="text-input" maxlength="160" placeholder="Contoh: Area layanan belajar UPBJJ"></div>`;
+    openModal("Buat kelompok belajar", content, "Buat kelompok", async () => {
+      const name = $("#new-group-name").value.trim();
+      const description = $("#new-group-description").value.trim();
+      const courseId = $("#new-group-course").value || null;
+      const mode = $("#new-group-mode").value;
+      const accessType = $("#new-group-access").value;
+      const capacity = Number($("#new-group-capacity").value);
+      const schedule = $("#new-group-schedule").value.trim();
+      const onlineUrl = $("#new-group-online-url").value.trim();
+      const offlineArea = $("#new-group-offline-area").value.trim();
+
+      if (name.length < 3 || name.length > 100) { toast("Nama kelompok harus 3–100 karakter."); return false; }
+      if (description.length > 1500) { toast("Deskripsi maksimal 1.500 karakter."); return false; }
+      if (!Number.isInteger(capacity) || capacity < 2 || capacity > 100) { toast("Kapasitas harus antara 2 dan 100 anggota."); return false; }
+      if (mode === "online" && onlineUrl && !/^https?:\/\//i.test(onlineUrl)) { toast("Tautan online harus diawali http:// atau https://."); return false; }
+
+      try {
+        await createStudyGroup({
+          name,
+          description: description || null,
+          course_id: courseId,
+          mode,
+          capacity,
+          access_type: accessType,
+          schedule_text: schedule || null,
+          online_url: mode === "online" && onlineUrl ? onlineUrl : null,
+          offline_area_label: mode === "offline" && offlineArea ? offlineArea : null,
+        });
+        await loadGroups({ showLoading: false });
+        return true;
+      } catch (error) {
+        console.error("Study group creation failed:", error);
+        toast(error?.message || "Kelompok belum berhasil dibuat. Periksa data dan status verifikasi.");
+        return false;
+      }
+    }, "Kelompok belajar berhasil dibuat.");
+  }
+
+  $("#group-search").addEventListener("input", renderGroups);
+  $$("[data-group-filter]").forEach(button => button.addEventListener("click", () => {
+    state.groupFilter = button.dataset.groupFilter;
+    $$("[data-group-filter]").forEach(item => item.classList.toggle("active", item === button));
+    renderGroups();
+  }));
+  $("#create-group").addEventListener("click", openCreateGroupForm);
+
   const INFO_CATEGORY_LABELS={competition:'Lomba',job:'Loker',seminar:'Seminar',tips:'Tips Belajar',ukm:'UKM',hima:'HIMA',academic:'Akademik'};
   const INFO_CATEGORY_OPTIONS=Object.entries(INFO_CATEGORY_LABELS);
   function infoDate(value){
@@ -538,5 +793,5 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   function closeModal(){$('#modal-backdrop').classList.remove('open');if(activeVerificationPreviewUrl){URL.revokeObjectURL(activeVerificationPreviewUrl);activeVerificationPreviewUrl=null}}
   const guide=`<div style="display:grid;gap:14px"><div><b style="font-size:11px">01 · Lengkapi profil</b><p class="section-note">Daftar dengan data akademik yang diperlukan. Verifikasi identitas harus dilakukan melalui layanan yang sah pada versi produksi.</p></div><div><b style="font-size:11px">02 · Atur lokasi secara sadar</b><p class="section-note">Pilih lokasi perkiraan dan tentukan apakah ingin tampil di radar. Jangan tampilkan alamat rumah atau koordinat presisi kepada pengguna lain.</p></div><div><b style="font-size:11px">03 · Temukan teman belajar</b><p class="section-note">Gunakan radius dan preferensi mata kuliah untuk melihat rekomendasi yang relevan.</p></div><div><b style="font-size:11px">04 · Bangun koneksi</b><p class="section-note">Kirim permintaan connect. Chat hanya tersedia setelah kedua pihak menyetujui koneksi.</p></div><div><b style="font-size:11px">05 · Belajar bersama</b><p class="section-note">Gunakan forum untuk peer help atau bergabung dan membuat kelompok belajar.</p></div><p class="tiny muted" style="padding:10px;background:#f7f9fc;border-radius:9px">Catatan: halaman ini adalah prototype UI/UX dengan data simulasi. Integrasi akun, lokasi aman, koneksi, dan chat multi-user belum tersedia.</p></div>`;
   $$('[data-open-guide]').forEach(b=>b.addEventListener('click',()=>openModal('Panduan UT Connect',guide)));$('#modal-close').addEventListener('click',closeModal);$('#modal-cancel').addEventListener('click',closeModal);$('#modal-confirm').addEventListener('click',async()=>{if(modalAction){const confirmButton=$('#modal-confirm');confirmButton.disabled=true;try{const result=await modalAction();if(result===false)return;modalAction=null;closeModal();toast(modalSuccessMessage)}catch(error){console.error('Modal action failed:',error);toast(error.message||'Tindakan gagal. Silakan coba lagi.')}finally{confirmButton.disabled=false}return}closeModal();toast('Panduan ditutup.')});$('#modal-backdrop').addEventListener('click',e=>{if(e.target.id==='modal-backdrop')closeModal()});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});$('#notif-btn').addEventListener('click',()=>toast('Belum ada notifikasi baru.'));$('#edit-profile').addEventListener('click',()=>openModal('Edit profil',`<p class="section-note">Form edit profil ditampilkan sebagai rancangan UI. Penyimpanan dan verifikasi perubahan belum terhubung ke backend.</p><div class="field"><label>Nama tampilan</label><input class="text-input" value="Andi Bintang"></div><div class="field"><label>Program studi</label><input class="text-input" value="Sistem Informasi" disabled></div><div class="field"><label>Preferensi belajar</label><select class="select"><option>Online · Malam hari</option><option>Online · Akhir pekan</option><option>Offline</option></select></div>`,`Tutup`));
-  renderNearby();renderMatches();loadForum();renderGroups();loadInformation();loadVerification();initMap();icons();
+  renderNearby();renderMatches();loadForum();loadGroups();loadInformation();loadVerification();initMap();icons();
 }
