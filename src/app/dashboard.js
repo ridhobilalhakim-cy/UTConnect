@@ -1959,10 +1959,14 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     const faculty = escapeText(profile.faculty || "");
     const program = escapeText(profile.program || "");
     const verifiedIdentityMayReset = isVerified;
+    let selectedAvatarPreset = profile.avatar_path?.startsWith("preset:") ? profile.avatar_path.slice("preset:".length) : null;
     const content = `
       <form id="profile-edit-form" class="profile-edit-form">
         <div class="profile-edit-avatar"><div class="profile-edit-avatar-preview" id="profile-edit-avatar-preview">${profile.avatar_path ? '<img src="' + escapeText(getProfileAvatarUrl(profile.avatar_path) || "") + '" alt="Foto profil saat ini">' : escapeText(initialsForName(profile.full_name || currentUserName))}</div>
-          <div><strong>Foto profil</strong><small>Unggah JPG, PNG, atau WebP, maksimal 5 MB.</small><label class="btn btn-secondary btn-sm" for="profile-avatar-file">Pilih foto</label><input id="profile-avatar-file" type="file" accept="image/jpeg,image/png,image/webp" hidden></div>
+          <div><strong>Foto profil</strong><small>Pilih avatar bawaan atau unggah JPG, PNG, WebP (maks. 5 MB).</small><label class="btn btn-secondary btn-sm" for="profile-avatar-file">Unggah foto sendiri</label><input id="profile-avatar-file" type="file" accept="image/jpeg,image/png,image/webp" hidden></div>
+        </div>
+        <div class="profile-avatar-preset-grid" role="group" aria-label="Pilih avatar bawaan">
+          ${["avatar-01","avatar-02","avatar-03","avatar-04"].map((id,index) => '<button type="button" class="profile-avatar-preset ' + (profile.avatar_path === 'preset:' + id ? 'selected' : '') + '" data-profile-avatar-preset="' + id + '" aria-label="Pilih avatar ' + (index+1) + '"><img src="/avatars/' + id + '.svg" alt=""><span>Avatar ' + (index+1) + '</span></button>').join("")}
         </div>
         <div class="field"><label for="profile-edit-name">Nama lengkap</label><input id="profile-edit-name" class="text-input" maxlength="100" minlength="2" required value="${escapeText(profile.full_name || currentUserName)}"></div>
         <div class="field"><label for="profile-edit-faculty">Fakultas</label><select id="profile-edit-faculty" class="select" required></select></div>
@@ -1990,6 +1994,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
           acknowledgeVerificationReset: acknowledge,
         });
         if (file) updated.avatar_path = await uploadMyProfileAvatar(file);
+        else if (selectedAvatarPreset) updated.avatar_path = await setMyProfileAvatarPreset(selectedAvatarPreset);
         state.profile = { ...state.profile, ...updated };
         isVerified = state.profile.verification_status === "verified";
         verificationStatus = state.profile.verification_status || "pending";
@@ -2010,10 +2015,18 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       const file = event.target.files?.[0];
       if (!file) return;
       if (file.size > 5 * 1024 * 1024) { toast("Ukuran foto profil maksimal 5 MB."); event.target.value = ""; return; }
+      selectedAvatarPreset = null;
+      $("[data-profile-avatar-preset]").forEach(button => button.classList.remove("selected"));
       const preview = $("#profile-edit-avatar-preview");
       const url = URL.createObjectURL(file);
       preview.innerHTML = '<img src="' + url + '" alt="Pratinjau foto profil">';
     });
+    $("[data-profile-avatar-preset]").forEach(button => button.addEventListener("click", () => {
+      selectedAvatarPreset = button.dataset.profileAvatarPreset;
+      $("#profile-avatar-file").value = "";
+      $("[data-profile-avatar-preset]").forEach(item => item.classList.toggle("selected", item === button));
+      $("#profile-edit-avatar-preview").innerHTML = '<img src="/avatars/' + escapeText(selectedAvatarPreset) + '.svg" alt="Avatar pilihan">';
+    }));
   }
     function escapeText(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   let modalAction=null,modalSuccessMessage='Perubahan diterapkan pada sesi demo.';function openModal(title,content,confirm='Mengerti',action=null,successMessage='Perubahan diterapkan pada sesi demo.'){ modalAction=action;modalSuccessMessage=successMessage;$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal-confirm').textContent=confirm;$('#modal-confirm').style.display='';$('#modal-confirm').disabled=false;$('#modal-cancel').textContent='Tutup';$('#modal-backdrop').classList.add('open'); }
