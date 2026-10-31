@@ -31,7 +31,7 @@ Next database-maintenance task: create a reviewed, reproducible schema snapshot/
 
 ## Existing data
 
-The live introspection returned one row in `profiles` and one in `user_locations` at the time of inspection. These may be test records. Do not delete them without confirming ownership with the team.
+Latest live introspection returned four rows in `profiles` and four rows in `user_locations`. Treat these as real staging records and do not delete them without confirming ownership with the team.
 
 ## Current frontend integration status
 
@@ -51,7 +51,7 @@ The live introspection returned one row in `profiles` and one in `user_locations
 - Student upload is restricted to the caller's own folder and pending/rejected profiles without an outstanding request.
 - Admin queue/review functions check the signed-in user and administrator role. Review decisions update profiles.verification_status and add a review event.
 - Authenticated role cannot directly UPDATE profiles.verification_status.
-- Counts at inspection: 3 profiles pending, 0 verified, 0 rejected; 0 submitted verification requests; 0 review events.
+- Latest counts: 4 profiles total; 1 verified, 3 pending, 0 rejected; 0 submitted verification requests; 0 review events.
 - The UI now integrates these existing services. Actual browser upload/download with real accounts still needs acceptance testing. Evidence acceptance and retention rules remain a project policy decision.
 
 
