@@ -74,7 +74,7 @@ begin
     p_user_id,
     extensions.st_setsrid(extensions.st_makepoint(p_lng, p_lat), 4326)::extensions.geography,
     p_show_in_radar,
-    case when p_show_in_radar then now() else null end,
+    now(),
     now()
   )
   on conflict (user_id) do update
@@ -110,7 +110,7 @@ begin
 
   update public.user_locations
   set show_in_radar = p_show_in_radar,
-      consented_at = case when p_show_in_radar then now() else null end,
+      consented_at = case when p_show_in_radar then now() else consented_at end,
       updated_at = now()
   where user_id = p_user_id;
 
