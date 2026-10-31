@@ -93,15 +93,36 @@
 
       <!-- MATCHING -->
       <section class="page-section" id="page-matching">
-        <div class="page-head"><div><div class="eyebrow">Koneksi akademik</div><h1 class="page-title">Temukan teman belajar yang cocok</h1><p class="page-subtitle">Cari mahasiswa berdasarkan mata kuliah, topik, minat, dan waktu belajar.</p></div></div>
-        <div class="match-layout"><aside class="surface filter-panel"><h2 class="section-title">Preferensi belajar</h2><p class="section-note">Atur kriteria untuk menemukan teman yang relevan.</p>
-          <div class="field"><label for="filter-course">Mata kuliah</label><select id="filter-course" class="select"><option value="">Semua mata kuliah</option><option>Algoritma & Pemrograman</option><option>Pengantar Manajemen</option><option>Statistika</option><option>Sistem Operasi</option></select></div>
-          <div class="field"><label for="filter-topic">Topik yang ingin dipelajari</label><select id="filter-topic" class="select"><option value="">Semua topik</option><option>Struktur data</option><option>Perulangan</option><option>Manajemen waktu</option><option>Analisis data</option></select></div>
-          <div class="field"><label for="filter-time">Waktu belajar</label><select id="filter-time" class="select"><option value="">Semua waktu</option><option>Malam hari</option><option>Akhir pekan</option><option>Pagi hari</option></select></div>
-          <div class="field"><label for="filter-mode">Preferensi pertemuan</label><select id="filter-mode" class="select"><option value="">Online & offline</option><option>Online</option><option>Offline</option></select></div>
-          <button class="btn btn-primary" style="width:100%;margin-top:17px" id="apply-match"><i data-lucide="sliders-horizontal"></i>Terapkan filter</button><button class="btn btn-quiet" style="width:100%;margin-top:5px" id="reset-match">Reset pilihan</button>
-        </aside>
-        <div><div class="section-head"><div><h2 class="section-title">Rekomendasi untukmu</h2><p class="section-note" id="match-count">Pilih preferensi untuk menyaring rekomendasi.</p></div><span class="tag">Data demo</span></div><div class="match-results" id="match-results"></div></div></div>
+        <div class="page-head"><div><div class="eyebrow">Koneksi akademik</div><h1 class="page-title">Temukan teman belajar yang cocok</h1><p class="page-subtitle">Temukan mahasiswa terverifikasi berdasarkan area perkiraan, mata kuliah, topik, dan waktu belajar.</p></div></div>
+        <div class="match-access-notice surface" id="match-access-notice" hidden></div>
+        <div class="match-layout" id="match-layout">
+          <aside class="surface filter-panel">
+            <h2 class="section-title">Preferensi belajar</h2>
+            <p class="section-note">Preferensi ini tersimpan pada akunmu dan hanya dapat kamu ubah sendiri.</p>
+            <div class="field"><label for="preferred-courses">Mata kuliah yang diikuti</label><select id="preferred-courses" class="select" multiple size="4"></select><small class="field-help" id="matching-course-note">Katalog mata kuliah aktif belum tersedia. Preferensi topik dan minat tetap bisa disimpan.</small></div>
+            <div class="field"><label for="preference-topics">Topik yang ingin dipelajari atau dikuasai</label><textarea id="preference-topics" class="text-input" rows="2" maxlength="720" placeholder="Contoh: perulangan, struktur data, analisis sistem"></textarea><small class="field-help">Pisahkan setiap topik dengan koma.</small></div>
+            <div class="field"><label for="preference-interests">Minat belajar</label><textarea id="preference-interests" class="text-input" rows="2" maxlength="720" placeholder="Contoh: belajar kelompok, persiapan UAS"></textarea><small class="field-help">Pisahkan setiap minat dengan koma.</small></div>
+            <div class="field"><label for="preference-study-times">Waktu belajar yang disukai</label><select id="preference-study-times" class="select" multiple size="4"><option value="Pagi hari">Pagi hari</option><option value="Siang hari">Siang hari</option><option value="Malam hari">Malam hari</option><option value="Akhir pekan">Akhir pekan</option></select></div>
+            <button class="btn btn-primary" style="width:100%;margin-top:15px" id="save-matching-preferences"><i data-lucide="save"></i>Simpan preferensi</button>
+            <div class="matching-filter-divider"></div>
+            <h2 class="section-title">Saring rekomendasi</h2>
+            <div class="field"><label for="match-radius">Radius pencarian</label><select id="match-radius" class="select"><option value="1000">1 km</option><option value="3000" selected>3 km</option><option value="5000">5 km</option></select></div>
+            <div class="field"><label for="filter-course">Mata kuliah</label><select id="filter-course" class="select"><option value="">Semua mata kuliah</option></select></div>
+            <div class="field"><label for="filter-topic">Topik atau minat</label><input id="filter-topic" class="text-input" type="search" placeholder="Cari topik atau minat"></div>
+            <div class="field"><label for="filter-time">Waktu belajar</label><select id="filter-time" class="select"><option value="">Semua waktu</option><option value="Pagi hari">Pagi hari</option><option value="Siang hari">Siang hari</option><option value="Malam hari">Malam hari</option><option value="Akhir pekan">Akhir pekan</option></select></div>
+            <button class="btn btn-secondary" style="width:100%;margin-top:15px" id="apply-match"><i data-lucide="sliders-horizontal"></i>Terapkan filter</button>
+            <button class="btn btn-quiet" style="width:100%;margin-top:5px" id="reset-match">Reset filter</button>
+          </aside>
+          <div class="matching-results-column">
+            <section class="surface connection-panel" id="connection-panel" hidden>
+              <div class="section-head"><div><h2 class="section-title">Permintaan dan koneksi</h2><p class="section-note">Identitas mahasiswa lain ditampilkan secara terbatas.</p></div><span class="tag" id="connection-count">0</span></div>
+              <div class="connection-list" id="connection-list"></div>
+            </section>
+            <div class="section-head matching-results-head"><div><h2 class="section-title">Rekomendasi untukmu</h2><p class="section-note" id="match-count">Cari mahasiswa terverifikasi di area sekitarmu.</p></div><button type="button" class="btn btn-secondary btn-sm" id="refresh-matches"><i data-lucide="refresh-cw"></i>Muat ulang</button></div>
+            <div class="match-results" id="match-results"></div>
+            <p class="matching-privacy-note"><i data-lucide="shield-check"></i> Matching hanya menggunakan mahasiswa terverifikasi yang memilih tampil di radar. UT Connect tidak menampilkan NIM atau koordinat lokasi presisi.</p>
+          </div>
+        </div>
       </section>
 
       <!-- FORUM -->
