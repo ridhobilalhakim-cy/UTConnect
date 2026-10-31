@@ -26,8 +26,9 @@ function jsonResponse(body, status = 200) {
   return { status, contentType: 'application/json', body: JSON.stringify(body) };
 }
 
-async function mockSupabase(page, { isAdmin = false, informationPosts = [], verificationStatus = { profile_status: 'pending', latest_request: null }, verificationQueue = [], profile = PROFILE, forumPosts = [], forumComments = [], courses = [], studyGroups = [], groupMembers = [], matchingPreferences = null, profileCourseIds = [], matchingCandidates = [], connectionSummaries = [] } = {}) {
-  const state = { loginCalls: 0, recoveryCalls: 0, passwordUpdates: 0, logoutCalls: 0, informationPosts: [...informationPosts], informationCreateCalls: 0, verificationStatus: structuredClone(verificationStatus), verificationQueue: [...verificationQueue], verificationUploadCalls: 0, verificationSubmitCalls: 0, verificationReviewCalls: [], profile, forumPosts: [...forumPosts], forumComments: [...forumComments], courses: [...courses], studyGroups: [...studyGroups], groupMembers: [...groupMembers], groupCreateCalls: 0, groupJoinCalls: [], groupReviewCalls: [], matchingPreferences: matchingPreferences ? structuredClone(matchingPreferences) : null, profileCourseIds: [...profileCourseIds], matchingCandidates: [...matchingCandidates], connectionSummaries: [...connectionSummaries], matchingPreferenceSaveCalls: 0, profileCourseInsertCalls: 0, profileCourseDeleteCalls: 0, matchingSearchCalls: [], connectionCreateCalls: [], connectionResponseCalls: [], forumPostCreateCalls: 0, forumCommentCreateCalls: 0 };
+async function mockSupabase(page, { isAdmin = false, informationPosts = [], verificationStatus = { profile_status: 'pending', latest_request: null }, verificationQueue = [], profile = PROFILE, forumPosts = [], forumComments = [], courses = [], studyGroups = [], groupMembers = [], matchingPreferences = null, profileCourseIds = [], matchingCandidates = [], connectionSummaries = [], directMessages = [] } = {}) {
+  const state = { loginCalls: 0, recoveryCalls: 0, passwordUpdates: 0, logoutCalls: 0, informationPosts: [...informationPosts], informationCreateCalls: 0, verificationStatus: structuredClone(verificationStatus), verificationQueue: [...verificationQueue], verificationUploadCalls: 0, verificationSubmitCalls: 0, verificationReviewCalls: [], profile, forumPosts: [...forumPosts], forumComments: [...forumComments], courses: [...courses], studyGroups: [...studyGroups], groupMembers: [...groupMembers], groupCreateCalls: 0, groupJoinCalls: [], groupReviewCalls: [], matchingPreferences: matchingPreferences ? structuredClone(matchingPreferences) : null, profileCourseIds: [...profileCourseIds], matchingCandidates: [...matchingCandidates], connectionSummaries: [...connectionSummaries], directMessages: structuredClone(directMessages), directMessageSendCalls: [], directMessageReadCalls: [], matchingPreferenceSaveCalls: 0, profileCourseInsertCalls: 0, profileCourseDeleteCalls: 0, matchingSearchCalls: [], connectionCreateCalls: [], connectionResponseCalls: [], forumPostCreateCalls: 0, forumCommentCreateCalls: 0 };
+  await page.addInitScript(() => { window.__UTCONNECT_DISABLE_REALTIME__ = true; });
   for (const pattern of [
     /^https:\/\/fonts\.googleapis\.com\//,
     /^https:\/\/fonts\.gstatic\.com\//,
@@ -168,6 +169,54 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
         is_incoming: false,
       });
       return route.fulfill(jsonResponse(created, 201));
+    }
+    if (path.endsWith('/rest/v1/direct_messages')) {
+      const connectionFilter = url.searchParams.get('connection_id') || '';
+      const connectionId = connectionFilter.startsWith('eq.') ? connectionFilter.slice(3) : '';
+      if (method === 'GET') {
+        const rows = state.directMessages
+          .filter(message => !connectionId || message.connection_id === connectionId)
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+          .slice(0, Number(url.searchParams.get('limit') || 60));
+        return route.fulfill(jsonResponse(rows));
+      }
+      if (method === 'POST') {
+        const input = request.postDataJSON();
+        const connection = state.connectionSummaries.find(item => item.connection_id === input.connection_id && item.status === 'accepted');
+        if (!connection || input.sender_id !== USER.id) {
+          return route.fulfill(jsonResponse({ message: 'direct message policy denied' }, 403));
+        }
+        const body = String(input.body || '').trim();
+        if (!body || Array.from(body).length > 5000) {
+          return route.fulfill(jsonResponse({ message: 'invalid message body' }, 400));
+        }
+        const created = {
+          id: `direct-message-e2e-${state.directMessages.length + 1}`,
+          created_at: new Date().toISOString(),
+          read_at: null,
+          ...input,
+        };
+        state.directMessageSendCalls.push(input);
+        state.directMessages.push(created);
+        return route.fulfill(jsonResponse(created, 201));
+      }
+      if (method === 'PATCH') {
+        const input = request.postDataJSON();
+        const senderFilter = url.searchParams.get('sender_id') || '';
+        const readFilter = url.searchParams.get('read_at') || '';
+        if (senderFilter !== `neq.${USER.id}` || readFilter !== 'is.null') {
+          return route.fulfill(jsonResponse({ message: 'read receipt policy denied' }, 403));
+        }
+        state.directMessageReadCalls.push({ connection_id: connectionId, read_at: input.read_at });
+        const updated = [];
+        for (const message of state.directMessages) {
+          if (message.connection_id === connectionId && message.sender_id !== USER.id && message.read_at == null) {
+            message.read_at = input.read_at;
+            updated.push({ id: message.id });
+          }
+        }
+        return route.fulfill(jsonResponse(updated));
+      }
     }
     if (path.endsWith('/rest/v1/study_groups')) {
       if (method === 'GET') return route.fulfill(jsonResponse(state.studyGroups.filter(group => !group.is_archived)));
@@ -896,3 +945,76 @@ test('verified student can reject an incoming connection request', async ({ page
   expect(state.connectionResponseCalls[0].p_accept).toBe(false);
   expect(state.connectionSummaries[0].status).toBe('rejected');
 });
+
+test('verified student can open an accepted connection chat, read messages and send a persisted message', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+    connectionSummaries: [{
+      connection_id: 'connection-chat-001',
+      other_student_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      initials: 'RA',
+      program: 'Manajemen',
+      status: 'accepted',
+      created_at: '2026-10-30T10:00:00.000Z',
+      is_incoming: false,
+    }],
+    directMessages: [{
+      id: 'direct-message-incoming-001',
+      connection_id: 'connection-chat-001',
+      sender_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      body: '<script>window.__chatInjected = true</script>Halo! Kita belajar bareng?',
+      created_at: '2026-10-30T11:00:00.000Z',
+      read_at: null,
+    }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="matching"]').first().click();
+  await page.locator('[data-chat-open="connection-chat-001"]').click();
+
+  await expect(page.locator('#modal-backdrop')).toHaveClass(/open/);
+  await expect(page.locator('#modal-title')).toContainText('Mahasiswa UT · RA');
+  await expect(page.locator('#direct-chat-messages')).toContainText('Halo! Kita belajar bareng?');
+  await expect(page.locator('#direct-chat-messages script')).toHaveCount(0);
+  await expect.poll(() => state.directMessages[0].read_at).not.toBeNull();
+
+  await page.locator('#direct-chat-input').fill('Siap, aku akan bahas materi Sistem Operasi.');
+  await page.locator('#direct-chat-send').click();
+  await expect(page.locator('#direct-chat-messages')).toContainText('Siap, aku akan bahas materi Sistem Operasi.');
+  expect(state.directMessageSendCalls).toHaveLength(1);
+  expect(state.directMessageSendCalls[0]).toEqual({
+    connection_id: 'connection-chat-001',
+    sender_id: USER.id,
+    body: 'Siap, aku akan bahas materi Sistem Operasi.',
+  });
+  expect(state.directMessages.some(message => message.body === 'Siap, aku akan bahas materi Sistem Operasi.')).toBe(true);
+});
+
+test('chat action is unavailable while a connection request is still pending', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+    connectionSummaries: [{
+      connection_id: 'connection-chat-pending-001',
+      other_student_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      initials: 'RA',
+      program: 'Manajemen',
+      status: 'pending',
+      created_at: '2026-10-30T10:00:00.000Z',
+      is_incoming: false,
+    }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="matching"]').first().click();
+  await expect(page.locator('#connection-list')).toContainText('Menunggu jawaban');
+  await expect(page.locator('[data-chat-open]')).toHaveCount(0);
+  expect(state.directMessageSendCalls).toHaveLength(0);
+  expect(state.directMessageReadCalls).toHaveLength(0);
+});
+
