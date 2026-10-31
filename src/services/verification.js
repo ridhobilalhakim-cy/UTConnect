@@ -23,15 +23,22 @@ export async function submitStudentVerificationEvidence(file) {
   if (!ALLOWED_TYPES.has(file.type)) throw new Error("Format dokumen harus PDF, JPG, atau PNG.");
   if (file.size <= 0 || file.size > MAX_FILE_SIZE) throw new Error("Ukuran dokumen maksimal 5 MB.");
 
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  throwIfError(userError);
+  const userId = userData?.user?.id;
+  if (!userId || !/^[0-9a-f-]{36}$/i.test(userId)) {
+    throw new Error("Sesi akun tidak valid. Silakan masuk kembali.");
+  }
+
   const extension = ALLOWED_TYPES.get(file.type);
-  const storagePath = `${(await supabase.auth.getUser()).data.user?.id}/${crypto.randomUUID()}.${extension}`;
+  const storagePath = `${userId}/${crypto.randomUUID()}.${extension}`;
   const originalFilename = file.name
     .replace(/[\\/\\r\\n]/g, "_")
     .trim()
     .slice(0, 255);
 
-  if (!storagePath.startsWith("undefined/") && !/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(pdf|jpg|png)$/i.test(storagePath)) {
-    throw new Error("Sesi akun tidak valid. Silakan masuk kembali.");
+  if (!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(pdf|jpg|png)$/i.test(storagePath)) {
+    throw new Error("Lokasi penyimpanan bukti tidak valid.");
   }
   if (!originalFilename) throw new Error("Nama file tidak valid.");
 
