@@ -13,12 +13,21 @@ import {
   downloadStudentVerificationEvidence,
   reviewStudentVerificationRequest,
 } from "../services/verification.js";
+import {
+  listActiveForumCourses,
+  listForumPosts,
+  createForumPost,
+  deleteForumPost,
+  listForumComments,
+  createForumComment,
+  deleteForumComment,
+} from "../services/forum.js";
 
-export function initDashboard({ isAdmin = false } = {}) {
+export function initDashboard({ isAdmin = false, isVerified = false, verificationStatus = "pending", currentUserId = null, currentUserName = "Mahasiswa UT" } = {}) {
   window.L = L;
   const lucide = window.lucide;
 const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root.querySelectorAll(s)];
-  const state={page:'home',radius:3,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,center:[-6.9175,107.6191],connected:new Set(),pending:new Set(),joined:new Set(),messages:{},infoItems:[]};
+  const state={page:'home',radius:3,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,center:[-6.9175,107.6191],connected:new Set(),pending:new Set(),joined:new Set(),messages:{},infoItems:[],forumPosts:[],forumCourses:[]};
   const students=[
     {id:1,nim:'049100101',initial:'RA',name:'Rina Amelia',prodi:'Manajemen',distance:.55,courses:['Pengantar Manajemen','Statistika'],topics:['Manajemen waktu'],times:['Malam hari'],mode:'Online'},
     {id:2,nim:'049100102',initial:'DP',name:'Dimas Prakoso',prodi:'Sistem Informasi',distance:1.2,courses:['Algoritma & Pemrograman','Sistem Operasi'],topics:['Struktur data','Perulangan'],times:['Akhir pekan','Malam hari'],mode:'Online'},
@@ -37,14 +46,10 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     {id:3,name:'Sistem Operasi — Study Circle',course:'Sistem Operasi',mode:'Online',when:'Rabu, 20.00 WIB',place:'Zoom',members:20,capacity:20,open:false},
     {id:4,name:'English Practice Corner',course:'Bahasa Inggris',mode:'Online',when:'Minggu, 09.00 WIB',place:'Google Meet',members:9,capacity:15,open:true}
   ];
-  const posts=[
-    {id:1,initial:'DP',name:'Dimas P.',course:'Algoritma & Pemrograman',time:'2 jam lalu',text:'Ada yang bisa membantu memahami perulangan bersarang? Saya sedang mencoba membuat flowchart dan masih bingung menentukan kondisi berhentinya.',replies:4},
-    {id:2,initial:'AR',name:'Anisa R.',course:'Pengantar Manajemen',time:'5 jam lalu',text:'Menurut teman-teman, bagaimana cara membedakan fungsi perencanaan dan pengorganisasian dalam contoh kasus sederhana?',replies:2},
-    {id:3,initial:'FN',name:'Fajar N.',course:'Statistika',time:'Kemarin',text:'Saya sedang belajar uji hipotesis. Ada rekomendasi cara memahami hubungan hipotesis nol dan hipotesis alternatif?',replies:6}
-  ];
+
   function toast(message){const el=$('#toast');el.textContent=message;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),2500)}
   function icons(){if(window.lucide)lucide.createIcons()}
-  function navigate(page){state.page=page;$$('.page-section').forEach(s=>s.classList.toggle('active',s.id==='page-'+page));$$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));const labels={home:'Beranda',matching:'Matching',forum:'Forum',groups:'Grup Belajar',info:'Informasi UT',profile:'Profil Saya',verification:'Verifikasi Mahasiswa'};$('#crumb-current').textContent=labels[page]||'Beranda';window.scrollTo({top:0,behavior:'smooth'});if(page==='home'&&state.map)setTimeout(()=>state.map.invalidateSize(),80);if(page==='verification')loadVerification();icons()}
+  function navigate(page){state.page=page;$$('.page-section').forEach(s=>s.classList.toggle('active',s.id==='page-'+page));$$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));const labels={home:'Beranda',matching:'Matching',forum:'Forum',groups:'Grup Belajar',info:'Informasi UT',profile:'Profil Saya',verification:'Verifikasi Mahasiswa'};$('#crumb-current').textContent=labels[page]||'Beranda';window.scrollTo({top:0,behavior:'smooth'});if(page==='home'&&state.map)setTimeout(()=>state.map.invalidateSize(),80);if(page==='verification')loadVerification();if(page==='forum')loadForum();icons()}
   $$('[data-page]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));$$('[data-go]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.go)));
   function visibleStudents(){return students.filter(s=>s.distance<=state.radius&&(!state.search||s.nim.includes(state.search)))}
   function renderNearby(){const list=$('#nearby-list');const items=visibleStudents().slice(0,5);list.innerHTML=items.length?items.map(s=>`<div class="person-row"><div class="person-avatar">${s.initial}</div><div class="person-meta"><strong>${state.connected.has(s.id)?escapeText(s.name):`Mahasiswa ${s.initial}`}</strong><span>${s.prodi}</span></div><span class="distance">~${Math.round(s.distance*10)/10} km</span></div>`).join(''):`<div class="empty-state"><div class="empty-icon"><i data-lucide="user-search"></i></div><h3>Belum ada hasil</h3><p>Tidak ditemukan mahasiswa dalam radius atau pencarian yang dipilih.</p></div>`;icons()}
@@ -54,8 +59,189 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   $('#nim-search').addEventListener('input',e=>{state.search=e.target.value.replace(/\D/g,'').slice(0,9);$('#clear-search').style.display=state.search?'inline-flex':'none';renderMapMarkers();if(state.search.length===9){const found=visibleStudents().find(s=>s.nim===state.search);if(found){toast(`Mahasiswa ditemukan: ${found.initial}`);if(state.map){const bearing=(found.id*137.5)*Math.PI/180;const latOffset=(Math.cos(bearing)*found.distance)/111.32;const lngOffset=(Math.sin(bearing)*found.distance)/(111.32*Math.cos(state.center[0]*Math.PI/180));state.map.setView([state.center[0]+latOffset,state.center[1]+lngOffset],16);if(state.markers[0])state.markers[0].openPopup()}}else toast(`NIM tidak ditemukan dalam radius ${state.radius} km`)} });$('#clear-search').addEventListener('click',()=>{$('#nim-search').value='';state.search='';$('#clear-search').style.display='none';renderMapMarkers()});$('#locate-btn').addEventListener('click',()=>toast('Lokasi demo digunakan. GPS belum diaktifkan pada prototype ini.'));
   function renderMatches(){const course=$('#filter-course').value,topic=$('#filter-topic').value,time=$('#filter-time').value,mode=$('#filter-mode').value;const filtered=students.filter(s=>(!course||s.courses.includes(course))&&(!topic||s.topics.includes(topic))&&(!time||s.times.includes(time))&&(!mode||s.mode===mode));$('#match-count').textContent=`${filtered.length} rekomendasi berdasarkan preferensi · data simulasi`;$('#match-results').innerHTML=filtered.length?filtered.map(s=>`<article class="surface match-card"><div class="match-top"><div class="person-avatar">${s.initial}</div><div class="person-meta"><strong>${state.connected.has(s.id)?escapeText(s.name):`Mahasiswa ${s.initial}`}</strong><span>${s.prodi} · sekitar ${s.distance.toFixed(1)} km</span></div><span class="match-score">${s.courses.includes(course)&&course?'Cocok':'Relevan'}</span></div><div class="match-tags">${s.courses.map(c=>`<span class="tag">${c}</span>`).join('')}${s.topics.map(t=>`<span class="tag">${t}</span>`).join('')}</div><div class="match-card-foot"><span class="tiny muted">${s.mode} · ${s.times.join(', ')}</span>${state.connected.has(s.id)?`<button class="btn btn-primary btn-sm" data-chat="${s.id}"><i data-lucide="message-circle"></i>Chat</button>`:state.pending?.has(s.id)?`<div style="display:flex;align-items:center;gap:6px"><span class="tiny muted">Menunggu</span><button class="btn btn-secondary btn-sm" data-accept="${s.id}">Simulasikan diterima</button></div>`:`<button class="btn btn-primary btn-sm" data-connect="${s.id}">Connect</button>`}</div></article>`).join(''):`<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon"><i data-lucide="users"></i></div><h3>Belum ada rekomendasi yang sesuai</h3><p>Coba ubah preferensi mata kuliah, topik, atau waktu belajar.</p></div>`;$$('[data-connect]').forEach(b=>b.addEventListener('click',()=>{const id=Number(b.dataset.connect);state.pending.add(id);renderMatches();toast('Permintaan connect dicatat di sesi demo.')}));$$('[data-accept]').forEach(b=>b.addEventListener('click',()=>{const id=Number(b.dataset.accept);state.pending.delete(id);state.connected.add(id);renderMatches();toast('Koneksi demo disetujui. Tombol chat sekarang aktif.')}));$$('[data-chat]').forEach(b=>b.addEventListener('click',()=>openChat(Number(b.dataset.chat))));icons()}
   $('#apply-match').addEventListener('click',renderMatches);$('#reset-match').addEventListener('click',()=>{$$('#page-matching select').forEach(s=>s.value='');renderMatches()});
-  function renderPosts(){$('#post-list').innerHTML=posts.map(p=>`<article class="surface post-card"><div class="post-author"><div class="person-avatar">${escapeText(p.initial)}</div><div class="person-meta"><strong>${escapeText(p.name)}</strong><span>${escapeText(p.course)} · ${escapeText(p.time)}</span></div><span class="tag">Peer help</span></div><p>${escapeText(p.text)}</p><div class="post-actions"><button data-reply="${p.id}"><i data-lucide="message-circle"></i>${p.replies} tanggapan</button><button data-copy="${p.id}"><i data-lucide="share-2"></i>Bagikan</button></div></article>`).join('');$$('[data-reply]').forEach(b=>b.addEventListener('click',()=>toast('Diskusi detail akan dibuka setelah integrasi backend.')));$$('[data-copy]').forEach(b=>b.addEventListener('click',()=>toast('Tautan demo belum tersedia.')));icons()}
-  $('#publish-post').addEventListener('click',()=>{const text=$('#post-content').value.trim();if(!text){toast('Tulis isi diskusi terlebih dahulu.');return}posts.unshift({id:Date.now(),initial:'AB',name:'Andi B.',course:$('#post-course').value,time:'Baru saja',text,replies:0});$('#post-content').value='';renderPosts();toast('Postingan ditambahkan ke sesi demo.');});$('#new-post').addEventListener('click',()=>$('#post-content').focus());
+
+  const FORUM_POST_TYPES = { need_help: "Butuh bantuan", can_help: "Bisa membantu", discussion: "Diskusi umum" };
+  function forumDate(value) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "Tanggal tidak tersedia" : date.toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+  }
+  function renderForumAccess() {
+    const composer = $("#forum-compose");
+    const notice = $("#forum-access-notice");
+    const newPostButton = $("#new-post");
+    if (composer) composer.hidden = !isVerified;
+    if (newPostButton) newPostButton.hidden = !isVerified;
+    if (notice) {
+      notice.hidden = isVerified;
+      const reason = verificationStatus === "rejected"
+        ? "Bukti verifikasi kamu perlu diperbaiki terlebih dahulu."
+        : "Akses forum dibuka setelah status mahasiswa kamu terverifikasi.";
+      notice.innerHTML = `<div class="empty-icon"><i data-lucide="shield-check"></i></div><h3>Forum khusus mahasiswa terverifikasi</h3><p>${reason} Silakan selesaikan proses verifikasi mahasiswa terlebih dahulu.</p><button type="button" class="btn btn-primary btn-sm" id="forum-go-verification">Buka verifikasi</button>`;
+      $("#forum-go-verification")?.addEventListener("click", () => navigate("verification"));
+    }
+    icons();
+  }
+  function populateForumCourses(courses) {
+    const select = $("#post-course");
+    const notice = $("#forum-course-notice");
+    if (!select) return;
+    select.innerHTML = '<option value="">Diskusi umum</option>' + courses.map(course =>
+      `<option value="${escapeText(course.id)}">${escapeText(course.course_name)}${course.course_code ? ` · ${escapeText(course.course_code)}` : ""}</option>`
+    ).join("");
+    if (notice) notice.hidden = courses.length > 0;
+  }
+  function renderForum() {
+    const list = $("#post-list");
+    if (!list) return;
+    if (!state.forumPosts.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon"><i data-lucide="messages-square"></i></div><h3>Belum ada diskusi</h3><p>Jadilah yang pertama mengajukan pertanyaan atau berbagi pemahaman dengan mahasiswa lain.</p></div>';
+      icons();
+      return;
+    }
+    list.innerHTML = state.forumPosts.map(post => {
+      const ownPost = post.author_id === currentUserId;
+      const author = ownPost ? currentUserName : "Mahasiswa UT";
+      const typeLabel = FORUM_POST_TYPES[post.post_type] || "Diskusi";
+      const courseLabel = post.course?.course_name || "Diskusi umum";
+      const deleteButton = ownPost
+        ? `<button type="button" class="btn btn-quiet btn-sm forum-delete" data-forum-delete="${escapeText(post.id)}"><i data-lucide="trash-2"></i>Hapus</button>`
+        : "";
+      return `
+        <article class="surface post-card forum-post-card">
+          <div class="forum-post-meta"><span class="tag">${escapeText(typeLabel)}</span><span class="tag">${escapeText(courseLabel)}</span></div>
+          <div class="post-author"><div class="person-avatar">${escapeText(ownPost ? currentUserName.split(/\\s+/).slice(0,2).map(x=>x[0]||"").join("").toUpperCase() : "UT")}</div><div class="person-meta"><strong>${escapeText(author)}</strong><span>${escapeText(forumDate(post.created_at))}</span></div></div>
+          <h3 class="forum-post-title">${escapeText(post.title)}</h3>
+          <p class="forum-post-body">${escapeText(post.body)}</p>
+          <div class="post-actions forum-post-actions"><button type="button" data-forum-thread="${escapeText(post.id)}"><i data-lucide="message-circle"></i>Buka diskusi</button>${deleteButton}</div>
+        </article>`;
+    }).join("");
+    $$("[data-forum-thread]").forEach(button => button.addEventListener("click", () => openForumThread(button.dataset.forumThread)));
+    $$("[data-forum-delete]").forEach(button => button.addEventListener("click", () => confirmDeleteForumPost(button.dataset.forumDelete)));
+    icons();
+  }
+  async function loadForum({ showLoading = true } = {}) {
+    if (!isVerified) {
+      renderForumAccess();
+      $("#post-list").innerHTML = "";
+      return;
+    }
+    renderForumAccess();
+    if (showLoading) $("#post-list").innerHTML = '<div class="verification-loading">Memuat diskusi mahasiswa...</div>';
+    try {
+      const [courses, posts] = await Promise.all([listActiveForumCourses(), listForumPosts()]);
+      state.forumCourses = courses;
+      state.forumPosts = posts;
+      populateForumCourses(courses);
+      renderForum();
+    } catch (error) {
+      console.error("Forum load failed:", error);
+      $("#post-list").innerHTML = `<div class="empty-state"><div class="empty-icon"><i data-lucide="alert-circle"></i></div><h3>Forum belum dapat dimuat</h3><p>${escapeText(error?.message || "Periksa koneksi lalu coba kembali.")}</p><button class="btn btn-secondary btn-sm" id="forum-retry">Coba lagi</button></div>`;
+      $("#forum-retry")?.addEventListener("click", () => loadForum());
+      icons();
+    }
+  }
+  $("#publish-post").addEventListener("click", async () => {
+    if (!isVerified) { toast("Verifikasi mahasiswa diperlukan untuk membuat diskusi."); return; }
+    const title = $("#post-title").value.trim();
+    const body = $("#post-content").value.trim();
+    const postType = $("#post-type").value;
+    const courseId = $("#post-course").value || null;
+    if (title.length < 3 || title.length > 140) { toast("Judul diskusi harus 3–140 karakter."); return; }
+    if (!body || body.length > 5000) { toast("Isi diskusi wajib diisi dan maksimal 5.000 karakter."); return; }
+    if (!Object.hasOwn(FORUM_POST_TYPES, postType)) { toast("Jenis diskusi tidak valid."); return; }
+    const button = $("#publish-post");
+    button.disabled = true;
+    button.textContent = "Mempublikasikan...";
+    try {
+      await createForumPost({ title, body, postType, courseId });
+      $("#post-title").value = "";
+      $("#post-content").value = "";
+      $("#post-type").value = "need_help";
+      $("#post-course").value = "";
+      await loadForum({ showLoading: false });
+      toast("Diskusi berhasil dipublikasikan.");
+    } catch (error) {
+      console.error("Forum post creation failed:", error);
+      toast(`Diskusi gagal dipublikasikan: ${error?.message || "periksa status verifikasi dan koneksi."}`);
+    } finally {
+      button.disabled = false;
+      button.innerHTML = '<i data-lucide="send"></i>Publikasikan';
+      icons();
+    }
+  });
+  $("#new-post").addEventListener("click", () => $("#post-title")?.focus());
+  async function openForumThread(postId) {
+    const post = state.forumPosts.find(item => item.id === postId);
+    if (!post) return;
+    try {
+      const comments = await listForumComments(postId);
+      const commentsHtml = comments.length ? comments.map(comment => {
+        const ownComment = comment.author_id === currentUserId;
+        const author = ownComment ? currentUserName : "Mahasiswa UT";
+        const remove = ownComment
+          ? `<button type="button" class="link-btn forum-comment-delete" data-forum-comment-delete="${escapeText(comment.id)}">Hapus</button>`
+          : "";
+        return `<div class="forum-comment"><div class="forum-comment-head"><strong>${escapeText(author)}</strong><span>${escapeText(forumDate(comment.created_at))}</span></div><p>${escapeText(comment.body)}</p>${remove}</div>`;
+      }).join("") : '<div class="forum-thread-empty">Belum ada tanggapan. Mulai percakapan dengan komentar yang relevan dan santun.</div>';
+      openModal("Diskusi dan tanggapan", `
+        <div class="forum-thread">
+          <span class="tag">${escapeText(FORUM_POST_TYPES[post.post_type] || "Diskusi")}</span>
+          <h3>${escapeText(post.title)}</h3>
+          <p class="forum-thread-body">${escapeText(post.body)}</p>
+          <div class="forum-thread-comments"><strong>Tanggapan (${comments.length})</strong>${commentsHtml}</div>
+          <div class="field"><label for="forum-comment-input">Tulis tanggapan</label><textarea id="forum-comment-input" class="textarea" rows="3" maxlength="3000" placeholder="Berikan penjelasan atau pertanyaan lanjutan..."></textarea></div>
+          <button type="button" class="btn btn-primary btn-sm" id="forum-comment-send"><i data-lucide="send"></i>Kirim tanggapan</button>
+        </div>`, "Tutup");
+      $("#modal-confirm").style.display = "none";
+      $("#modal-cancel").textContent = "Tutup";
+      $("#forum-comment-send").addEventListener("click", async () => {
+        const input = $("#forum-comment-input");
+        const body = input.value.trim();
+        if (!body || body.length > 3000) { toast("Tanggapan wajib diisi dan maksimal 3.000 karakter."); return; }
+        const button = $("#forum-comment-send");
+        button.disabled = true;
+        button.textContent = "Mengirim...";
+        try {
+          await createForumComment(postId, body);
+          toast("Tanggapan berhasil dikirim.");
+          await openForumThread(postId);
+        } catch (error) {
+          console.error("Forum comment creation failed:", error);
+          toast(`Tanggapan gagal dikirim: ${error?.message || "periksa status verifikasi dan koneksi."}`);
+          button.disabled = false;
+          button.innerHTML = '<i data-lucide="send"></i>Kirim tanggapan';
+          icons();
+        }
+      });
+      $$("[data-forum-comment-delete]").forEach(button => button.addEventListener("click", async () => {
+        try {
+          await deleteForumComment(button.dataset.forumCommentDelete);
+          toast("Tanggapan dihapus.");
+          await openForumThread(postId);
+        } catch (error) {
+          toast(error?.message || "Tanggapan tidak dapat dihapus.");
+        }
+      }));
+      icons();
+    } catch (error) {
+      console.error("Forum thread load failed:", error);
+      toast(error?.message || "Tanggapan tidak dapat dimuat.");
+    }
+  }
+  function confirmDeleteForumPost(postId) {
+    const post = state.forumPosts.find(item => item.id === postId);
+    if (!post || post.author_id !== currentUserId) return;
+    openModal("Hapus diskusi?", `<p class="section-note">Diskusi <strong>${escapeText(post.title)}</strong> dan seluruh tanggapannya akan dihapus. Tindakan ini tidak dapat dibatalkan.</p>`, "Hapus diskusi", async () => {
+      try {
+        await deleteForumPost(postId);
+        await loadForum({ showLoading: false });
+        return true;
+      } catch (error) {
+        toast(error?.message || "Diskusi tidak dapat dihapus.");
+        return false;
+      }
+    }, "Diskusi berhasil dihapus.");
+  }
   function renderGroups(){const q=$('#group-search').value.toLowerCase();const filtered=groups.filter(g=>(state.groupFilter==='Semua'||g.mode===state.groupFilter)&&(`${g.name} ${g.course}`.toLowerCase().includes(q)));$('#group-list').innerHTML=filtered.map(g=>`<article class="surface group-card"><div class="group-head"><div><h3>${escapeText(g.name)}</h3><div class="group-sub">${escapeText(g.course)}</div></div><span class="mode ${g.mode.toLowerCase()}">${g.mode}</span></div><div class="group-sub" style="margin-top:11px"><i data-lucide="calendar-days" style="width:12px;height:12px;vertical-align:middle"></i> ${escapeText(g.when)} · ${escapeText(g.place)}</div><div class="capacity"><span style="width:${g.members/g.capacity*100}%"></span></div><div class="group-sub">${g.members} dari ${g.capacity} anggota</div><div class="group-foot"><span class="tiny" style="color:${g.open?'#287b59':'#b7791f'}">${g.open?'Pendaftaran dibuka':'Kapasitas penuh'}</span><button class="btn ${state.joined.has(g.id)?'btn-secondary':'btn-primary'} btn-sm" data-join="${g.id}" ${!g.open&&!state.joined.has(g.id)?'disabled':''}>${state.joined.has(g.id)?'Tergabung':g.open?'Lihat grup':'Penuh'}</button></div></article>`).join('')||'<div class="empty-state" style="grid-column:1/-1"><h3>Kelompok tidak ditemukan</h3><p>Coba kata kunci atau filter lain.</p></div>';$$('[data-join]').forEach(b=>b.addEventListener('click',()=>{const id=Number(b.dataset.join);state.joined.add(id);renderGroups();toast('Status bergabung demo diperbarui.')}));icons()}
   $('#group-search').addEventListener('input',renderGroups);$$('[data-group-filter]').forEach(b=>b.addEventListener('click',()=>{state.groupFilter=b.dataset.groupFilter;$$('[data-group-filter]').forEach(x=>x.classList.toggle('active',x===b));renderGroups()}));$('#create-group').addEventListener('click',()=>openModal('Buat kelompok belajar',`<p class="section-note">Kelompok baru akan ditambahkan ke sesi preview ini. Penyimpanan bersama memerlukan backend.</p><div class="field"><label for="new-group-name">Nama kelompok</label><input id="new-group-name" class="text-input" placeholder="Contoh: Belajar Algoritma Bersama" maxlength="70"></div><div class="field"><label for="new-group-course">Mata kuliah</label><select id="new-group-course" class="select"><option>Algoritma & Pemrograman</option><option>Statistika</option><option>Sistem Operasi</option><option>Pengantar Manajemen</option><option>Bahasa Inggris</option></select></div><div class="field"><label for="new-group-mode">Mode pertemuan</label><select id="new-group-mode" class="select"><option>Online</option><option>Offline</option></select></div><div class="field"><label for="new-group-cap">Kapasitas (2–100)</label><input id="new-group-cap" class="text-input" type="number" min="2" max="100" value="10"></div><div class="field"><label for="new-group-when">Jadwal</label><input id="new-group-when" class="text-input" placeholder="Contoh: Sabtu, 19.00 WIB"></div>`,`Buat kelompok (demo)`,()=>{const name=$('#new-group-name').value.trim(),capacity=Number($('#new-group-cap').value),when=$('#new-group-when').value.trim();if(!name||!when||!Number.isInteger(capacity)||capacity<2||capacity>100){toast('Lengkapi nama, jadwal, dan kapasitas 2–100.');return false}groups.unshift({id:Date.now(),name,course:$('#new-group-course').value,mode:$('#new-group-mode').value,when,place:$('#new-group-mode').value==='Online'?'Platform online':'Lokasi menyusul',members:1,capacity,open:true});renderGroups();return true}));
   const INFO_CATEGORY_LABELS={competition:'Lomba',job:'Loker',seminar:'Seminar',tips:'Tips Belajar',ukm:'UKM',hima:'HIMA',academic:'Akademik'};
@@ -352,5 +538,5 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   function closeModal(){$('#modal-backdrop').classList.remove('open');if(activeVerificationPreviewUrl){URL.revokeObjectURL(activeVerificationPreviewUrl);activeVerificationPreviewUrl=null}}
   const guide=`<div style="display:grid;gap:14px"><div><b style="font-size:11px">01 · Lengkapi profil</b><p class="section-note">Daftar dengan data akademik yang diperlukan. Verifikasi identitas harus dilakukan melalui layanan yang sah pada versi produksi.</p></div><div><b style="font-size:11px">02 · Atur lokasi secara sadar</b><p class="section-note">Pilih lokasi perkiraan dan tentukan apakah ingin tampil di radar. Jangan tampilkan alamat rumah atau koordinat presisi kepada pengguna lain.</p></div><div><b style="font-size:11px">03 · Temukan teman belajar</b><p class="section-note">Gunakan radius dan preferensi mata kuliah untuk melihat rekomendasi yang relevan.</p></div><div><b style="font-size:11px">04 · Bangun koneksi</b><p class="section-note">Kirim permintaan connect. Chat hanya tersedia setelah kedua pihak menyetujui koneksi.</p></div><div><b style="font-size:11px">05 · Belajar bersama</b><p class="section-note">Gunakan forum untuk peer help atau bergabung dan membuat kelompok belajar.</p></div><p class="tiny muted" style="padding:10px;background:#f7f9fc;border-radius:9px">Catatan: halaman ini adalah prototype UI/UX dengan data simulasi. Integrasi akun, lokasi aman, koneksi, dan chat multi-user belum tersedia.</p></div>`;
   $$('[data-open-guide]').forEach(b=>b.addEventListener('click',()=>openModal('Panduan UT Connect',guide)));$('#modal-close').addEventListener('click',closeModal);$('#modal-cancel').addEventListener('click',closeModal);$('#modal-confirm').addEventListener('click',async()=>{if(modalAction){const confirmButton=$('#modal-confirm');confirmButton.disabled=true;try{const result=await modalAction();if(result===false)return;modalAction=null;closeModal();toast(modalSuccessMessage)}catch(error){console.error('Modal action failed:',error);toast(error.message||'Tindakan gagal. Silakan coba lagi.')}finally{confirmButton.disabled=false}return}closeModal();toast('Panduan ditutup.')});$('#modal-backdrop').addEventListener('click',e=>{if(e.target.id==='modal-backdrop')closeModal()});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});$('#notif-btn').addEventListener('click',()=>toast('Belum ada notifikasi baru.'));$('#edit-profile').addEventListener('click',()=>openModal('Edit profil',`<p class="section-note">Form edit profil ditampilkan sebagai rancangan UI. Penyimpanan dan verifikasi perubahan belum terhubung ke backend.</p><div class="field"><label>Nama tampilan</label><input class="text-input" value="Andi Bintang"></div><div class="field"><label>Program studi</label><input class="text-input" value="Sistem Informasi" disabled></div><div class="field"><label>Preferensi belajar</label><select class="select"><option>Online · Malam hari</option><option>Online · Akhir pekan</option><option>Offline</option></select></div>`,`Tutup`));
-  renderNearby();renderMatches();renderPosts();renderGroups();loadInformation();loadVerification();initMap();icons();
+  renderNearby();renderMatches();loadForum();renderGroups();loadInformation();loadVerification();initMap();icons();
 }
