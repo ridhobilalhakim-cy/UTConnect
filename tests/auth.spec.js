@@ -341,9 +341,16 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
       const group = state.studyGroups.find(item => item.id === input.p_group_id);
       if (!group) return route.fulfill(jsonResponse({ message: 'group not found' }, 404));
       const status = group.access_type === 'approval' ? 'pending' : 'active';
+      if (group.access_type === 'private' && !state.myGroupInvitations.some(invite => invite.group_id === group.id)) {
+        return route.fulfill(jsonResponse({ message: 'private invitation required' }, 403));
+      }
       const existing = state.groupMembers.find(member => member.group_id === group.id && member.user_id === USER.id);
       if (existing) Object.assign(existing, { status, role: 'member', joined_at: status === 'active' ? new Date().toISOString() : null });
       else state.groupMembers.push({ group_id: group.id, user_id: USER.id, role: 'member', status, created_at: new Date().toISOString(), joined_at: status === 'active' ? new Date().toISOString() : null });
+      if (group.access_type === 'private') {
+        state.myGroupInvitations = state.myGroupInvitations.filter(invite => invite.group_id !== group.id);
+        state.groupInvites = state.groupInvites.map(invite => invite.group_id === group.id ? { ...invite, accepted_at: new Date().toISOString() } : invite);
+      }
       return route.fulfill(jsonResponse(status));
     }
     if (path.endsWith('/rest/v1/rpc/respond_group_join_request') && method === 'POST') {
@@ -355,6 +362,154 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
       member.status = input.p_accept ? 'active' : 'rejected';
       member.joined_at = input.p_accept ? new Date().toISOString() : null;
       return route.fulfill(jsonResponse(member.status));
+    }
+    if (path.endsWith('/rest/v1/group_messages')) {
+      const groupFilter = url.searchParams.get('group_id') || '';
+      const groupId = groupFilter.startsWith('eq.') ? groupFilter.slice(3) : '';
+      if (method === 'GET') {
+        return route.fulfill(jsonResponse(state.groupMessages
+          .filter(item => !groupId || item.group_id === groupId)
+          .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))));
+      }
+      if (method === 'POST') {
+        const input = request.postDataJSON();
+        if (input.sender_id !== USER.id || !state.groupMembers.some(member =>
+          member.group_id === input.group_id && member.user_id === USER.id && member.status === 'active'
+        )) return route.fulfill(jsonResponse({ message: 'active group member required' }, 403));
+        const created = {
+          id: 'group-message-e2e-' + (state.groupMessages.length + 1),
+          created_at: new Date().toISOString(),
+          pinned_at: null,
+          pinned_by: null,
+          ...input,
+        };
+        state.groupMessageSendCalls.push(input);
+        state.groupMessages.push(created);
+        return route.fulfill(jsonResponse(created, 201));
+      }
+    }
+    if (path.endsWith('/rest/v1/rpc/set_group_message_pin') && method === 'POST') {
+      const input = request.postDataJSON();
+      state.groupMessagePinCalls.push(input);
+      const member = state.groupMembers.find(item => item.group_id === state.groupMessages.find(message => message.id === input.p_message_id)?.group_id && item.user_id === USER.id && item.status === 'active' && ['admin', 'co_admin'].includes(item.role));
+      if (!member) return route.fulfill(jsonResponse({ message: 'admin required' }, 403));
+      const message = state.groupMessages.find(item => item.id === input.p_message_id);
+      if (!message) return route.fulfill(jsonResponse({ message: 'message not found' }, 404));
+      message.pinned_at = input.p_pin ? new Date().toISOString() : null;
+      message.pinned_by = input.p_pin ? USER.id : null;
+      return route.fulfill(jsonResponse(null));
+    }
+    if (path.endsWith('/rest/v1/group_materials')) {
+      if (method === 'GET') {
+        const groupId = url.searchParams.get('group_id')?.replace(/^eq\./, '');
+        return route.fulfill(jsonResponse(state.groupMaterials
+          .filter(item => !groupId || item.group_id === groupId)
+          .map(item => ({ ...item }))));
+      }
+      if (method === 'POST') {
+        const input = request.postDataJSON();
+        if (input.uploaded_by !== USER.id || !state.groupMembers.some(member =>
+          member.group_id === input.group_id && member.user_id === USER.id && member.status === 'active'
+        )) return route.fulfill(jsonResponse({ message: 'active group member required' }, 403));
+        const created = { id: 'group-material-e2e-' + (state.groupMaterials.length + 1), created_at: new Date().toISOString(), ...input };
+        state.groupMaterials.push(created);
+        return route.fulfill(jsonResponse(created, 201));
+      }
+      if (method === 'DELETE') {
+        const id = url.searchParams.get('id')?.replace(/^eq\./, '');
+        const row = state.groupMaterials.find(item => item.id === id && (item.uploaded_by === USER.id || state.groupMembers.some(member => member.group_id === item.group_id && member.user_id === USER.id && member.role === 'admin' && member.status === 'active')));
+        if (!row) return route.fulfill(jsonResponse({ message: 'material delete denied' }, 403));
+        state.groupMaterialDeleteCalls.push(id);
+        state.groupMaterials = state.groupMaterials.filter(item => item.id !== id);
+        return route.fulfill(jsonResponse([{ storage_path: row.storage_path }]));
+      }
+    }
+    if (path.endsWith('/rest/v1/group_agenda_items')) {
+      if (method === 'GET') {
+        const groupId = url.searchParams.get('group_id')?.replace(/^eq\./, '');
+        return route.fulfill(jsonResponse(state.groupAgendaItems.filter(item => !groupId || item.group_id === groupId)));
+      }
+      if (method === 'POST') {
+        const input = request.postDataJSON();
+        if (input.created_by !== USER.id || !state.groupMembers.some(member =>
+          member.group_id === input.group_id && member.user_id === USER.id && member.status === 'active'
+        )) return route.fulfill(jsonResponse({ message: 'active group member required' }, 403));
+        const created = { id: 'group-agenda-e2e-' + (state.groupAgendaItems.length + 1), created_at: new Date().toISOString(), updated_at: new Date().toISOString(), ...input };
+        state.groupAgendaCreateCalls.push(input);
+        state.groupAgendaItems.push(created);
+        return route.fulfill(jsonResponse(created, 201));
+      }
+      if (method === 'PATCH') {
+        const id = url.searchParams.get('id')?.replace(/^eq\./, '');
+        const input = request.postDataJSON();
+        const item = state.groupAgendaItems.find(row => row.id === id && (row.created_by === USER.id || state.groupMembers.some(member => member.group_id === row.group_id && member.user_id === USER.id && ['admin', 'co_admin'].includes(member.role) && member.status === 'active')));
+        if (!item) return route.fulfill(jsonResponse({ message: 'agenda update denied' }, 403));
+        Object.assign(item, input, { updated_at: new Date().toISOString() });
+        state.groupAgendaUpdateCalls.push({ id, input });
+        return route.fulfill(jsonResponse(item));
+      }
+      if (method === 'DELETE') {
+        const id = url.searchParams.get('id')?.replace(/^eq\./, '');
+        const item = state.groupAgendaItems.find(row => row.id === id && (row.created_by === USER.id || state.groupMembers.some(member => member.group_id === row.group_id && member.user_id === USER.id && ['admin', 'co_admin'].includes(member.role) && member.status === 'active')));
+        if (!item) return route.fulfill(jsonResponse({ message: 'agenda delete denied' }, 403));
+        state.groupAgendaDeleteCalls.push(id);
+        state.groupAgendaItems = state.groupAgendaItems.filter(row => row.id !== id);
+        return route.fulfill({ status: 204, body: '' });
+      }
+    }
+    if (path.endsWith('/rest/v1/rpc/get_group_agenda_poll_results') && method === 'POST') {
+      const input = request.postDataJSON();
+      const item = state.groupAgendaItems.find(row => row.id === input.p_item_id && row.item_type === 'poll');
+      if (!item) return route.fulfill(jsonResponse({ message: 'poll not found' }, 404));
+      const votes = state.groupPollVotes.filter(vote => vote.item_id === item.id);
+      return route.fulfill(jsonResponse({
+        options: (item.poll_options || []).map(option => ({ option, votes: votes.filter(vote => vote.option === option).length })),
+        total_votes: votes.length,
+      }));
+    }
+    if (path.endsWith('/rest/v1/rpc/cast_group_agenda_vote') && method === 'POST') {
+      const input = request.postDataJSON();
+      const item = state.groupAgendaItems.find(row => row.id === input.p_item_id && row.item_type === 'poll');
+      if (!item || !(item.poll_options || []).includes(input.p_option)) return route.fulfill(jsonResponse({ message: 'invalid poll vote' }, 400));
+      const previous = state.groupPollVotes.find(vote => vote.item_id === item.id && vote.user_id === USER.id);
+      if (previous) previous.option = input.p_option;
+      else state.groupPollVotes.push({ item_id: item.id, user_id: USER.id, option: input.p_option });
+      return route.fulfill(jsonResponse({
+        options: item.poll_options.map(option => ({ option, votes: state.groupPollVotes.filter(vote => vote.item_id === item.id && vote.option === option).length })),
+        total_votes: state.groupPollVotes.filter(vote => vote.item_id === item.id).length,
+      }));
+    }
+    if (path.endsWith('/rest/v1/rpc/list_my_group_invites') && method === 'POST') {
+      const input = request.postDataJSON();
+      if (input.p_actor_id !== USER.id) return route.fulfill(jsonResponse({ message: 'invite owner mismatch' }, 403));
+      return route.fulfill(jsonResponse(state.myGroupInvitations));
+    }
+    if (path.endsWith('/rest/v1/group_invites') && method === 'GET') {
+      const groupId = url.searchParams.get('group_id')?.replace(/^eq\./, '');
+      return route.fulfill(jsonResponse(state.groupInvites.filter(item => !groupId || item.group_id === groupId)));
+    }
+    if (path.endsWith('/functions/v1/manage-group-invites') && method === 'POST') {
+      const input = request.postDataJSON();
+      if (input.action === 'invite_by_nim') {
+        state.groupInviteCalls.push(input);
+        const created = { id: 'group-invite-e2e-' + (state.groupInvites.length + 1), group_id: input.group_id, invited_by: USER.id, created_at: new Date().toISOString(), accepted_at: null };
+        state.groupInvites.unshift(created);
+        return route.fulfill(jsonResponse({ success: true, invite_id: created.id }, 201));
+      }
+      if (input.action === 'cancel') {
+        state.groupInviteCancelCalls.push(input.invite_id);
+        state.groupInvites = state.groupInvites.filter(item => item.id !== input.invite_id);
+        state.myGroupInvitations = state.myGroupInvitations.filter(item => item.invite_id !== input.invite_id);
+        return route.fulfill(jsonResponse({ success: true }));
+      }
+      return route.fulfill(jsonResponse({ error: 'unknown invite action' }, 400));
+    }
+    if (path.includes('/storage/v1/object/group-materials/') && method === 'POST') {
+      state.groupMaterialUploadCalls.push(request.url());
+      return route.fulfill(jsonResponse({ Key: request.url().split('/object/')[1] }, 200));
+    }
+    if (path.includes('/storage/v1/object/sign/group-materials/') && method === 'POST') {
+      return route.fulfill(jsonResponse({ signedURL: '/storage/v1/object/sign/group-materials/test-signed-material' }));
     }
     if (path.endsWith('/rest/v1/forum_posts')) {
       if (method === 'GET') return route.fulfill(jsonResponse([...state.forumPosts].reverse()));
