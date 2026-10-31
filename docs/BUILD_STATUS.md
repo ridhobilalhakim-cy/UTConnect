@@ -4,19 +4,19 @@ Date: 2026-10-31
 
 ## Latest CI result
 
-Latest confirmed GitHub Actions run #119: **SUCCESS** (2026-10-31).
-Commit: 6801fd15c4ebc4b4ef1fffcc6a206e07ec29d7c1
+Latest confirmed successful GitHub Actions run for the complete Group workspace: **run #171** on 2026-10-31.
+
+Commit: `3fb584e089c87c552f805842974b5fb3be9aa813`
 
 - Dependency installation with committed lockfile — PASS.
-- npm run check — PASS (2 HTML pages, local imports, one shared Supabase client, and 13 JS/test modules syntax-checked).
-- npm run build — PASS; Vite generated the production site in dist/.
+- `npm run check` — PASS.
+- `npm run build` — PASS; Vite generated the production site in `dist/`.
 - Playwright Chromium installation — PASS.
-- Browser end-to-end suite — **30 passed, 0 failed**.
-- Home Map scenarios cover authenticated nearby results, NIM request-body handling, radar opt-out while browsing remains available, and pending-student gating.
+- Browser end-to-end suite — **35 passed, 0 failed**.
 
-Workflow run: https://github.com/ridhobilalhakim-cy/UTConnect/actions/runs/41201332750
+Workflow run: https://github.com/ridhobilalhakim-cy/UTConnect/actions/runs/41208606720
 
-These browser tests use mocked Supabase HTTP responses and synthetic fixtures. A passing run verifies browser wiring and production bundle construction, not the live behavior of two real staging accounts, third-party OAuth/email, or deployment to Netlify.
+These browser tests use mocked Supabase/Storage HTTP responses and synthetic fixtures. They verify the UI wiring and production bundle but do not establish real two-account Realtime, real Storage access, OAuth/email delivery, or deployment to Netlify. Documentation/migration-history cleanup commits were pushed after run #171; the newest PR-head CI run is tracked separately in GitHub Actions.
 
 ## Information UT milestone
 
@@ -158,7 +158,7 @@ Security migrations applied to staging:
 
 Live staging counts remain 0 study_groups, 0 group_members, 0 group_invites, and 0 active courses. No group test records were retained.
 
-The repository defines 35 mocked Playwright scenarios, including five new workspace cases (chat/pin, material upload, poll create/vote, private invite by NIM, invite acceptance) and the existing group membership approval case. The current PR head has fresh Actions run #156 in progress; source checks/build status and the complete 35-test Playwright result must be confirmed on that exact head before merge. Real two-account group chat, Storage access, invitation notification, poll Realtime and member-approval acceptance remain external checks.
+The repository defines 35 mocked Playwright scenarios, including five new workspace cases (chat/pin, material upload, poll create/vote, private invite by NIM, invite acceptance) and the existing group membership approval case. Run #171 passed all 35 tests. The current PR head includes subsequent documentation-only cleanup and is being rechecked by GitHub Actions before merge. Real two-account group chat, Storage access, invitation notification, poll Realtime and member-approval acceptance remain external checks.
 
 
 ## Matching & Connections milestone — implementation added 2026-10-31
