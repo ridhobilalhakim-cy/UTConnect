@@ -158,7 +158,7 @@ Security changes applied to staging:
 
 Live staging counts remain 0 study_groups, 0 group_members, 0 group_invites, and 0 active courses. No group test records were retained.
 
-The repository defines 35 mocked Playwright scenarios. Run #171 passed all 35 tests, including the five Group workspace scenarios for chat/pinning, private material upload, poll creation/voting, private invitation by NIM, and invite acceptance. Later changes clean up migration-history and status documentation; the latest PR-head CI run remains the merge gate. Real two-account group chat, Storage access, invitation notification, poll Realtime and membership approval remain external acceptance checks.
+At the Group workspace milestone on 2026-10-31 the repository defined 35 mocked Playwright scenarios. The suite has since expanded to 43 scenarios; PR-head run #230 passed all 43. Real two-account group chat, Storage access, invitation notification, poll Realtime and membership approval remain external acceptance checks.
 
 
 ## Matching & Connections milestone — implementation added 2026-10-31
@@ -183,7 +183,7 @@ Database and privacy boundary:
 
 Live staging counts after migration: 0 matching preferences, 0 profile-course links, 0 connections, 0 direct messages, and 0 matching search events. Four profiles exist, with one verified and three pending; all four current location records have radar visibility enabled, but only verified profiles are eligible for matching.
 
-The repository now defines 35 Playwright scenarios in total. Run #119 passed all 30 tests that existed at that point, including Matching, Direct Messaging, Notifications, and Home Map integration scenarios. The five Group workspace scenarios were added afterwards and still require confirmation on the current PR head. Home Map tests use mocked Edge Function responses; live multi-account location and privacy behavior remains an external acceptance check.
+At the earlier Home Map milestone, run #119 passed the 30 tests then present. The current suite has expanded to 43 scenarios and PR-head run #230 passed all 43. Home Map tests use mocked Edge Function responses; live multi-account location and privacy behavior remains an external acceptance check.
 
 The Supabase security advisor previously flagged the Matching-related SECURITY DEFINER functions because authenticated users can execute them; their function bodies validate the authenticated caller and constrain results/actions to that caller. The Home Map location and search RPCs are separately restricted to service_role and are called only through JWT-verified Edge Functions. The private search-event tables have RLS enabled and no public table privileges. The advisor also reports leaked-password protection disabled; this is a separate Auth configuration item.
 
