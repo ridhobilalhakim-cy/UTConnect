@@ -1,21 +1,21 @@
-# Build and verification status — Phase 0.5 / Information UT / Student Verification
+# Build and verification status — Information UT / Student Verification / Forum Diskusi
 
 Date: 2026-10-31
 
 ## Latest CI result
 
-GitHub Actions run #33: **SUCCESS**  
-Commit: `f90411793c213c91a31ad80a212f38316b4319cf`  
+GitHub Actions run #50: **SUCCESS**  
+Commit: `ec7eacf3b136b29f4887843654cb4c41268ed7bd`  
 Workflow: `Verify UT Connect build`
 
 - Dependency install with committed `package-lock.json` — PASS.
 - `npm run check` — PASS.
 - `npm run build` — PASS; Vite generated the production site in `dist/`.
 - Playwright Chromium installation — PASS.
-- Browser E2E — **10 passed**.
-- Filename-sanitization fix included and verified.
+- Browser E2E — **13 passed**.
+- Forum create/comment flows and verified-only access checks included.
 
-Workflow run: https://github.com/ridhobilalhakim-cy/UTConnect/actions/runs/41182270518
+Workflow run: https://github.com/ridhobilalhakim-cy/UTConnect/actions/runs/41191070350
 
 ## Information UT milestone
 
@@ -34,7 +34,7 @@ Student feed behavior:
 - The management button is hidden for non-admin accounts.
 - The production table currently has zero information posts; no sample posts have been inserted.
 
-The ten mocked Playwright tests cover auth UI/session behavior, admin Information UT create/edit/unpublish/republish/delete, and student read-only visibility. They verify client-side behavior but do not substitute for a real-browser test against live Supabase.
+The 13 mocked Playwright tests cover auth UI/session behavior, admin Information UT CRUD/publication, student read-only visibility, Student Verification upload/review, and Forum Diskusi verified-only access, post creation, and comments. They verify client-side behavior but do not substitute for a real-browser test against live Supabase.
 
 ## Supabase role and RLS verification
 
@@ -63,7 +63,7 @@ This environment could not independently resolve the public Netlify domain. The 
 2. Test Google sign-in and profile completion using each team's actual account.
 3. Test Information UT create/edit/publish/unpublish/delete from a real admin browser session and confirm student read visibility.
 4. Define and publish the evidence acceptance and retention policy before opening Student Verification to the public.
-5. Integrate and test Forum, Groups, Matching/Connections, Chat, notifications, and map access one service at a time.
+5. Integrate Groups, Matching/Connections, Chat, notifications, and map access one service at a time.
 
 ## Source-control caveats
 
@@ -107,3 +107,25 @@ At the last live database check:
 - 0 profiles are verified.
 - 0 verification requests are awaiting review.
 - 0 review events have been recorded.
+
+
+## Forum Diskusi milestone
+
+The Forum page is now connected to the existing public.forum_posts and public.forum_comments tables through src/services/forum.js.
+
+Student experience:
+- Verified students can browse the latest 50 discussions.
+- They can create a post with a title (3–140 characters), body (up to 5,000 characters), and post type: need_help, can_help, or discussion.
+- An optional active course can be attached. The current active course catalogue is empty, so discussions can still be posted as general discussions.
+- Students can open a thread, read comments, add comments (up to 3,000 characters), and delete their own posts/comments.
+- Pending/rejected students see a verification gate and cannot access the forum UI.
+
+Security boundary:
+- Live RLS policies on forum_posts and forum_comments restrict SELECT and INSERT to verified users and enforce author_id = auth.uid() for inserts.
+- UPDATE/DELETE policies scope post/comment changes to the original author.
+- The UI receives the signed-in user's own name from the profile already loaded for the session. Other students' profile names are masked because profiles RLS does not permit reading another user's profile record.
+- Existing RLS remains authoritative; the UI gate is supplementary and cannot grant access by itself.
+
+Live database counts at the latest check: 0 forum posts, 0 forum comments, and 0 active courses. One of four profiles is verified; three are pending. No live test records were inserted.
+
+The 13 Playwright tests use mocked Supabase HTTP routes and synthetic data. They prove client-side flows but do not prove live posting/commenting across real accounts. Real-browser acceptance against Supabase and confirmation of the Netlify deployment are still required.
