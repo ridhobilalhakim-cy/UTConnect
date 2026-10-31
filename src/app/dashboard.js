@@ -1766,7 +1766,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   }
 
   function initialsForName(value) {
-    return String(value || "UT").trim().split(/\\s+/).slice(0, 2).map(part => part[0] || "").join("").toUpperCase() || "UT";
+    return String(value || "UT").trim().split(/\s+/).slice(0, 2).map(part => part[0] || "").join("").toUpperCase() || "UT";
   }
 
   function renderMessageRooms() {
