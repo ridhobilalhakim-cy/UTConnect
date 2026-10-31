@@ -69,7 +69,7 @@ This environment could not independently resolve the public Netlify domain. The 
 
 ## Source-control caveats
 
-- The remote staging project has fourteen recorded migrations. The first five original SQL bodies and the student_verification_workflow SQL body still need reconstruction/review in repository source. Do not re-run them blindly against the live staging database.
+- The remote staging project has nineteen recorded migrations. The first five original SQL bodies and the student_verification_workflow SQL body still need reconstruction/review in repository source. Do not re-run them blindly against the live staging database.
 - Edge Function source edits in GitHub do not automatically deploy to Supabase. The Home Map functions were explicitly deployed to staging; the registration Edge Function remains a separately deployed source mirror.
 - Never put the Supabase service-role key, secret keys, or NIM HMAC secret in browser code or public GitHub files.
 
@@ -133,26 +133,30 @@ Live database counts at the latest check: 0 forum posts, 0 forum comments, and 0
 The 13 Playwright tests use mocked Supabase HTTP routes and synthetic data. They prove client-side flows but do not prove live posting/commenting across real accounts. Real-browser acceptance against Supabase and confirmation of the Netlify deployment are still required.
 
 
-## Grup Belajar milestone — implementation added 2026-10-31
+## Grup Belajar milestone — live workspace integrated 2026-10-31
 
-The Groups page now reads and writes through `src/services/groups.js` and the existing `public.study_groups` / `public.group_members` schema.
+The Groups page now opens a live workspace through `src/app/group-workspace.js` and `src/services/groups.js`.
 
-- Verified students can discover non-archived groups and create a group. The database trigger assigns the creator as the first active admin.
-- Group creation supports a general group (no course), optional active course, online/offline mode, open/approval access, capacity (2–100), optional schedule, and optional meeting URL/area label.
-- Open groups accept eligible users immediately. Approval groups create a pending membership request; active group admins/co-admins can approve or reject requests.
-- The group UI shows generic member/request labels rather than other profile names because profile RLS does not expose another student's identity to the current user.
-- The current active course catalogue is empty, so the UI deliberately permits general groups rather than presenting invented courses.
-- Private groups can be discovered by invitees through existing RLS, but the UI for sending/managing private invitations is not included. Group chat, agenda, and material upload are also not included.
+- **Chat grup:** reads and sends `public.group_messages` for active members. Admin/co-admin pin/unpin uses actor-checked RPC `set_group_message_pin`. Realtime refreshes message history.
+- **Materi:** uploads to the existing private `group-materials` bucket (50 MiB limit; PDF, DOC/DOCX, PPTX, XLSX, JPG, PNG), records metadata in `public.group_materials`, and generates 10-minute signed download URLs for active members. Uploader or active group admin/co-admin can delete.
+- **Agenda:** supports schedule, target, task, poll and note. Active members can create; creator/admin permissions govern updates/deletes. Polls have 2–6 unique options and one vote per member. Vote rows are private and only aggregate totals/options are returned.
+- **Anggota:** admins/co-admins can approve or reject pending join requests. Other profile identities remain masked; the panel shows generic request labels and uses the authenticated membership-decision RPC.
+- **Undangan privat:** admins/co-admins can invite verified students by nine-digit NIM. NIM is HMACed in an Edge Function and resolved server-side; invitee UUID is not returned to the browser. Invitees see an owner-scoped inbox and can accept or decline.
+- Private group invitations create a `group_invite` notification and route the recipient to Groups.
+- Realtime includes messages, materials, agenda, invitations and membership status; all events remain subject to RLS SELECT policies.
+- Course catalogue is currently empty, so creating general groups remains supported.
 
-Database security update:
-- Migration `20261031101336_secure_enable_group_join_workflow_rpcs` is applied to staging.
-- `join_study_group` and `respond_group_join_request` now reject a caller whose `p_actor_id` differs from `auth.uid()`.
-- EXECUTE is granted to `authenticated` (and service_role), revoked from `PUBLIC` and `anon`; the existing database capacity, verification, and active-admin checks remain authoritative.
-- Supabase's security advisor reports a SECURITY DEFINER warning for these two RPCs because authenticated users are intentionally permitted to call these narrowly scoped functions. The functions validate the caller and do not allow direct group_members table writes.
+Security migrations applied to staging:
+- `20261031101336_secure_enable_group_join_workflow_rpcs` retains actor checks for join and membership decisions.
+- `20261031124333_group_workspace_workflows` adds private poll voting, actor-checked invitations, cancellation and actor-bound message pinning.
+- `20261031124407_group_invite_inbox_limit` adds a private invite inbox and five-per-minute NIM lookup limit.
+- `20261031133930_group_workspace_realtime_and_invite_notifications`, `20261031134014_group_members_realtime`, and `20261031134443_group_poll_realtime_touch` add RLS-filtered Realtime updates and invite notifications.
+- `manage-group-invites` Edge Function v1 is ACTIVE with JWT verification.
+- The `group-materials` bucket remains private with three object policies; `group_agenda_votes` has RLS enabled and is accessible through actor-checked RPCs only.
 
-Latest live staging counts after the migration and code changes: 0 study_groups, 0 group_members, 0 group_invites, and 0 active courses. No group test data has been inserted into Supabase. There is one verified profile and three pending profiles; verified-only group UI and database policies therefore currently restrict access to the single verified profile.
+Live staging counts remain 0 study_groups, 0 group_members, 0 group_invites, and 0 active courses. No group test records were retained.
 
-The four new group Playwright tests use mocked Supabase responses. They cover the verification gate, group creation, approval-based join request, and admin approval. They have not been counted as passing until an Actions run for the latest code confirms them. Real-user group creation and join workflows remain an acceptance test.
+The repository defines 35 mocked Playwright scenarios, including five new workspace cases (chat/pin, material upload, poll create/vote, private invite by NIM, invite acceptance) and the existing group membership approval case. CI run #134 was started for an earlier PR head; the current PR head still requires a fresh successful Actions run before merge. Real two-account group chat, Storage access, invitation notification, poll Realtime and member-approval acceptance remain external checks.
 
 
 ## Matching & Connections milestone — implementation added 2026-10-31
@@ -177,7 +181,7 @@ Database and privacy boundary:
 
 Live staging counts after migration: 0 matching preferences, 0 profile-course links, 0 connections, 0 direct messages, and 0 matching search events. Four profiles exist, with one verified and three pending; all four current location records have radar visibility enabled, but only verified profiles are eligible for matching.
 
-The repository now defines 30 Playwright scenarios in total. Run #119 passed all 30 tests, including the Matching, Direct Messaging, Notifications, and Home Map integration scenarios. Home Map tests use mocked Edge Function responses; live multi-account location and privacy behavior remains an external acceptance check.
+The repository now defines 35 Playwright scenarios in total. Run #119 passed all 30 tests that existed at that point, including Matching, Direct Messaging, Notifications, and Home Map integration scenarios. The five Group workspace scenarios were added afterwards and still require confirmation on the current PR head. Home Map tests use mocked Edge Function responses; live multi-account location and privacy behavior remains an external acceptance check.
 
 The Supabase security advisor previously flagged the Matching-related SECURITY DEFINER functions because authenticated users can execute them; their function bodies validate the authenticated caller and constrain results/actions to that caller. The Home Map location and search RPCs are separately restricted to service_role and are called only through JWT-verified Edge Functions. The private search-event tables have RLS enabled and no public table privileges. The advisor also reports leaked-password protection disabled; this is a separate Auth configuration item.
 
@@ -233,3 +237,12 @@ The dashboard removed its static Bandung center, fabricated student profiles, du
 
 Outstanding acceptance gates: use two verified synthetic staging accounts to confirm location consent, radar visibility, approximate marker privacy, server-side NIM lookup, and the hidden-viewer search behavior. The current staging project has only one verified profile, so multi-account map behavior has not yet been exercised against live data. Configure a strict CORS origin allowlist before public release. Netlify deployment is not inferred from CI success.
 
+
+ 
+## Group workspace milestone — integrated 2026-10-31
+
+The former group details modal is now a tabbed workspace for Chat grup, Materi, Agenda, and (for private groups) Undangan. Admins/co-admins have an Anggota tab for pending membership decisions.
+
+Backend features: RLS-protected group messages with admin pinning; private Storage materials with 50 MiB limit and signed URLs; agenda schedule/target/task/note/poll items; private per-member poll voting with aggregate-only result RPCs; private-group invites by server-side NIM lookup; invitee inbox accept/decline; group invitation notifications; and RLS-filtered Realtime for messages, materials, agenda, invites and membership changes.
+
+The five new migrations and `manage-group-invites` Edge Function are applied/deployed in staging. No test accounts or group content have been written to live staging. The PR currently defines 35 mocked Playwright scenarios; the CI result must be rechecked for the latest PR head before merge. See `docs/STAGING_STATE.md`, `docs/API_CONTRACT.md`, and `supabase/migrations/REMOTE_MIGRATIONS.md`.
