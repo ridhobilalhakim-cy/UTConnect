@@ -1430,6 +1430,10 @@ test('unverified student cannot access matching search or connection controls', 
 test('verified student can save personal matching preferences and preferred programmes', async ({ page }) => {
   const state = await mockSupabase(page, {
     profile: { ...PROFILE, verification_status: 'verified' },
+    matchingCandidates: [
+      { student_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', initials: 'SI', program: 'Sistem Informasi', approx_distance_m: 850, topic_tags: [], interests: [], study_times: [] },
+      { student_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', initials: 'MA', program: 'Manajemen', approx_distance_m: 900, topic_tags: [], interests: [], study_times: [] },
+    ],
   });
   await page.goto('/');
   await page.locator('#loginEmail').fill(USER.email);
@@ -1450,6 +1454,8 @@ test('verified student can save personal matching preferences and preferred prog
   expect(state.matchingPreferences.interests).toEqual(['belajar kelompok', 'persiapan UAS']);
   expect(state.matchingPreferences.study_times).toEqual(['Malam hari', 'Akhir pekan']);
   expect(state.matchingPreferences.preferred_programs).toEqual(['Sistem Informasi']);
+  await expect(page.locator('.match-card')).toHaveCount(1);
+  await expect(page.locator('.match-card')).toContainText('Sistem Informasi');
   expect(state.profileCourseIds).toEqual([]);
   expect(state.profileCourseInsertCalls).toBe(0);
   expect(state.matchingSearchCalls.length).toBeGreaterThan(0);
