@@ -127,7 +127,7 @@ Latest data counts: 0 matching preference rows, 0 profile-course links, 0 connec
 - Authenticated users cannot INSERT or DELETE notifications and cannot edit title/body/owner. They have column-level UPDATE on `read_at` only, with an RLS check that restricts updates to their own unread notifications.
 - The dashboard bell displays an unread count, lists recent notifications, marks one or all as read, and routes direct-message, forum-comment, connection, and group notifications to the relevant feature.
 - A temporary SQL transaction verified all six trigger events using synthetic profiles, a connection, message, forum post/comment, and group join. Authenticated receiver/owner contexts saw only their own notification rows; read_at updates worked while attempts to insert or change title were not granted. The transaction ended with ROLLBACK.
-- Latest real staging counts remain 0 notifications, 0 connections, 0 direct messages, 0 forum posts/comments, and 0 groups/members. No test data was retained. Two mocked Playwright tests were added; CI has not yet confirmed them.
+- Latest real staging counts checked 2026-11-01: 0 notifications, 0 connections, 0 direct messages, 0 forum posts/comments, and 0 groups/members. No test data was retained. PR-head run #230 passed all 43 mocked Playwright scenarios; live cross-account acceptance remains outstanding.
 
 ## Direct Messaging state (checked 2026-10-31)
 
