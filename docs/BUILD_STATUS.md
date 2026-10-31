@@ -138,27 +138,26 @@ The 13 Playwright tests use mocked Supabase HTTP routes and synthetic data. They
 The Groups page now opens a live workspace through `src/app/group-workspace.js` and `src/services/groups.js`.
 
 - **Chat grup:** reads and sends `public.group_messages` for active members. Admin/co-admin pin/unpin uses actor-checked RPC `set_group_message_pin`. Realtime refreshes message history.
-- **Materi:** uploads to the existing private `group-materials` bucket (50 MiB limit; PDF, DOC/DOCX, PPTX, XLSX, JPG, PNG), records metadata in `public.group_materials`, and generates 10-minute signed download URLs for active members. Uploader or active group admin/co-admin can delete.
+- **Materi:** uploads to the existing private `group-materials` bucket (50 MiB limit; PDF, DOC/DOCX, PPTX, XLSX, JPG, PNG), records metadata in `public.group_materials`, and generates 10-minute signed download URLs for active members. Uploader or active group admin/co-admin can delete, provided the caller remains a verified active member.
 - **Agenda:** supports schedule, target, task, poll and note. Active members can create; creator/admin permissions govern updates/deletes. Polls have 2–6 unique options and one vote per member. Vote rows are private and only aggregate totals/options are returned.
-- **Anggota:** admins/co-admins can approve or reject pending join requests. Other profile identities remain masked; the panel shows generic request labels and uses the authenticated membership-decision RPC.
+- **Anggota:** admins/co-admins can approve or reject pending join requests. Other profile identities remain masked; decisions use the authenticated membership RPC.
 - **Undangan privat:** admins/co-admins can invite verified students by nine-digit NIM. NIM is HMACed in an Edge Function and resolved server-side; invitee UUID is not returned to the browser. Invitees see an owner-scoped inbox and can accept or decline.
 - Private group invitations create a `group_invite` notification and route the recipient to Groups.
 - Realtime includes messages, materials, agenda, invitations and membership status; all events remain subject to RLS SELECT policies.
 - Course catalogue is currently empty, so creating general groups remains supported.
 
-Security migrations applied to staging:
+Security changes applied to staging:
 - `20261031101336_secure_enable_group_join_workflow_rpcs` retains actor checks for join and membership decisions.
 - `20261031124333_group_workspace_workflows` adds private poll voting, actor-checked invitations, cancellation and actor-bound message pinning.
 - `20261031124407_group_invite_inbox_limit` adds a private invite inbox and five-per-minute NIM lookup limit.
 - `20261031133930_group_workspace_realtime_and_invite_notifications`, `20261031134014_group_members_realtime`, and `20261031134443_group_poll_realtime_touch` add RLS-filtered Realtime updates and invite notifications.
-- `20261031135852_group_membership_verification_guard` requires the signed-in account to remain verified for group member/admin RLS helpers and protected group RPCs.
-- `20261031140523_group_materials_verified_delete_guard` requires current verified active group membership even when the uploader deletes their own group material.
-- `manage-group-invites` Edge Function v1 is ACTIVE with JWT verification.
-- Migration `20261031135852_group_membership_verification_guard` updates central group-member/admin RLS helpers to require the signed-in account to remain verified. It also hardens admin decisions, poll RPCs, invite inbox access, and message pinning against stale membership after verification is revoked.\n- Migration `20261031140027_group_materials_verified_delete_guard` requires current verified active membership to delete a group material file, including for the uploader; admin/co-admin deletion remains active-verified-only.\n- The `group-materials` bucket remains private with three object policies; `group_agenda_votes` has RLS enabled and is accessible through actor-checked RPCs only.
+- `20261031135852_group_membership_verification_guard` requires current verification for active-member/admin access and the protected membership, poll, invite-inbox and pin RPCs.
+- `20261031140523_group_materials_verified_delete_guard` requires current verified active membership for material metadata and Storage deletion, including when the caller uploaded the file.
+- Edge Function `manage-group-invites` v1 is ACTIVE with JWT verification. The `group-materials` bucket remains private; `group_agenda_votes` has RLS enabled and user access only through actor-checked RPCs.
 
 Live staging counts remain 0 study_groups, 0 group_members, 0 group_invites, and 0 active courses. No group test records were retained.
 
-The repository defines 35 mocked Playwright scenarios, including five new workspace cases (chat/pin, material upload, poll create/vote, private invite by NIM, invite acceptance) and the existing group membership approval case. Run #171 passed all 35 tests. The current PR head includes subsequent documentation-only cleanup and is being rechecked by GitHub Actions before merge. Real two-account group chat, Storage access, invitation notification, poll Realtime and member-approval acceptance remain external checks.
+The repository defines 35 mocked Playwright scenarios. Run #171 passed all 35 tests, including the five Group workspace scenarios for chat/pinning, private material upload, poll creation/voting, private invitation by NIM, and invite acceptance. Later changes clean up migration-history and status documentation; the latest PR-head CI run remains the merge gate. Real two-account group chat, Storage access, invitation notification, poll Realtime and membership approval remain external acceptance checks.
 
 
 ## Matching & Connections milestone — implementation added 2026-10-31
