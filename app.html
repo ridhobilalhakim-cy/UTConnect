@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#ffffff" />
+  <meta name="description" content="UT Connect — ruang kolaborasi belajar mahasiswa Universitas Terbuka." />
+  <title>UT Connect — Clean Academic Premium | Official Wordmark V2.2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  
+  <link rel="stylesheet" href="/src/styles/app.css">
+  <script defer src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+<div class="auth-guard" id="authGuard"><div class="auth-guard-card"><div class="auth-guard-spinner" id="authGuardSpinner"></div><h2 id="authGuardTitle">Memeriksa akun UT Connect</h2><p id="authGuardText">Memulihkan sesi dan memuat profil mahasiswa.</p></div></div>
+<div class="app-shell">
+  <aside class="sidebar">
+    <a class="brand" href="#home" aria-label="UT Connect — Beranda" data-page="home">
+      <svg class="brand-full-logo" xmlns="http://www.w3.org/2000/svg" width="820" height="176" viewBox="0 0 820 176" role="img" aria-labelledby="title desc">
+  <title id="title">UTConnect — Peer Learning Network</title>
+  <desc id="desc">Wordmark UTConnect in Universitas Terbuka blue and gold, with a bold UT monogram.</desc>
+  <defs>
+    <linearGradient id="goldLine" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFD54F"/>
+      <stop offset="1" stop-color="#E5A900"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(12 12)">
+    <rect x="0" y="0" width="148" height="148" rx="38" fill="#003366"/>
+    <text x="17" y="105" fill="#FFFFFF" font-family="Plus Jakarta Sans, Arial, sans-serif" font-size="91" font-weight="900" letter-spacing="-10">U</text>
+    <text x="80" y="105" fill="#FFC107" stroke="#B47B00" stroke-width="1.2" paint-order="stroke" font-family="Plus Jakarta Sans, Arial, sans-serif" font-size="91" font-weight="900" letter-spacing="-8">T</text>
+    <path d="M28 122 C55 139 93 139 120 119" fill="none" stroke="url(#goldLine)" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="122" cy="119" r="5" fill="#FFC107"/>
+  </g>
+  <g font-family="Plus Jakarta Sans, Arial, sans-serif" font-weight="900" letter-spacing="-4">
+    <text x="188" y="111" font-size="82" fill="#003366">U</text>
+    <text x="246" y="111" font-size="82" fill="#D69E00" stroke="#A87500" stroke-width=".35" paint-order="stroke">T</text>
+    <text x="306" y="111" font-size="82" fill="#A87500">C</text>
+    <text x="365" y="111" font-size="82" fill="#003366">onnect</text>
+  </g>
+  <rect x="190" y="132" width="85" height="5" rx="2.5" fill="#FFC107"/>
+  <text x="290" y="140" font-family="Plus Jakarta Sans, Arial, sans-serif" font-size="15" font-weight="800" letter-spacing="3.3" fill="#718096">PEER LEARNING NETWORK</text>
+</svg>
+
+    </a>
+    <div class="nav-label">Workspace</div>
+    <nav class="nav-list" aria-label="Navigasi utama">
+      <button class="nav-item active" data-page="home"><i data-lucide="map-pinned"></i>Beranda</button>
+      <button class="nav-item" data-page="matching"><i data-lucide="users"></i>Matching</button>
+      <button class="nav-item" data-page="forum"><i data-lucide="messages-square"></i>Forum</button>
+      <button class="nav-item" data-page="groups"><i data-lucide="users-round"></i>Grup Belajar</button>
+      <button class="nav-item" data-page="info"><i data-lucide="megaphone"></i>Informasi UT</button>
+    </nav>
+    <div class="nav-label" style="margin-top:25px">Personal</div>
+    <nav class="nav-list"><button class="nav-item" data-page="profile"><i data-lucide="user-round"></i>Profil Saya</button></nav>
+    <div class="sidebar-bottom">
+      <div class="help-card"><strong>Butuh bantuan menggunakan UT Connect?</strong><p>Pelajari cara menemukan teman belajar, terhubung, dan membuat kelompok.</p><button class="link-btn" data-open-guide>Pelajari panduan <i data-lucide="arrow-up-right" style="width:13px;height:13px"></i></button></div>
+      <div class="user-mini"><div class="avatar" id="sideAvatar">UT</div><div><strong id="sideUserName">Mahasiswa UT</strong><small id="sideUserMeta">Akun aktif</small></div></div>
+    </div>
+  </aside>
+
+  <div class="main-wrap">
+    <header class="topbar">
+      <div class="crumb"><span class="mobile-brand-mark" aria-hidden="true"><span class="mobile-u">U</span><span class="mobile-t">T</span></span><span class="crumb-brand"><span class="crumb-u">UT</span><span class="crumb-c">Connect</span></span><span style="color:#c1ccd8">/</span> <b id="crumb-current">Beranda</b></div>
+      <div class="top-actions"><span class="demo-badge">PROTOTYPE · DATA SIMULASI</span><button class="icon-btn" aria-label="Notifikasi" id="notif-btn"><i data-lucide="bell"></i><span class="notif-dot"></span></button><button class="icon-btn auth-logout" id="authSignout" type="button" title="Keluar"><i data-lucide="log-out"></i><span>Keluar</span></button><div class="top-profile"><div class="avatar" id="topAvatar">UT</div><div class="who"><strong id="topUserName">Mahasiswa UT</strong><small id="topUserMeta">Akun aktif</small></div></div></div>
+    </header>
+    <div class="session-notice" id="sessionNotice">Akun terhubung. Data mahasiswa, forum, matching, dan grup pada dashboard ini masih berupa simulasi UI.</div>
+
+    <main class="page">
+      <!-- HOME -->
+      <section class="page-section active" id="page-home">
+        <div class="page-head"><div><div class="eyebrow">Ruang belajar bersama</div><h1 class="page-title">Selamat datang di UT Connect 👋</h1><p class="page-subtitle">Temukan teman belajar, perluas koneksi, dan tumbuh bersama komunitas UT.</p></div><div class="page-actions"><button class="btn btn-secondary" data-open-guide><i data-lucide="book-open"></i>Panduan</button><button class="btn btn-yellow" data-go="matching"><i data-lucide="users"></i>Cari teman belajar</button></div></div>
+        <div class="welcome-strip"><div class="welcome-copy"><div class="hello">Halo! Siap belajar hari ini?</div><h2>Belajar lebih terarah,<br>bersama komunitas yang mendukung.</h2><p>Mulai dari satu koneksi kecil menuju pengalaman belajar yang lebih bermakna.</p></div><div class="welcome-actions"><button class="btn btn-yellow" data-go="groups"><i data-lucide="plus-circle"></i>Temukan kelompok</button><button class="btn btn-secondary" data-go="forum">Jelajahi forum</button><button class="btn btn-quiet" data-go="info">Informasi UT <i data-lucide="arrow-up-right"></i></button></div></div>
+        <div class="stats-grid">
+          <div class="surface stat-card"><div class="stat-icon"><i data-lucide="users"></i></div><div><div class="stat-value">10</div><div class="stat-label">Teman di sekitar · data demo</div></div></div>
+          <div class="surface stat-card"><div class="stat-icon"><i data-lucide="book-open-check"></i></div><div><div class="stat-value">6</div><div class="stat-label">Kelompok belajar aktif · data demo</div></div></div>
+          <div class="surface stat-card"><div class="stat-icon"><i data-lucide="messages-square"></i></div><div><div class="stat-value">12</div><div class="stat-label">Diskusi baru minggu ini · data demo</div></div></div>
+        </div>
+        <div class="home-grid">
+          <div class="surface map-card">
+            <div class="section-head"><div><h2 class="section-title">Temukan mahasiswa di sekitarmu</h2><p class="section-note">Jelajahi koneksi belajar berdasarkan area, tanpa menampilkan alamat pribadi.</p></div><span class="tag" style="background:#edf6f1;color:#34785a">● Area aktif</span></div>
+            <div class="map-tools"><div class="searchbox"><i data-lucide="search"></i><input id="nim-search" type="search" placeholder="Cari mahasiswa berdasarkan NIM" aria-label="Cari berdasarkan NIM"><button id="clear-search" class="link-btn" style="display:none">Hapus</button></div><div class="radius-control" aria-label="Pilih radius"><button class="radius-btn" data-radius="1">1 km</button><button class="radius-btn active" data-radius="3">3 km</button><button class="radius-btn" data-radius="5">5 km</button></div><button class="btn btn-secondary btn-sm" id="locate-btn"><i data-lucide="locate-fixed"></i>Lokasi saya</button></div>
+            <div id="map" role="img" aria-label="Peta interaktif area sekitar dengan lokasi mahasiswa simulasi"></div>
+            <div class="map-foot"><div class="privacy-note"><i data-lucide="shield-check"></i>Pin ditampilkan secara perkiraan. Alamat lengkap tidak ditampilkan.</div><div class="map-legend"><span><i class="legend-dot me"></i>Kamu</span><span><i class="legend-dot"></i>Mahasiswa</span></div></div>
+            <div id="map-result" class="tiny muted" style="margin-top:8px">Menampilkan mahasiswa dalam radius 3 km · data simulasi.</div>
+          </div>
+          <aside class="surface nearby-panel"><div class="section-head"><div><h2 class="section-title">Mahasiswa terdekat</h2><p class="section-note">Teman belajar di sekitar lokasimu.</p></div><button class="btn btn-quiet btn-sm" data-go="matching">Lihat semua</button></div><div class="nearby-list" id="nearby-list"></div><div class="list-footer"><span class="tiny muted">Data contoh untuk preview</span><button class="link-btn" data-go="matching">Buka matching <i data-lucide="arrow-right" style="width:13px;height:13px"></i></button></div></aside>
+        </div>
+      </section>
+
+      <!-- MATCHING -->
+      <section class="page-section" id="page-matching">
+        <div class="page-head"><div><div class="eyebrow">Koneksi akademik</div><h1 class="page-title">Temukan teman belajar yang cocok</h1><p class="page-subtitle">Cari mahasiswa berdasarkan mata kuliah, topik, minat, dan waktu belajar.</p></div></div>
+        <div class="match-layout"><aside class="surface filter-panel"><h2 class="section-title">Preferensi belajar</h2><p class="section-note">Atur kriteria untuk menemukan teman yang relevan.</p>
+          <div class="field"><label for="filter-course">Mata kuliah</label><select id="filter-course" class="select"><option value="">Semua mata kuliah</option><option>Algoritma & Pemrograman</option><option>Pengantar Manajemen</option><option>Statistika</option><option>Sistem Operasi</option></select></div>
+          <div class="field"><label for="filter-topic">Topik yang ingin dipelajari</label><select id="filter-topic" class="select"><option value="">Semua topik</option><option>Struktur data</option><option>Perulangan</option><option>Manajemen waktu</option><option>Analisis data</option></select></div>
+          <div class="field"><label for="filter-time">Waktu belajar</label><select id="filter-time" class="select"><option value="">Semua waktu</option><option>Malam hari</option><option>Akhir pekan</option><option>Pagi hari</option></select></div>
+          <div class="field"><label for="filter-mode">Preferensi pertemuan</label><select id="filter-mode" class="select"><option value="">Online & offline</option><option>Online</option><option>Offline</option></select></div>
+          <button class="btn btn-primary" style="width:100%;margin-top:17px" id="apply-match"><i data-lucide="sliders-horizontal"></i>Terapkan filter</button><button class="btn btn-quiet" style="width:100%;margin-top:5px" id="reset-match">Reset pilihan</button>
+        </aside>
+        <div><div class="section-head"><div><h2 class="section-title">Rekomendasi untukmu</h2><p class="section-note" id="match-count">Pilih preferensi untuk menyaring rekomendasi.</p></div><span class="tag">Data demo</span></div><div class="match-results" id="match-results"></div></div></div>
+      </section>
+
+      <!-- FORUM -->
+      <section class="page-section" id="page-forum">
+        <div class="page-head"><div><div class="eyebrow">Peer help</div><h1 class="page-title">Ruang diskusi mahasiswa</h1><p class="page-subtitle">Ajukan pertanyaan, berbagi pemahaman, dan bantu teman menyelesaikan tantangan belajar.</p></div><button class="btn btn-primary" id="new-post"><i data-lucide="plus"></i>Buat diskusi</button></div>
+        <div class="forum-layout"><div><div class="surface compose"><textarea class="textarea" id="post-content" placeholder="Apa yang sedang kamu pelajari? Tulis pertanyaan atau tawarkan bantuan..." rows="3"></textarea><div class="compose-foot"><select class="select" id="post-course" style="max-width:220px"><option>Algoritma & Pemrograman</option><option>Pengantar Manajemen</option><option>Statistika</option><option>Sistem Operasi</option></select><button class="btn btn-primary" id="publish-post"><i data-lucide="send"></i>Publikasikan</button></div></div><div class="post-list" id="post-list"></div></div>
+          <aside class="surface side-info"><h2 class="section-title">Etika berdiskusi</h2><p class="section-note">Bangun ruang belajar yang saling menghargai.</p><div class="info-line"><strong>Berikan konteks pertanyaan</strong><small>Sebutkan mata kuliah, modul, atau bagian yang sedang dipelajari.</small></div><div class="info-line"><strong>Gunakan bahasa yang santun</strong><small>Hargai perbedaan pendapat dan pengalaman belajar.</small></div><div class="info-line"><strong>Bagikan sumber yang relevan</strong><small>Utamakan referensi yang bisa diperiksa bersama.</small></div></aside>
+        </div>
+      </section>
+
+      <!-- GROUPS -->
+      <section class="page-section" id="page-groups">
+        <div class="page-head"><div><div class="eyebrow">Belajar kolaboratif</div><h1 class="page-title">Kelompok belajar</h1><p class="page-subtitle">Belajar bersama membuat proses memahami materi terasa lebih terarah.</p></div><button class="btn btn-primary" id="create-group"><i data-lucide="plus"></i>Buat kelompok</button></div>
+        <div class="group-toolbar"><div class="searchbox"><i data-lucide="search"></i><input id="group-search" placeholder="Cari nama kelompok atau mata kuliah"></div><button class="pill active" data-group-filter="Semua">Semua</button><button class="pill" data-group-filter="Online">Online</button><button class="pill" data-group-filter="Offline">Offline</button></div>
+        <div class="group-grid" id="group-list"></div>
+      </section>
+
+      <!-- INFO -->
+      <section class="page-section" id="page-info">
+        <div class="page-head"><div><div class="eyebrow">Informasi dan peluang</div><h1 class="page-title">Informasi UT</h1><p class="page-subtitle">Temukan kabar, kegiatan, dan kesempatan yang relevan untuk perjalanan kuliahmu.</p></div><button class="btn btn-secondary" id="share-info"><i data-lucide="plus"></i>Bagikan informasi</button></div>
+        <div class="info-tabs"><button class="pill active" data-info-filter="Semua">Semua</button><button class="pill" data-info-filter="Lomba">Lomba</button><button class="pill" data-info-filter="Seminar">Seminar</button><button class="pill" data-info-filter="Loker">Loker</button><button class="pill" data-info-filter="Tips">Tips belajar</button></div>
+        <div class="info-grid" id="info-grid"></div>
+      </section>
+
+      <!-- PROFILE -->
+      <section class="page-section" id="page-profile">
+        <div class="page-head"><div><div class="eyebrow">Ruang personal</div><h1 class="page-title">Profil saya</h1><p class="page-subtitle">Kelola informasi akademik dan preferensi belajar.</p></div><button class="btn btn-secondary" id="edit-profile"><i data-lucide="pencil"></i>Edit profil</button></div>
+        <div class="profile-grid"><div class="surface profile-card"><div class="profile-big" id="profileInitials">UT</div><h3 id="profileFullName">Mahasiswa UT</h3><p>Mahasiswa Universitas Terbuka</p><span class="tag" id="profileStatusTag" style="background:#fff3c2;color:#765400">Status: Pending</span></div><div class="surface profile-main"><h2 class="section-title">Informasi akademik</h2><div class="detail-row"><span>NIM</span><strong id="profileNimLabel">Tidak ditampilkan</strong></div><div class="detail-row"><span>Fakultas</span><strong id="profileFaculty">-</strong></div><div class="detail-row"><span>Program studi</span><strong id="profileProgram">-</strong></div><div class="detail-row"><span>Semester</span><strong id="profileSemester">-</strong></div><div class="detail-row"><span>Preferensi belajar</span><strong>Online · Malam hari</strong></div><div class="detail-row"><span>Visibilitas lokasi</span><strong style="color:#287b59">Tampil dengan jarak perkiraan</strong></div><div style="margin-top:16px;padding:12px;border-radius:11px;background:#f7f9fc;color:#718096;font-size:10px;line-height:1.7"><i data-lucide="shield-check" style="width:14px;height:14px;vertical-align:middle;color:#16845b"></i> Lokasi presisi dan informasi pribadi tidak ditampilkan pada profil publik. Pengaturan keamanan final memerlukan backend.</div></div></div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<nav class="mobile-nav" aria-label="Navigasi mobile"><button class="active" data-page="home"><i data-lucide="map-pinned"></i><span>Beranda</span></button><button data-page="matching"><i data-lucide="users"></i><span>Matching</span></button><button data-page="forum"><i data-lucide="messages-square"></i><span>Forum</span></button><button data-page="groups"><i data-lucide="users-round"></i><span>Grup</span></button><button data-page="profile"><i data-lucide="user-round"></i><span>Profil</span></button></nav>
+<button class="help-fab" data-open-guide><i data-lucide="circle-help"></i><span>Panduan</span></button>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="modal-backdrop" id="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal"><div class="modal-head"><h3 id="modal-title">Panduan UT Connect</h3><button class="close-btn" id="modal-close" aria-label="Tutup"><i data-lucide="x"></i></button></div><div id="modal-content"></div><div class="modal-actions"><button class="btn btn-secondary" id="modal-cancel">Tutup</button><button class="btn btn-primary" id="modal-confirm">Mengerti</button></div></div></div>
+
+
+
+
+  <script type="module" src="/src/app/main.js"></script>
+</body>
+</html>

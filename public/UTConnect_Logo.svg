@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="176" viewBox="0 0 820 176" role="img" aria-labelledby="title desc">
+  <title id="title">UTConnect — Peer Learning Network</title>
+  <desc id="desc">Wordmark UTConnect in Universitas Terbuka blue and gold, with a bold UT monogram.</desc>
+  <defs>
+    <linearGradient id="goldLine" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFD54F"/>
+      <stop offset="1" stop-color="#E5A900"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(12 12)">
+    <rect x="0" y="0" width="148" height="148" rx="38" fill="#003366"/>
+    <text x="17" y="105" fill="#FFFFFF" font-family="Plus Jakarta Sans, Arial, sans-serif" font-size="91" font-weight="900" letter-spacing="-10">U</text>
+    <text x="80" y="105" fill="#FFC107" stroke="#B47B00" stroke-width="1.2" paint-order="stroke" font-family="Plus Jakarta Sans, Arial, sans-serif" font-size="91" font-weight="900" letter-spacing="-8">T</text>
+    <path d="M28 122 C55 139 93 139 120 119" fill="none" stroke="url(#goldLine)" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="122" cy="119" r="5" fill="#FFC107"/>
+  </g>
+  <g font-family="Plus Jakarta Sans, Arial, sans-serif" font-weight="900" letter-spacing="-4">
+    <text x="188" y="111" font-size="82" fill="#003366">U</text>
+    <text x="246" y="111" font-size="82" fill="#D69E00" stroke="#A87500" stroke-width=".35" paint-order="stroke">T</text>
+    <text x="306" y="111" font-size="82" fill="#A87500">C</text>
+    <text x="365" y="111" font-size="82" fill="#003366">onnect</text>
+  </g>
+  <rect x="190" y="132" width="85" height="5" rx="2.5" fill="#FFC107"/>
+  <text x="290" y="140" font-family="Plus Jakarta Sans, Arial, sans-serif" font-size="15" font-weight="800" letter-spacing="3.3" fill="#718096">PEER LEARNING NETWORK</text>
+</svg>

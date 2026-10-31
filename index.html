@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#003366" />
+  <title>UT Connect — Masuk</title>
+  
+  <link rel="stylesheet" href="/src/styles/auth.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 8h8v13c0 5 2 8 6 8 2 0 4-1 5-3V8h8v20c-3 6-8 9-14 9C11 37 7 31 7 22V8Z" fill="#fff"/><path d="M22 8h14v7h-4v20h-8V15h-2V8Z" fill="#FFC107"/></svg></div>
+    <div><div class="brand-name">UT<span class="connect">Connect</span></div><div class="tagline">PEER LEARNING NETWORK</div></div>
+  </div>
+  <span class="staging">AUTH · STAGING</span>
+</header>
+<main class="shell">
+  <section class="hero">
+    <div class="eyebrow">Ruang belajar bersama mahasiswa UT</div>
+    <h1>Satu akun untuk <em>terhubung</em> dan berkembang.</h1>
+    <p>Temukan teman belajar, diskusikan mata kuliah, dan bangun komunitas akademik bersama mahasiswa Universitas Terbuka.</p>
+    <div class="hero-points">
+      <div class="point"><span class="point-icon">✓</span><span><strong>Masuk lebih praktis</strong><br>Gunakan email dan password atau akun Google.</span></div>
+      <div class="point"><span class="point-icon">↻</span><span><strong>Tidak perlu login berulang</strong><br>Sesi akun tersimpan di perangkat sampai kamu keluar.</span></div>
+      <div class="point"><span class="point-icon">⌖</span><span><strong>Privasi lokasi diperhatikan</strong><br>Alamat lengkap tidak ditampilkan kepada mahasiswa lain.</span></div>
+    </div>
+    <div class="privacy-strip"><strong>Privasi data mahasiswa</strong><p>NIM diproses di server menjadi HMAC digest. NIM asli tidak disimpan sebagai teks biasa. Titik lokasi presisi hanya digunakan untuk pemrosesan radius dan tidak ditampilkan kepada pengguna lain.</p></div>
+  </section>
+
+  <section class="panel" aria-live="polite">
+    <div id="alertBox" class="alert"></div>
+
+    <section id="loginView">
+      <h2>Selamat datang kembali</h2>
+      <p class="sub">Masuk untuk melanjutkan aktivitas belajar bersama.</p>
+      <form id="loginForm">
+        <div class="field"><label for="loginEmail">Email</label><input id="loginEmail" type="email" autocomplete="username" placeholder="nama@email.com" required maxlength="254"></div>
+        <div class="field"><div class="row-between"><label for="loginPassword">Password</label><button class="text-link" id="forgotBtn" type="button">Lupa password?</button></div><input id="loginPassword" type="password" autocomplete="current-password" placeholder="Masukkan password" required maxlength="72"></div>
+        <button id="loginBtn" class="btn btn-primary" type="submit">Masuk</button>
+        <label class="remember"><input type="checkbox" checked disabled><span>Sesi tetap tersimpan di perangkat ini. Kamu tidak perlu login lagi setiap kali membuka UT Connect, kecuali memilih Keluar atau menghapus data browser.</span></label>
+      </form>
+      <div class="divider">ATAU</div>
+      <button id="googleLoginBtn" class="btn btn-google" type="button"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.61l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.73 7.17l7.65 5.93c4.47-4.13 7.12-10.2 7.12-17.57Z"/><path fill="#FBBC05" d="M10.54 28.59a14.4 14.4 0 0 1 0-9.18l-7.98-6.19a24 24 0 0 0 0 21.56l7.98-6.19Z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.78l-7.65-5.93c-2.13 1.43-4.85 2.28-8.25 2.28-6.26 0-11.57-4.22-13.46-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48Z"/></svg>Masuk dengan Google</button>
+      <p class="bottom-note">Belum punya akun? <button id="goRegister" type="button">Daftar sekarang</button></p>
+      <p class="fine">Dengan masuk, kamu menyetujui ketentuan penggunaan dan kebijakan privasi UT Connect.</p>
+    </section>
+
+    <section id="registerView" class="hidden">
+      <h2>Buat akun UT Connect</h2>
+      <p class="sub">Daftar sekali, lalu lengkapi profil akademik dan lokasi belajarmu.</p>
+      <div id="oauthAccountBox" class="account-badge hidden"></div>
+      <form id="registerForm">
+        <div id="credentialsBlock">
+          <div class="field"><label for="regEmail">Email</label><input id="regEmail" type="email" autocomplete="email" placeholder="nama@email.com" required maxlength="254"></div>
+          <div class="field"><label for="regPassword">Password</label><input id="regPassword" type="password" autocomplete="new-password" placeholder="Minimal 8 karakter" required minlength="8" maxlength="72"></div>
+        </div>
+        <div class="field"><label for="fullName">Nama lengkap</label><input id="fullName" type="text" autocomplete="name" placeholder="Nama sesuai identitas" required minlength="2" maxlength="100"></div>
+        <div class="field"><label for="nim">NIM</label><input id="nim" type="text" inputmode="numeric" autocomplete="off" placeholder="Masukkan NIM" required pattern="[0-9]{9}" minlength="9" maxlength="9"></div>
+        <div class="field"><label for="faculty">Fakultas</label><input id="faculty" type="text" placeholder="Masukkan fakultas" required minlength="2" maxlength="80"></div>
+        <div class="field"><label for="program">Program studi</label><input id="program" type="text" placeholder="Masukkan program studi" required minlength="2" maxlength="100"></div>
+        <div class="field"><label for="semester">Semester</label><select id="semester" required><option value="">Pilih semester</option><option value="1">Semester 1</option><option value="2">Semester 2</option><option value="3">Semester 3</option><option value="4">Semester 4</option><option value="5">Semester 5</option><option value="6">Semester 6</option><option value="7">Semester 7</option><option value="8">Semester 8</option><option value="9">Semester 9</option><option value="10">Semester 10</option><option value="11">Semester 11</option><option value="12">Semester 12</option><option value="13">Semester 13</option><option value="14">Semester 14</option><option value="15">Semester 15</option><option value="16">Semester 16</option></select></div>
+        <div class="section-title">Tandai lokasi belajar</div>
+        <p class="section-help">Klik peta untuk menentukan titik lokasi, atau gunakan lokasi perangkatmu.</p>
+        <div class="map-wrap">
+          <div class="map-toolbar"><button id="useMyLocation" class="btn btn-soft" type="button">⌖ Gunakan lokasi saya</button><button id="clearLocation" class="btn btn-soft" type="button">Hapus titik</button></div>
+          <div id="registrationMap"></div>
+          <div class="map-foot"><span id="locationState">Belum ada titik lokasi. Klik pada peta untuk memilih.</span></div>
+        </div>
+        <label class="consent"><input id="locationConsent" type="checkbox" required><span>Saya menyetujui penggunaan titik lokasi ini untuk fitur pencarian mahasiswa di sekitar. Alamat lengkap dan koordinat presisi saya tidak ditampilkan kepada mahasiswa lain. Saya dapat menonaktifkan visibilitas lokasi melalui pengaturan akun.</span></label>
+        <button id="registerBtn" class="btn btn-primary" type="submit">Buat akun dan profil</button>
+      </form>
+      <p class="bottom-note" id="registerGoogleNote">Atau <button id="googleRegisterBtn" type="button">daftar dengan Google</button></p>
+      <p class="bottom-note">Sudah punya akun? <button id="backToLogin" type="button">Masuk</button></p>
+      <p class="fine">Status awal profil mahasiswa adalah Pending sampai mekanisme verifikasi mahasiswa UT dilakukan.</p>
+    </section>
+
+    <section id="resetPasswordView" class="hidden">
+      <h2>Atur ulang password</h2>
+      <p class="sub">Buat password baru untuk mengamankan akun UT Connect.</p>
+      <form id="resetPasswordForm">
+        <div class="field"><label for="newPassword">Password baru</label><input id="newPassword" type="password" autocomplete="new-password" placeholder="Minimal 8 karakter" required minlength="8" maxlength="72"></div>
+        <div class="field"><label for="confirmNewPassword">Konfirmasi password baru</label><input id="confirmNewPassword" type="password" autocomplete="new-password" placeholder="Ulangi password baru" required minlength="8" maxlength="72"></div>
+        <button id="resetPasswordBtn" class="btn btn-primary" type="submit">Simpan password baru</button>
+      </form>
+      <p class="fine">Tautan pemulihan hanya dapat digunakan sesuai masa berlaku yang ditetapkan layanan autentikasi.</p>
+    </section>
+
+    <section id="accountView" class="hidden">
+      <h2 id="accountHeading">Akun UT Connect</h2>
+      <p class="sub">Sesi akunmu tersimpan di perangkat ini.</p>
+      <div class="profile-card"><div id="accountEmail" style="font-weight:800;color:#173c60;overflow-wrap:anywhere"></div><div id="accountDetails" style="font-size:12px;color:#6b7d91;margin-top:5px"></div><div style="margin-top:11px"><span class="status-pill" id="verificationBadge">PENDING</span></div></div>
+      <p id="accountMessage" style="font-size:13px;color:#61758b"></p>
+      <button id="completeProfileBtn" class="btn btn-primary hidden" type="button">Lengkapi profil mahasiswa</button>
+      <button id="signoutBtn" class="btn btn-google" type="button" style="margin-top:12px">Keluar dari akun</button>
+      <p class="fine">Untuk keamanan, selalu keluar jika menggunakan perangkat bersama.</p>
+    </section>
+  </section>
+</main>
+<div class="footer">UT Connect · Peer Learning Network · Prototype autentikasi untuk staging</div>
+
+  <script type="module" src="/src/auth/main.js"></script>
+</body>
+</html>

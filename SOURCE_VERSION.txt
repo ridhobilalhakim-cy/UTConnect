@@ -1,0 +1,4 @@
+UT Connect Main Codebase
+Version: 0.1.0-phase04-auth-e2e-readiness
+Purpose: Consolidated source of truth for the web application
+Status: Password recovery flow added; mocked browser E2E tests authored; dependency install, production build, and browser execution pending CI

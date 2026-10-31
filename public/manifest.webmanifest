@@ -1,0 +1,9 @@
+{
+  "name": "UT Connect — Peer Learning Network",
+  "short_name": "UT Connect",
+  "description": "Platform peer learning mahasiswa Universitas Terbuka",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F5F8FC",
+  "theme_color": "#003366"
+}

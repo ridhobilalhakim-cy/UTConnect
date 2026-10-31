@@ -1,0 +1,57 @@
+name: Verify UT Connect build
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install dependencies and bootstrap lockfile when absent
+        shell: bash
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund
+          else
+            npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+            npm ci --no-audit --no-fund
+          fi
+
+      - name: Run source checks
+        run: npm run check
+
+      - name: Build production site
+        run: npm run build
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser end-to-end tests
+        run: npm run test:e2e
+
+      - name: Upload build, lockfile, and browser test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: utconnect-build-${{ github.run_number }}
+          path: |
+            dist/
+            package-lock.json
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14
