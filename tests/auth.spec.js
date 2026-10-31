@@ -1735,6 +1735,22 @@ test('student can upload a profile photo from the profile editor', async ({ page
   expect(state.avatarUpdateCalls[0].p_avatar_path).toMatch(new RegExp('^' + USER.id + '/'));
 });
 
+test('student can choose a preset avatar from the profile editor', async ({ page }) => {
+  const state = await mockSupabase(page, { profile: { ...PROFILE, verification_status: 'pending' } });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+  await page.locator('[data-page="profile"]').first().click();
+  await page.locator('#edit-profile').click();
+  await page.locator('[data-profile-avatar-preset="avatar-02"]').click();
+  await expect(page.locator('#profile-edit-avatar-preview img')).toHaveAttribute('src', '/avatars/avatar-02.svg');
+  await page.locator('#modal-confirm').click();
+  await expect(page.locator('#profileInitials img')).toHaveAttribute('src', '/avatars/avatar-02.svg');
+  expect(state.avatarUpdateCalls).toHaveLength(1);
+  expect(state.avatarUpdateCalls[0].p_avatar_path).toBe('preset:avatar-02');
+});
+
 test('student can mark all notifications as read and clear the unread counter', async ({ page }) => {
   const now = new Date().toISOString();
   const state = await mockSupabase(page, {
