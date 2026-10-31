@@ -33,7 +33,10 @@ export async function submitStudentVerificationEvidence(file) {
   const extension = ALLOWED_TYPES.get(file.type);
   const storagePath = `${userId}/${crypto.randomUUID()}.${extension}`;
   const originalFilename = file.name
-    .replace(/[\\/\\r\\n]/g, "_")
+    .split("/").join("_")
+    .split(String.fromCharCode(92)).join("_")
+    .split(String.fromCharCode(10)).join("_")
+    .split(String.fromCharCode(13)).join("_")
     .trim()
     .slice(0, 255);
 
