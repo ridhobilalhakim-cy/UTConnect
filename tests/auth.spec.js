@@ -26,8 +26,8 @@ function jsonResponse(body, status = 200) {
   return { status, contentType: 'application/json', body: JSON.stringify(body) };
 }
 
-async function mockSupabase(page, { isAdmin = false, informationPosts = [], verificationStatus = { profile_status: 'pending', latest_request: null }, verificationQueue = [] } = {}) {
-  const state = { loginCalls: 0, recoveryCalls: 0, passwordUpdates: 0, logoutCalls: 0, informationPosts: [...informationPosts], informationCreateCalls: 0, verificationStatus: structuredClone(verificationStatus), verificationQueue: [...verificationQueue], verificationUploadCalls: 0, verificationSubmitCalls: 0, verificationReviewCalls: [] };
+async function mockSupabase(page, { isAdmin = false, informationPosts = [], verificationStatus = { profile_status: 'pending', latest_request: null }, verificationQueue = [], profile = PROFILE, forumPosts = [], forumComments = [], courses = [] } = {}) {
+  const state = { loginCalls: 0, recoveryCalls: 0, passwordUpdates: 0, logoutCalls: 0, informationPosts: [...informationPosts], informationCreateCalls: 0, verificationStatus: structuredClone(verificationStatus), verificationQueue: [...verificationQueue], verificationUploadCalls: 0, verificationSubmitCalls: 0, verificationReviewCalls: [], profile, forumPosts: [...forumPosts], forumComments: [...forumComments], courses: [...courses], forumPostCreateCalls: 0, forumCommentCreateCalls: 0 };
   for (const pattern of [
     /^https:\/\/fonts\.googleapis\.com\//,
     /^https:\/\/fonts\.gstatic\.com\//,
@@ -96,6 +96,42 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
       state.verificationUploadCalls += 1;
       return route.fulfill(jsonResponse({ Key: 'student-verification-evidence/e2e-student-001/evidence.pdf' }));
     }
+    if (path.endsWith('/rest/v1/courses') && method === 'GET') {
+      return route.fulfill(jsonResponse(state.courses));
+    }
+    if (path.endsWith('/rest/v1/forum_posts')) {
+      if (method === 'GET') return route.fulfill(jsonResponse([...state.forumPosts].reverse()));
+      if (method === 'POST') {
+        const input = request.postDataJSON();
+        const created = { id: 'forum-post-e2e-001', author_id: USER.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), course: null, ...input };
+        state.forumPostCreateCalls += 1;
+        state.forumPosts.unshift(created);
+        return route.fulfill(jsonResponse(created, 201));
+      }
+      if (method === 'DELETE') {
+        const id = url.searchParams.get('id')?.replace(/^eq\\./, '');
+        state.forumPosts = state.forumPosts.filter(item => item.id !== id);
+        return route.fulfill({ status: 204, body: '' });
+      }
+    }
+    if (path.endsWith('/rest/v1/forum_comments')) {
+      if (method === 'GET') {
+        const postId = url.searchParams.get('post_id')?.replace(/^eq\\./, '');
+        return route.fulfill(jsonResponse(state.forumComments.filter(item => item.post_id === postId)));
+      }
+      if (method === 'POST') {
+        const input = request.postDataJSON();
+        const created = { id: 'forum-comment-e2e-001', author_id: USER.id, created_at: new Date().toISOString(), ...input };
+        state.forumCommentCreateCalls += 1;
+        state.forumComments.push(created);
+        return route.fulfill(jsonResponse(created, 201));
+      }
+      if (method === 'DELETE') {
+        const id = url.searchParams.get('id')?.replace(/^eq\\./, '');
+        state.forumComments = state.forumComments.filter(item => item.id !== id);
+        return route.fulfill({ status: 204, body: '' });
+      }
+    }
     if (path.endsWith('/rest/v1/information_posts')) {
       if (method === 'GET') return route.fulfill(jsonResponse(state.informationPosts));
       if (method === 'POST') {
@@ -122,7 +158,7 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
       return route.fulfill(jsonResponse({}));
     }
     if (path.endsWith('/rest/v1/profiles') && method === 'GET') {
-      return route.fulfill(jsonResponse([PROFILE]));
+      return route.fulfill(jsonResponse([profile]));
     }
     if (path.endsWith('/auth/v1/user') && method === 'GET') {
       return route.fulfill(jsonResponse(USER));
@@ -376,4 +412,75 @@ test('administrator must provide a reason when rejecting student verification', 
   expect(state.verificationReviewCalls).toHaveLength(1);
   expect(state.verificationReviewCalls[0].p_decision).toBe('rejected');
   expect(state.verificationReviewCalls[0].p_review_note).toContain('Bukti registrasi');
+});
+
+
+test('unverified student sees the forum gate and cannot compose a discussion', async ({ page }) => {
+  const state = await mockSupabase(page, { profile: { ...PROFILE, verification_status: 'pending' } });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="forum"]').first().click();
+  await expect(page.locator('#forum-access-notice')).toContainText('Forum khusus mahasiswa terverifikasi');
+  await expect(page.locator('#forum-compose')).toBeHidden();
+  await expect(page.locator('#new-post')).toBeHidden();
+  expect(state.forumPostCreateCalls).toBe(0);
+});
+
+test('verified student can publish a forum post and add a comment', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="forum"]').first().click();
+  await expect(page.locator('#forum-compose')).toBeVisible();
+  await expect(page.locator('#post-course')).toContainText('Diskusi umum');
+  await page.locator('#post-title').fill('Memahami perulangan bersarang');
+  await page.locator('#post-type').selectOption('need_help');
+  await page.locator('#post-content').fill('Bagaimana menentukan kondisi berhenti pada perulangan bersarang?');
+  await page.locator('#publish-post').click();
+
+  await expect(page.locator('.forum-post-title')).toHaveText('Memahami perulangan bersarang');
+  expect(state.forumPostCreateCalls).toBe(1);
+  expect(state.forumPosts[0].author_id).toBe(USER.id);
+  expect(state.forumPosts[0].post_type).toBe('need_help');
+
+  await page.locator('[data-forum-thread="forum-post-e2e-001"]').click();
+  await page.locator('#forum-comment-input').fill('Perhatikan kondisi pada setiap perulangan.');
+  await page.locator('#forum-comment-send').click();
+
+  await expect(page.locator('#modal-content')).toContainText('Perhatikan kondisi pada setiap perulangan.');
+  expect(state.forumCommentCreateCalls).toBe(1);
+});
+
+test('verified student can read a live forum post without exposing another profile identity', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+    forumPosts: [{
+      id: 'forum-post-public-001',
+      author_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      course_id: null,
+      post_type: 'discussion',
+      title: 'Belajar mandiri di UT',
+      body: 'Apa strategi kalian membagi waktu belajar?',
+      created_at: '2026-10-30T10:00:00.000Z',
+      updated_at: '2026-10-30T10:00:00.000Z',
+      course: null,
+    }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="forum"]').first().click();
+  await expect(page.locator('.forum-post-title')).toHaveText('Belajar mandiri di UT');
+  await expect(page.locator('.post-author')).toContainText('Mahasiswa UT');
+  expect(state.forumPosts).toHaveLength(1);
 });
