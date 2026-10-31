@@ -1044,6 +1044,7 @@ test('verified student can search privacy-limited matches and send a connection 
   const state = await mockSupabase(page, {
     profile: { ...PROFILE, verification_status: 'verified' },
     matchingCandidates: [{
+      student_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       initials: 'RA',
       program: 'Manajemen',
       approx_distance_m: 1250,
