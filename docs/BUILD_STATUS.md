@@ -1,48 +1,39 @@
-# Build and verification status — Phase 0.5
+# Build and verification status — Phase 0.5 / Phase 04
 
 Date: 2026-10-31
 
-## Passed
+## Passed locally in GitHub Actions
 
-- Both HTML entry pages parse.
-- No duplicate HTML IDs were found.
-- Both pages have one Vite module entry and no remaining inline JavaScript.
-- Supabase client initialization is centralized in `src/lib/supabase.js`.
-- Both pages share the same Supabase browser auth storage key.
-- `npm run check` passes, including local import resolution and declared package dependency checks.
-- JavaScript syntax checks pass for all 4 files under `src/`.
-- Vite config and source-check script pass Node syntax checks.
-- The source ZIP passes archive integrity testing.
+GitHub Actions run #4: **SUCCESS**  
+Commit: `4b58e41eddfeef15f3882f892918b1facf394438`  
+Workflow: `Verify UT Connect build`
 
-## Not yet verified
+- `package-lock.json` exists in the repository and dependency installation completed successfully.
+- `npm run check` — PASS.
+- `npm run build` — PASS; Vite generated the production site in `dist/`.
+- Playwright Chromium setup — PASS.
+- Browser E2E — **5 passed**:
+  1. Login and registration are separate views.
+  2. Guest cannot open the protected dashboard.
+  3. Email login restores session and logout clears it.
+  4. Forgot-password sends a non-enumerating recovery request.
+  5. Password recovery validates confirmation and updates the password.
+- CI artifact `utconnect-build-4` was uploaded successfully.
 
-- `npm install` / `npm ci`: package installation could not complete in this environment. A direct DNS check for `registry.npmjs.org` returned `Could not resolve host`; no `package-lock.json` was generated. Do not fabricate a lockfile.
-- `npm run build`: attempted but cannot run because Vite is not installed (`vite: not found`); dependencies could not be installed.
-- Browser runtime and responsive visual checks: not run against the Vite build.
-- Auth end-to-end (email signup, Google OAuth, profile completion, login, refresh, logout): not run during this consolidation.
-- Backend live feature integrations: still pending; dashboard feature logic is explicitly demo/simulated.
+## What this does and does not prove
 
-See `docs/PHASE05_DEPENDENCY_BUILD_GATE.md` for the full run log and handoff steps.
+These Playwright tests use mocked Supabase HTTP responses and synthetic student data. They verify client-side UI/auth flow behavior and a successful production build. They do **not** prove live Supabase Auth, actual email delivery, Google OAuth, deployed Edge Function behavior, production RLS, or real multi-user dashboard features.
 
-## CI bootstrap added
+## Remaining before public staging
 
-- `.github/workflows/verify-build.yml` now runs on pushes to `main` / `master`, pull requests, and manual dispatch.
-- The workflow installs dependencies in GitHub Actions. If no lockfile exists yet, it creates one there, runs `npm ci`, executes source checks and the Vite build, then uploads both `dist/` and `package-lock.json` as a downloadable artifact.
-- The generated lockfile must be committed back to the repository after the first successful run so subsequent builds remain reproducible. The workflow has been authored but cannot be executed until the source is pushed to GitHub.
+1. Connect GitHub repository `ridhobilalhakim-cy/UTConnect` to Netlify.
+2. Use build command `npm ci && npm run build` and publish directory `dist` (also specified by `netlify.toml`).
+3. Add the actual HTTPS staging domain to Supabase Auth Site URL and Redirect URLs.
+4. Configure Google OAuth origins/redirects in Google Cloud and Supabase.
+5. Test signup, profile completion, login, session restore, protected route, logout, Google OAuth, and password recovery with test accounts.
+6. Keep multi-user feature claims on hold until each dashboard service is integrated and tested against live Supabase.
 
-## Required before staging deployment
+## Backend/source-control caveats
 
-1. Push this source folder to a GitHub repository.
-2. Run the `Verify UT Connect build` GitHub Actions workflow and confirm it passes. Download the artifact and commit its generated `package-lock.json` back into the repository.
-3. Run the workflow again to confirm the committed lockfile works with `npm ci`.
-4. Connect the GitHub repository to Netlify and deploy the `dist/` output to a new staging URL.
-5. Add the staging URL to Supabase Auth redirect allow-list and Google OAuth origins/redirect setup.
-6. Execute the Auth acceptance tests with two test accounts.
-
-## Phase 04 auth recovery and browser-test readiness (2026-10-31)
-
-- Added a dedicated password recovery view and `PASSWORD_RECOVERY` event handling.
-- Added Playwright 1.64.1 as a pinned development dependency and five mocked Supabase browser E2E scenarios.
-- Extended GitHub Actions to install Chromium and run the browser tests after the Vite build.
-- Source checks and `node --check` pass for the auth module, Playwright config, tests, and checker.
-- Playwright execution and Vite build remain unverified in this environment because dependencies are not installed; npm registry DNS was unavailable at the previous install attempt. No successful CI run or production artifact is claimed.
+- The deployed registration Edge Function is mirrored in this repository; repository edits do not automatically deploy it to Supabase.
+- The first five remote SQL migration bodies still need to be reconstructed and reviewed in source control. Do not blindly rerun SQL migrations on the existing staging project.
