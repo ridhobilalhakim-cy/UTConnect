@@ -29,6 +29,7 @@ These migrations have been applied on Supabase project `hqyusbyndtlfypdbmatw` (S
 | 20261031163243 | profile_avatar_presets |
 | 20261031164151 | legacy_faculty_code_profile_compatibility |
 | 20261031173449 | normalize_legacy_ut_programme_aliases |
+| 20261031174525 | notifications_for_information_and_verification |
 
 The matching RPC SQL source is retained as `20261030232434_student_registration_profile_location_rpc_v1.sql`, but the file name timestamp is a local artifact name and not the remote migration version. Treat the remote migration history above as authoritative for the existing staging project.
 
@@ -82,3 +83,6 @@ The `20261031140523_group_materials_verified_delete_guard.sql` migration further
 The programme alias compatibility migration `20261031173449_normalize_legacy_ut_programme_aliases.sql` is applied to staging. It canonicalizes legacy UT S1 programme labels in the profile-edit RPC before validating and comparing academic identity. An alias-only normalization does not count as an identity change and does not reset a verified student's status. The function accepts both legacy and current names, while persisting the current canonical label.
 
 The remote migration list is authoritative. The migration filename must retain the exact applied remote version; do not reapply this migration to the existing staging project.
+
+
+The notification coverage migration `20261031174525_notifications_for_information_and_verification.sql` is applied to staging. It notifies a student when their verification status is approved or rejected, and notifies eligible profiles when an Information UT draft is first published. Editing a post that is already published does not create duplicate notifications. The existing notification owner RLS policy and Realtime publication remain in force.
