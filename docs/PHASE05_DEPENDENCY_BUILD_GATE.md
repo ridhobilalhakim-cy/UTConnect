@@ -1,4 +1,4 @@
-# Phase 0.5 — Dependency and Build Gate / Grup Belajar
+# Phase 0.5 — Dependency and Build Gate / Grup Belajar / Matching & Connections
 
 Date: 2026-10-31
 
@@ -64,3 +64,14 @@ The group UI now reads and writes through `src/services/groups.js` and the exist
 - Private invitation management, group chat, agenda, and material uploads are not included in this milestone.
 
 Four mocked E2E tests were added for the unverified gate, group creation, approval-based join request, and group admin approval. They increase the repository test definition count from 13 to 17. The four new tests must not be reported as passing until a latest-commit Actions result confirms them. Real-account Supabase operations and Netlify deployment are separate acceptance checks.
+
+
+## Matching & Connections acceptance boundary — implementation added 2026-10-31
+
+The Matching page now calls src/services/matching.js and the existing preference/course tables. A guarded find_matching_students RPC obtains candidates through the existing nearby search logic and only returns initials, program, approximate distance, course names, topic tags, interests, and study times. It does not return full names, NIM digests, or latitude/longitude. It enforces verified-only access, the 1/3/5 km radius choices, radar consent, block exclusions, a maximum of ten candidates, and 30 searches per user per ten minutes.
+
+Connection requests use the existing connections INSERT RLS policy. The migration grants authenticated INSERT but deliberately does not grant UPDATE. A guarded respond_connection_request RPC validates the recipient, pending status, current verification status of both parties, and block status before accepting/rejecting. Connection summaries are also exposed through a per-user RPC with only initials and program.
+
+The active course catalogue is empty, so course selection options are currently unavailable; text preferences remain usable. Direct messages/chat remain unintegrated.
+
+Five new mocked Playwright scenarios were added: unverified access gate, preference/course save, privacy-limited candidate search and connection request, incoming accept, and incoming reject. The repository now defines 22 tests in total, but the five new tests are not marked passed until CI for the latest commit is confirmed. Live Supabase counts remain zero for matching_preferences, profile_courses, connections, direct_messages, and match_search_events.
