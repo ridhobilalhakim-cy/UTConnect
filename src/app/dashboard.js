@@ -21,6 +21,7 @@ import {
   listForumComments,
   createForumComment,
   deleteForumComment,
+  listForumAuthorProfiles,
 } from "../services/forum.js";
 import {
   listActiveMatchingCourses,
@@ -83,17 +84,22 @@ import {
   setMyLocationVisibility,
   findNearbyStudents,
 } from "../services/home-map.js";
+import { listMyChatRooms, updateMyStudentProfile, uploadMyProfileAvatar, getProfileAvatarUrl } from "../services/profile.js";
+import { populateUTFacultyProgramSelects } from "../data/ut-programs.js";
 
-export function initDashboard({ isAdmin = false, isVerified = false, verificationStatus = "pending", currentUserId = null, currentUserName = "Mahasiswa UT" } = {}) {
+export function initDashboard({ isAdmin = false, isVerified = false, verificationStatus = "pending", currentUserId = null, currentUserName = "Mahasiswa UT", currentProfile = {} } = {}) {
   window.L = L;
   const lucide = window.lucide;
 const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root.querySelectorAll(s)];
-  const state={page:'home',radius:3000,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,myMarker:null,center:null,myLocation:null,nearbyStudents:[],homeMapRequestId:0,connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumCourses:[],groups:[],groupCourses:[],groupMemberships:new Map(),groupMembers:[],groupInvitations:[],activeGroupChannel:null,activeGroupId:null,groupWorkspace:{messages:[],materials:[],agenda:[],invites:[],pollResults:{}},matchingCourses:[],matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredCourseIds:[],matchRadius:3000};
+  const state={page:'home',radius:3000,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,myMarker:null,center:null,myLocation:null,nearbyStudents:[],homeMapRequestId:0,connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumCourses:[],forumAuthors:new Map(),profile:{...currentProfile},chatRooms:[],activeChatRoom:null,groups:[],groupCourses:[],groupMemberships:new Map(),groupMembers:[],groupInvitations:[],activeGroupChannel:null,activeGroupId:null,groupWorkspace:{messages:[],materials:[],agenda:[],invites:[],pollResults:{}},matchingCourses:[],matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredCourseIds:[],matchRadius:3000};
   const NOTIFICATION_META = {
     connection_request: { icon: "user-plus", page: "matching" },
     connection_accepted: { icon: "user-check", page: "matching" },
     connection_rejected: { icon: "user-x", page: "matching" },
-    direct_message: { icon: "message-circle", page: "matching" },
+    direct_message: { icon: "message-circle", page: "messages" },
+    group_message: { icon: "messages-square", page: "groups" },
+    group_material: { icon: "folder-open", page: "groups" },
+    group_agenda: { icon: "calendar-check", page: "groups" },
     forum_comment: { icon: "messages-square", page: "forum" },
     group_join_request: { icon: "users-round", page: "groups" },
     group_join_approved: { icon: "check-circle-2", page: "groups" },
@@ -178,19 +184,17 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     try {
       if (route === "matching") {
         await navigate("matching");
-        if (notification.notification_type === "direct_message" && notification.reference_id) {
-          const summaries = await listMyConnectionSummaries();
-          state.connectionSummaries = summaries;
-          renderConnectionPanel();
-          renderMatches();
-          await openDirectChat(notification.reference_id);
-        }
+      } else if (route === "messages") {
+        await navigate("messages");
+        if (notification.reference_id) await openDirectChat(notification.reference_id);
       } else if (route === "forum") {
         await navigate("forum");
         if (notification.reference_id) await openForumThread(notification.reference_id);
       } else if (route === "groups") {
         await navigate("groups");
-        if (notification.notification_type === "group_join_request" && notification.reference_id) {
+        if (notification.reference_id && notification.notification_type === "group_join_request") {
+          await openGroupDetails(notification.reference_id);
+        } else if (notification.reference_id && ["group_message", "group_material", "group_agenda"].includes(notification.notification_type)) {
           await openGroupDetails(notification.reference_id);
         }
       } else {
@@ -257,7 +261,27 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
 
   function toast(message){const el=$('#toast');el.textContent=message;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),2500)}
   function icons(){if(window.lucide)lucide.createIcons()}
-  function navigate(page){state.page=page;$$('.page-section').forEach(s=>s.classList.toggle('active',s.id==='page-'+page));$$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));const labels={home:'Beranda',matching:'Matching',forum:'Forum',groups:'Grup Belajar',info:'Informasi UT',profile:'Profil Saya',verification:'Verifikasi Mahasiswa'};$('#crumb-current').textContent=labels[page]||'Beranda';window.scrollTo({top:0,behavior:'smooth'});if(page==='home'&&state.map)setTimeout(()=>state.map.invalidateSize(),80);let pageLoad=null;if(page==='verification')pageLoad=loadVerification();if(page==='forum')pageLoad=loadForum();if(page==='groups')pageLoad=loadGroups();if(page==='matching')pageLoad=loadMatching();icons();return pageLoad}
+  function navigate(page){
+    if(page!=="messages" && state.activeChatChannel){
+      const channel=state.activeChatChannel;state.activeChatChannel=null;
+      unsubscribeFromDirectMessages(channel).catch(error=>console.warn("Chat channel cleanup failed:",error));
+      state.activeChatConnectionId=null;state.activeChatRoom=null;state.chatMessages=[];
+    }
+    state.page=page;
+    $('.page-section').forEach(s=>s.classList.toggle('active',s.id==='page-'+page));
+    $('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
+    const labels={home:'Beranda',matching:'Matching',messages:'Pesan',forum:'Forum',groups:'Grup Belajar',info:'Informasi UT',profile:'Profil Saya',verification:'Verifikasi Mahasiswa'};
+    $('#crumb-current').textContent=labels[page]||'Beranda';
+    window.scrollTo({top:0,behavior:'smooth'});
+    if(page==='home'&&state.map)setTimeout(()=>state.map.invalidateSize(),80);
+    let pageLoad=null;
+    if(page==='verification')pageLoad=loadVerification();
+    if(page==='forum')pageLoad=loadForum();
+    if(page==='groups')pageLoad=loadGroups();
+    if(page==='matching')pageLoad=loadMatching();
+    if(page==='messages')pageLoad=loadMessages();
+    icons();return pageLoad;
+  }
   $$('[data-page]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));$$('[data-go]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.go)));
   function setMapStatus(message, status = "idle") {
     const statusText = $("#map-location-status");
@@ -963,7 +987,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     }
     list.innerHTML = state.forumPosts.map(post => {
       const ownPost = post.author_id === currentUserId;
-      const author = ownPost ? currentUserName : "Mahasiswa UT";
+      const author = ownPost ? currentUserName : (state.forumAuthors.get(post.author_id)?.full_name || "Mahasiswa UT");
       const typeLabel = FORUM_POST_TYPES[post.post_type] || "Diskusi";
       const courseLabel = post.course?.course_name || "Diskusi umum";
       const deleteButton = ownPost
@@ -994,6 +1018,8 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       const [courses, posts] = await Promise.all([listActiveForumCourses(), listForumPosts()]);
       state.forumCourses = courses;
       state.forumPosts = posts;
+      const authorProfiles = await listForumAuthorProfiles(posts.map(post => post.author_id));
+      state.forumAuthors = new Map(authorProfiles.map(profile => [profile.user_id, profile]));
       populateForumCourses(courses);
       renderForum();
     } catch (error) {
@@ -1038,9 +1064,11 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     if (!post) return;
     try {
       const comments = await listForumComments(postId);
+      const commentProfiles = await listForumAuthorProfiles([post.author_id, ...comments.map(comment => comment.author_id)]);
+      commentProfiles.forEach(profile => state.forumAuthors.set(profile.user_id, profile));
       const commentsHtml = comments.length ? comments.map(comment => {
         const ownComment = comment.author_id === currentUserId;
-        const author = ownComment ? currentUserName : "Mahasiswa UT";
+        const author = ownComment ? currentUserName : (state.forumAuthors.get(comment.author_id)?.full_name || "Mahasiswa UT");
         const remove = ownComment
           ? `<button type="button" class="link-btn forum-comment-delete" data-forum-comment-delete="${escapeText(comment.id)}">Hapus</button>`
           : "";
@@ -1050,6 +1078,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
         <div class="forum-thread">
           <span class="tag">${escapeText(FORUM_POST_TYPES[post.post_type] || "Diskusi")}</span>
           <h3>${escapeText(post.title)}</h3>
+          <p class="tiny muted">Oleh ${escapeText(post.author_id === currentUserId ? currentUserName : (state.forumAuthors.get(post.author_id)?.full_name || "Mahasiswa UT"))}</p>
           <p class="forum-thread-body">${escapeText(post.body)}</p>
           <div class="forum-thread-comments"><strong>Tanggapan (${comments.length})</strong>${commentsHtml}</div>
           <div class="field"><label for="forum-comment-input">Tulis tanggapan</label><textarea id="forum-comment-input" class="textarea" rows="3" maxlength="3000" placeholder="Berikan penjelasan atau pertanyaan lanjutan..."></textarea></div>
@@ -1684,7 +1713,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   }
 
   function renderDirectChatMessages() {
-    const container = $("#direct-chat-messages");
+    const container = $("#message-room-messages") || $("#direct-chat-messages");
     if (!container) return;
     const messages = state.chatMessages || [];
     container.innerHTML = messages.length ? messages.map(message => {
@@ -1706,13 +1735,18 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     if (state.activeChatConnectionId !== connectionId) return;
     state.chatMessages = messages;
     renderDirectChatMessages();
-    if (markRead) await markDirectMessagesRead(connectionId);
+    if (markRead) {
+      await markDirectMessagesRead(connectionId);
+      const activeRoom = state.chatRooms.find(room => room.connection_id === connectionId);
+      if (activeRoom) activeRoom.unread_count = 0;
+      renderMessageRooms();
+    }
   }
 
   async function submitDirectChatMessage() {
     const connectionId = state.activeChatConnectionId;
-    const input = $("#direct-chat-input");
-    const button = $("#direct-chat-send");
+    const input = $("#message-room-input") || $("#direct-chat-input");
+    const button = $("#message-room-send") || $("#direct-chat-send");
     if (!connectionId || !input || !button) return;
     const body = input.value.trim();
     if (!body) return;
@@ -1722,6 +1756,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       upsertDirectChatMessage(message);
       input.value = "";
       input.focus();
+      await refreshMessageRooms().catch(error => console.warn("Chat room refresh failed:", error));
     } catch (error) {
       console.error("Direct message send failed:", error);
       toast(error?.message || "Pesan belum berhasil dikirim.");
@@ -1730,62 +1765,128 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     }
   }
 
+  function initialsForName(value) {
+    return String(value || "UT").trim().split(/\\s+/).slice(0, 2).map(part => part[0] || "").join("").toUpperCase() || "UT";
+  }
+
+  function renderMessageRooms() {
+    const list = $("#message-room-list");
+    if (!list) return;
+    if (!state.chatRooms.length) {
+      list.innerHTML = '<div class="message-room-empty">Belum ada chat pribadi. Hubungkan diri dengan mahasiswa melalui menu Matching, lalu mulai percakapan setelah permintaan diterima.</div>';
+      return;
+    }
+    list.innerHTML = state.chatRooms.map(room => {
+      const active = room.connection_id === state.activeChatConnectionId;
+      const name = room.other_full_name || "Mahasiswa UT";
+      const avatar = getProfileAvatarUrl(room.avatar_path);
+      const avatarHtml = avatar
+        ? '<span class="message-room-avatar"><img src="' + escapeText(avatar) + '" alt=""></span>'
+        : '<span class="message-room-avatar">' + escapeText(initialsForName(name)) + '</span>';
+      const preview = room.last_message || "Belum ada pesan";
+      const unread = Number(room.unread_count || 0);
+      return '<button type="button" class="message-room-item ' + (active ? "active" : "") + '" data-message-room="' + escapeText(room.connection_id) + '">' +
+        avatarHtml + '<span class="message-room-copy"><strong>' + escapeText(name) + '</strong><small>' + escapeText(preview) + '</small></span>' +
+        '<span class="message-room-meta">' + (unread ? '<b>' + escapeText(String(unread > 99 ? "99+" : unread)) + '</b>' : '') +
+        '<time>' + escapeText(room.last_message_at ? new Date(room.last_message_at).toLocaleDateString("id-ID", {day:"2-digit",month:"short"}) : "") + '</time></span></button>';
+    }).join("");
+    $$("[data-message-room]").forEach(button => button.addEventListener("click", () => openDirectChat(button.dataset.messageRoom)));
+  }
+
+  async function refreshMessageRooms() {
+    state.chatRooms = await listMyChatRooms();
+    if (state.activeChatRoom) {
+      state.activeChatRoom = state.chatRooms.find(room => room.connection_id === state.activeChatConnectionId) || state.activeChatRoom;
+    }
+    renderMessageRooms();
+    return state.chatRooms;
+  }
+
+  async function loadMessages({ showLoading = true } = {}) {
+    const notice = $("#messages-access-notice");
+    const inbox = $("#message-inbox");
+    if (!isVerified) {
+      if (notice) {
+        notice.hidden = false;
+        notice.innerHTML = '<div class="group-access-content"><div class="group-access-icon"><i data-lucide="shield-check"></i></div><div><strong>Verifikasi mahasiswa diperlukan</strong><p>Chat pribadi hanya tersedia untuk mahasiswa UT terverifikasi yang telah saling menerima koneksi.</p><button type="button" class="link-btn" id="messages-verification-link">Buka halaman verifikasi</button></div></div>';
+        $("#messages-verification-link")?.addEventListener("click", () => navigate("verification"));
+      }
+      if (inbox) inbox.hidden = true;
+      state.chatRooms = [];
+      renderMessageRooms();
+      icons();
+      return [];
+    }
+    if (notice) notice.hidden = true;
+    if (inbox) inbox.hidden = false;
+    if (showLoading) $("#message-room-list").innerHTML = '<div class="verification-loading">Memuat daftar percakapan...</div>';
+    try {
+      await refreshMessageRooms();
+      return state.chatRooms;
+    } catch (error) {
+      console.error("Chat inbox load failed:", error);
+      $("#message-room-list").innerHTML = '<div class="message-room-empty">Daftar chat belum dapat dimuat. ' + escapeText(error?.message || "Periksa koneksi.") + '</div><button class="btn btn-secondary btn-sm" id="message-rooms-retry">Coba lagi</button>';
+      $("#message-rooms-retry")?.addEventListener("click", () => loadMessages());
+      return [];
+    }
+  }
+
   async function openDirectChat(connectionId) {
     if (!isVerified) {
       toast("Verifikasi mahasiswa diperlukan untuk menggunakan chat.");
       return;
     }
-    const connection = state.connectionSummaries.find(item => item.connection_id === connectionId);
-    if (!connection || connection.status !== "accepted") {
-      toast("Chat hanya tersedia setelah koneksi diterima kedua pihak.");
+    if (state.page !== "messages") await navigate("messages");
+    else if (!state.chatRooms.length) await refreshMessageRooms();
+    const room = state.chatRooms.find(item => item.connection_id === connectionId);
+    if (!room) {
+      toast("Ruang chat tidak ditemukan. Pastikan koneksi sudah diterima oleh kedua pihak.");
       return;
     }
+
     if (state.activeChatChannel) {
       const previousChannel = state.activeChatChannel;
       state.activeChatChannel = null;
-      unsubscribeFromDirectMessages(previousChannel).catch(error => console.warn("Chat channel cleanup failed:", error));
+      await unsubscribeFromDirectMessages(previousChannel).catch(error => console.warn("Chat channel cleanup failed:", error));
     }
-
     state.activeChatConnectionId = connectionId;
+    state.activeChatRoom = room;
     state.chatMessages = [];
-    const identity = `Mahasiswa UT · ${connection.initials || "UT"}`;
-    openModal(
-      `Chat · ${identity}`,
-      `
-        <div class="direct-chat-shell">
-          <div class="direct-chat-toolbar">
-            <span id="direct-chat-status">Memuat percakapan...</span>
-            <button type="button" class="btn btn-secondary btn-sm" id="direct-chat-refresh"><i data-lucide="refresh-cw"></i>Muat ulang</button>
-          </div>
-          <div class="direct-chat-messages" id="direct-chat-messages" role="log" aria-live="polite">
-            <div class="verification-loading">Memuat pesan...</div>
-          </div>
-          <form class="direct-chat-composer" id="direct-chat-form">
-            <textarea id="direct-chat-input" class="textarea" rows="2" maxlength="5000" placeholder="Tulis pesan untuk koneksimu..." aria-label="Tulis pesan"></textarea>
-            <button type="submit" class="btn btn-primary" id="direct-chat-send"><i data-lucide="send"></i>Kirim</button>
-          </form>
-          <p class="direct-chat-note">Pesan hanya dapat dibaca oleh dua peserta koneksi ini. Maksimal 5.000 karakter per pesan.</p>
-        </div>
-      `
-    );
-    $("#modal-confirm").style.display = "none";
-    $("#modal-cancel").textContent = "Tutup";
-    $("#direct-chat-form").addEventListener("submit", event => {
+
+    const name = room.other_full_name || "Mahasiswa UT";
+    const avatar = getProfileAvatarUrl(room.avatar_path);
+    const avatarElement = $("#message-room-avatar");
+    if (avatarElement) {
+      if (avatar) {
+        const image = document.createElement("img");
+        image.src = avatar;
+        image.alt = "";
+        avatarElement.replaceChildren(image);
+      } else avatarElement.textContent = initialsForName(name);
+    }
+    $("#message-room-name").textContent = name;
+    $("#message-room-program").textContent = room.program || "Mahasiswa UT";
+    $("#message-room-placeholder").hidden = true;
+    $("#message-room-view").hidden = false;
+    renderMessageRooms();
+
+    $("#message-room-form").onsubmit = async event => {
       event.preventDefault();
-      submitDirectChatMessage();
-    });
-    $("#direct-chat-refresh").addEventListener("click", async () => {
-      const status = $("#direct-chat-status");
-      status.textContent = "Memuat ulang...";
+      await submitDirectChatMessage();
+    };
+    $("#message-room-refresh").onclick = async () => {
+      $("#message-room-status").textContent = "Memuat ulang...";
       try {
         await refreshDirectChat();
-        status.textContent = "Percakapan diperbarui.";
+        await refreshMessageRooms();
+        $("#message-room-status").textContent = "Percakapan diperbarui.";
       } catch (error) {
-        status.textContent = "Belum dapat memuat percakapan.";
+        $("#message-room-status").textContent = "Belum dapat memuat percakapan.";
         toast(error?.message || "Gagal memuat pesan.");
       }
-    });
+    };
 
+    $("#message-room-status").textContent = "Memuat percakapan...";
     try {
       await refreshDirectChat();
       if (state.activeChatConnectionId !== connectionId) return;
@@ -1799,9 +1900,10 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
           if (payload.eventType === "INSERT" && message.sender_id !== currentUserId) {
             markDirectMessagesRead(connectionId).catch(error => console.warn("Read receipt update failed:", error));
           }
+          refreshMessageRooms().catch(error => console.warn("Chat room preview refresh failed:", error));
         },
         (status, error) => {
-          const statusLabel = $("#direct-chat-status");
+          const statusLabel = $("#message-room-status");
           if (!statusLabel || state.activeChatConnectionId !== connectionId) return;
           if (status === "SUBSCRIBED") {
             statusLabel.textContent = "Terhubung · pesan diperbarui langsung";
@@ -1812,20 +1914,112 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
           }
         }
       );
-      if (!state.activeChatChannel) {
-        const statusLabel = $("#direct-chat-status");
-        if (statusLabel) statusLabel.textContent = "Pembaruan langsung tidak aktif. Gunakan Muat ulang.";
-      }
+      if (!state.activeChatChannel) $("#message-room-status").textContent = "Pembaruan langsung tidak aktif. Gunakan Muat ulang.";
     } catch (error) {
       console.error("Direct chat load failed:", error);
-      const statusLabel = $("#direct-chat-status");
-      if (statusLabel) statusLabel.textContent = "Percakapan belum dapat dimuat.";
+      $("#message-room-status").textContent = "Percakapan belum dapat dimuat.";
       toast(error?.message || "Gagal membuka percakapan.");
     }
     icons();
   }
 
-  function escapeText(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+  $("#messages-refresh")?.addEventListener("click", () => loadMessages({ showLoading: false }));
+  $("#message-room-form")?.addEventListener("submit", event => {
+    event.preventDefault();
+    submitDirectChatMessage();
+  });
+
+  // Profile editor uses the authenticated update RPC; avatar uploads are stored in a private-to-owner path.
+  function renderProfileSummary() {
+    const profile = state.profile || {};
+    const name = profile.full_name || currentUserName || "Mahasiswa UT";
+    currentUserName = name;
+    ["topUserName", "sideUserName"].forEach(id => { const element = $("#" + id); if (element) element.textContent = name; });
+    const status = $("#profileStatusTag");
+    if (status) status.textContent = isAdmin ? "Role: ADMINISTRATOR" : "Status: " + String(profile.verification_status || "pending").toUpperCase();
+    const faculty = $("#profileFaculty"); if (faculty) faculty.textContent = profile.faculty || "-";
+    const program = $("#profileProgram"); if (program) program.textContent = profile.program || "-";
+    const semester = $("#profileSemester"); if (semester) semester.textContent = profile.semester || "-";
+    const bio = $("#profileBio"); if (bio) bio.textContent = profile.bio || "Mahasiswa Universitas Terbuka";
+    $("#profileFullName").textContent = name;
+    const avatarUrl = getProfileAvatarUrl(profile.avatar_path);
+    ["topAvatar", "sideAvatar", "profileInitials"].forEach(id => {
+      const element = $("#" + id);
+      if (!element) return;
+      if (avatarUrl) {
+        const image = document.createElement("img");
+        image.src = avatarUrl;
+        image.alt = "";
+        image.loading = "lazy";
+        element.replaceChildren(image);
+      } else {
+        element.textContent = initialsForName(name);
+      }
+    });
+  }
+
+  function openProfileEditor() {
+    const profile = state.profile || {};
+    const faculty = escapeText(profile.faculty || "");
+    const program = escapeText(profile.program || "");
+    const verifiedIdentityMayReset = isVerified;
+    const content = `
+      <form id="profile-edit-form" class="profile-edit-form">
+        <div class="profile-edit-avatar"><div class="profile-edit-avatar-preview" id="profile-edit-avatar-preview">${profile.avatar_path ? '<img src="' + escapeText(getProfileAvatarUrl(profile.avatar_path) || "") + '" alt="Foto profil saat ini">' : escapeText(initialsForName(profile.full_name || currentUserName))}</div>
+          <div><strong>Foto profil</strong><small>Unggah JPG, PNG, atau WebP, maksimal 5 MB.</small><label class="btn btn-secondary btn-sm" for="profile-avatar-file">Pilih foto</label><input id="profile-avatar-file" type="file" accept="image/jpeg,image/png,image/webp" hidden></div>
+        </div>
+        <div class="field"><label for="profile-edit-name">Nama lengkap</label><input id="profile-edit-name" class="text-input" maxlength="100" minlength="2" required value="${escapeText(profile.full_name || currentUserName)}"></div>
+        <div class="field"><label for="profile-edit-faculty">Fakultas</label><select id="profile-edit-faculty" class="select" required></select></div>
+        <div class="field"><label for="profile-edit-program">Program studi</label><select id="profile-edit-program" class="select" required></select></div>
+        <div class="field"><label for="profile-edit-semester">Semester</label><select id="profile-edit-semester" class="select" required>${Array.from({length:16},(_,i)=>'<option value="' + (i+1) + '"' + (Number(profile.semester)===(i+1) ? ' selected' : '') + '>Semester ' + (i+1) + '</option>').join("")}</select></div>
+        <div class="field"><label for="profile-edit-bio">Bio singkat (opsional)</label><textarea id="profile-edit-bio" class="textarea" rows="3" maxlength="280" placeholder="Ceritakan minat belajar atau bidang yang kamu sukai.">${escapeText(profile.bio || "")}</textarea></div>
+        ${verifiedIdentityMayReset ? '<label class="profile-reset-confirm"><input id="profile-reset-verification" type="checkbox"><span>Saya memahami bahwa mengubah nama/fakultas/program studi/semester akan mengembalikan status verifikasi mahasiswa menjadi Pending dan perlu diverifikasi ulang.</span></label>' : ''}
+      </form>`;
+    openModal("Edit profil", content, "Simpan perubahan", async () => {
+      const name = $("#profile-edit-name").value.trim();
+      const faculty = $("#profile-edit-faculty").value;
+      const program = $("#profile-edit-program").value;
+      const semester = Number($("#profile-edit-semester").value);
+      const bio = $("#profile-edit-bio").value.trim();
+      const file = $("#profile-avatar-file").files?.[0] || null;
+      const identityChanged = name !== profile.full_name || faculty !== profile.faculty || program !== profile.program || semester !== Number(profile.semester);
+      const acknowledge = Boolean($("#profile-reset-verification")?.checked);
+      if (identityChanged && verifiedIdentityMayReset && !acknowledge) {
+        toast("Centang konfirmasi perubahan identitas terlebih dahulu.");
+        return false;
+      }
+      try {
+        const updated = await updateMyStudentProfile({
+          fullName: name, faculty, program, semester, bio,
+          acknowledgeVerificationReset: acknowledge,
+        });
+        if (file) updated.avatar_path = await uploadMyProfileAvatar(file);
+        state.profile = { ...state.profile, ...updated };
+        isVerified = state.profile.verification_status === "verified";
+        verificationStatus = state.profile.verification_status || "pending";
+        renderProfileSummary();
+        await Promise.all([loadForum(), loadMatching(), loadGroups(), loadVerification()]);
+        toast("Profil berhasil diperbarui.");
+        return true;
+      } catch (error) {
+        console.error("Profile update failed:", error);
+        toast(error?.message || "Profil belum berhasil disimpan.");
+        return false;
+      }
+    }, "Profil berhasil diperbarui.");
+    populateUTFacultyProgramSelects($("#profile-edit-faculty"), $("#profile-edit-program"), {
+      faculty: profile.faculty || "", program: profile.program || "",
+    });
+    $("#profile-avatar-file").addEventListener("change", event => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      if (file.size > 5 * 1024 * 1024) { toast("Ukuran foto profil maksimal 5 MB."); event.target.value = ""; return; }
+      const preview = $("#profile-edit-avatar-preview");
+      const url = URL.createObjectURL(file);
+      preview.innerHTML = '<img src="' + url + '" alt="Pratinjau foto profil">';
+    });
+  }
+    function escapeText(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   let modalAction=null,modalSuccessMessage='Perubahan diterapkan pada sesi demo.';function openModal(title,content,confirm='Mengerti',action=null,successMessage='Perubahan diterapkan pada sesi demo.'){ modalAction=action;modalSuccessMessage=successMessage;$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal-confirm').textContent=confirm;$('#modal-confirm').style.display='';$('#modal-confirm').disabled=false;$('#modal-cancel').textContent='Tutup';$('#modal-backdrop').classList.add('open'); }
   function closeModal(){
     closeGroupWorkspace().catch(error => console.warn("Group workspace cleanup failed:", error));
@@ -1840,6 +2034,9 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     if(activeVerificationPreviewUrl){URL.revokeObjectURL(activeVerificationPreviewUrl);activeVerificationPreviewUrl=null}
   }
   const guide=`<div style="display:grid;gap:14px"><div><b style="font-size:11px">01 · Lengkapi profil</b><p class="section-note">Daftar dengan data akademik yang diperlukan. Verifikasi identitas harus dilakukan melalui layanan yang sah pada versi produksi.</p></div><div><b style="font-size:11px">02 · Atur lokasi secara sadar</b><p class="section-note">Pilih lokasi perkiraan dan tentukan apakah ingin tampil di radar. Jangan tampilkan alamat rumah atau koordinat presisi kepada pengguna lain.</p></div><div><b style="font-size:11px">03 · Temukan teman belajar</b><p class="section-note">Gunakan radius dan preferensi mata kuliah untuk melihat rekomendasi yang relevan.</p></div><div><b style="font-size:11px">04 · Bangun koneksi</b><p class="section-note">Kirim permintaan connect. Chat hanya tersedia setelah kedua pihak menyetujui koneksi.</p></div><div><b style="font-size:11px">05 · Belajar bersama</b><p class="section-note">Gunakan forum untuk peer help atau bergabung dan membuat kelompok belajar.</p></div><p class="tiny muted" style="padding:10px;background:#f7f9fc;border-radius:9px">Catatan: Peta sekitar, matching, koneksi, dan chat personal memakai layanan Supabase dan hanya tersedia sesuai status verifikasi. Pin lokasi mahasiswa lain adalah perkiraan dan hanya tampil jika pemilik mengaktifkan radar.</p></div>`;
-  $$('[data-open-guide]').forEach(b=>b.addEventListener('click',()=>openModal('Panduan UT Connect',guide)));$('#modal-close').addEventListener('click',closeModal);$('#modal-cancel').addEventListener('click',closeModal);$('#modal-confirm').addEventListener('click',async()=>{if(modalAction){const confirmButton=$('#modal-confirm');confirmButton.disabled=true;try{const result=await modalAction();if(result===false)return;modalAction=null;closeModal();toast(modalSuccessMessage)}catch(error){console.error('Modal action failed:',error);toast(error.message||'Tindakan gagal. Silakan coba lagi.')}finally{confirmButton.disabled=false}return}closeModal();toast('Panduan ditutup.')});$('#modal-backdrop').addEventListener('click',e=>{if(e.target.id==='modal-backdrop')closeModal()});document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();$('#notification-panel').hidden=true;$('#notif-btn').setAttribute('aria-expanded','false')}});$('#edit-profile').addEventListener('click',()=>openModal('Edit profil',`<p class="section-note">Form edit profil ditampilkan sebagai rancangan UI. Penyimpanan dan verifikasi perubahan belum terhubung ke backend.</p><div class="field"><label>Nama tampilan</label><input class="text-input" value="Andi Bintang"></div><div class="field"><label>Program studi</label><input class="text-input" value="Sistem Informasi" disabled></div><div class="field"><label>Preferensi belajar</label><select class="select"><option>Online · Malam hari</option><option>Online · Akhir pekan</option><option>Offline</option></select></div>`,`Tutup`));
+  $$('[data-open-guide]').forEach(b=>b.addEventListener('click',()=>openModal('Panduan UT Connect',guide)));$('#modal-close').addEventListener('click',closeModal);$('#modal-cancel').addEventListener('click',closeModal);$('#modal-confirm').addEventListener('click',async()=>{if(modalAction){const confirmButton=$('#modal-confirm');confirmButton.disabled=true;try{const result=await modalAction();if(result===false)return;modalAction=null;closeModal();toast(modalSuccessMessage)}catch(error){console.error('Modal action failed:',error);toast(error.message||'Tindakan gagal. Silakan coba lagi.')}finally{confirmButton.disabled=false}return}closeModal();toast('Panduan ditutup.')});$('#modal-backdrop').addEventListener('click',e=>{if(e.target.id==='modal-backdrop')closeModal()});document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();$('#notification-panel').hidden=true;$('#notif-btn').setAttribute('aria-expanded','false')}});$('#edit-profile').addEventListener('click',openProfileEditor);
+  renderProfileSummary();
+  $("#message-room-placeholder").hidden = false;
+  $("#message-room-view").hidden = true;
   initMap();loadHomeMap();loadForum();loadGroups();loadInformation();loadVerification();loadNotifications().catch(()=>{});initNotificationRealtime();icons();
 }
