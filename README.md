@@ -83,7 +83,7 @@ npm run build
 npm run test:e2e
 ```
 
-The repository now defines 35 Playwright scenarios covering login/register, session/recovery, Information UT, Student Verification, Forum Diskusi, Grup Belajar, Matching/Connections, Direct Messaging, Notifications, and Home Map. Run #119 passed the 30 tests that existed before Group workspace completion. Five additional Group workspace scenarios cover group chat/pinning, private material upload, agenda polls, private invitation by NIM, and invite acceptance; their current PR CI result is still pending. Google OAuth, real email delivery, live cross-account Edge Function behavior, Netlify deployment, and real Supabase RLS are verified separately rather than inferred from mocked tests.
+The repository now defines 35 Playwright scenarios covering login/register, session/recovery, Information UT, Student Verification, Forum Diskusi, Grup Belajar, Matching/Connections, Direct Messaging, Notifications, and Home Map. Run #171 passed all 35 tests, including five Group workspace scenarios covering group chat/pinning, private material upload, agenda polls, private invitation by NIM, and invite acceptance. Later commits after #171 only clean up documentation and migration-history records; the newest PR-head CI run is being rechecked. Google OAuth, real email delivery, live cross-account Edge Function behavior, Netlify deployment, and real Supabase RLS are verified separately rather than inferred from mocked tests.
 
 
 ## Notifications state (checked 2026-10-31)
