@@ -268,8 +268,8 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       state.activeChatConnectionId=null;state.activeChatRoom=null;state.chatMessages=[];
     }
     state.page=page;
-    $('.page-section').forEach(s=>s.classList.toggle('active',s.id==='page-'+page));
-    $('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
+    $$('.page-section').forEach(s=>s.classList.toggle('active',s.id==='page-'+page));
+    $$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
     const labels={home:'Beranda',matching:'Matching',messages:'Pesan',forum:'Forum',groups:'Grup Belajar',info:'Informasi UT',profile:'Profil Saya',verification:'Verifikasi Mahasiswa'};
     $('#crumb-current').textContent=labels[page]||'Beranda';
     window.scrollTo({top:0,behavior:'smooth'});
@@ -2032,15 +2032,15 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       if (!file) return;
       if (file.size > 5 * 1024 * 1024) { toast("Ukuran foto profil maksimal 5 MB."); event.target.value = ""; return; }
       selectedAvatarPreset = null;
-      $("[data-profile-avatar-preset]").forEach(button => button.classList.remove("selected"));
+      $$("[data-profile-avatar-preset]").forEach(button => button.classList.remove("selected"));
       const preview = $("#profile-edit-avatar-preview");
       const url = URL.createObjectURL(file);
       preview.innerHTML = '<img src="' + url + '" alt="Pratinjau foto profil">';
     });
-    $("[data-profile-avatar-preset]").forEach(button => button.addEventListener("click", () => {
+    $$("[data-profile-avatar-preset]").forEach(button => button.addEventListener("click", () => {
       selectedAvatarPreset = button.dataset.profileAvatarPreset;
       $("#profile-avatar-file").value = "";
-      $("[data-profile-avatar-preset]").forEach(item => item.classList.toggle("selected", item === button));
+      $$("[data-profile-avatar-preset]").forEach(item => item.classList.toggle("selected", item === button));
       $("#profile-edit-avatar-preview").innerHTML = '<img src="/avatars/' + escapeText(selectedAvatarPreset) + '.svg" alt="Avatar pilihan">';
     }));
   }
