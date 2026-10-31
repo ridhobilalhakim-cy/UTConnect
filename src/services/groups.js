@@ -369,3 +369,8 @@ export async function cancelGroupInvite(inviteId) {
   if (data?.error) throw new Error(data.error);
   return data;
 }
+
+export async function unsubscribeFromGroupMessages(channel) {
+  if (!channel) return;
+  await supabase.removeChannel(channel);
+}
