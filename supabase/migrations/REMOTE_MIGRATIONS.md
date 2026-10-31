@@ -18,6 +18,7 @@ These migrations have been applied on Supabase project `hqyusbyndtlfypdbmatw` (S
 | 20261031111603 | secure_notifications_workflow |
 | 20261031121632 | home_map_location_workflow |
 | 20261031121933 | home_map_hidden_viewer_search |
+| 20261031135852 | group_membership_verification_guard |
 | 20261031124333 | group_workspace_workflows |
 | 20261031124407 | group_invite_inbox_limit |
 | 20261031133930 | group_workspace_realtime_and_invite_notifications |
@@ -54,3 +55,6 @@ The Group workspace migration set is retained in these source files:
 - `20261031134443_group_poll_realtime_touch.sql`: updates the agenda row after poll votes so other group members receive refreshed aggregate poll results.
 
 The `manage-group-invites` Edge Function is deployed as version 1 with JWT verification. It HMACs NIM on the server, resolves only verified profiles, creates/cancels invitations through actor-checked RPCs, and returns no invitee UUID to the browser. The private `group-materials` Storage bucket remains non-public; active group membership and the existing object policies govern upload/read/delete, and the client uses short-lived signed download URLs.
+
+
+The Group membership verification guard is retained as `20261031135852_group_membership_verification_guard.sql`. It updates the central active-member/admin RLS helpers so group access is granted only while the signed-in account is still verified, and hardens the related decision, poll, invite-inbox and message-pin RPCs against stale memberships after verification is revoked.
