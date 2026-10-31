@@ -86,3 +86,14 @@ export async function deleteForumComment(commentId) {
   const { error } = await supabase.from("forum_comments").delete().eq("id", commentId);
   throwIfError(error);
 }
+
+export async function listForumAuthorProfiles(userIds = []) {
+  const uniqueIds = [...new Set(userIds.filter(Boolean))];
+  if (!uniqueIds.length) return [];
+  if (uniqueIds.length > 100) throw new Error("Daftar penulis terlalu besar.");
+  const { data, error } = await supabase.rpc("get_forum_author_profiles", {
+    p_user_ids: uniqueIds,
+  });
+  throwIfError(error);
+  return data || [];
+}
