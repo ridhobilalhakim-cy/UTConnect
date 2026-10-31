@@ -49,12 +49,18 @@ import {
   joinStudyGroup,
   respondGroupJoinRequest,
 } from "../services/groups.js";
+import {
+  listMyNotifications,
+  markMyNotificationRead,
+  markAllMyNotificationsRead,
+  subscribeToMyNotifications,
+} from "../services/notifications.js";
 
 export function initDashboard({ isAdmin = false, isVerified = false, verificationStatus = "pending", currentUserId = null, currentUserName = "Mahasiswa UT" } = {}) {
   window.L = L;
   const lucide = window.lucide;
 const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root.querySelectorAll(s)];
-  const state={page:'home',radius:3,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,center:[-6.9175,107.6191],connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,infoItems:[],forumPosts:[],forumCourses:[],groups:[],groupCourses:[],groupMemberships:new Map(),groupMembers:[],matchingCourses:[],matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredCourseIds:[],matchRadius:3000};
+  const state={page:'home',radius:3,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,center:[-6.9175,107.6191],connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumCourses:[],groups:[],groupCourses:[],groupMemberships:new Map(),groupMembers:[],matchingCourses:[],matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredCourseIds:[],matchRadius:3000};
   const students=[
     {id:1,nim:'049100101',initial:'RA',name:'Rina Amelia',prodi:'Manajemen',distance:.55,courses:['Pengantar Manajemen','Statistika'],topics:['Manajemen waktu'],times:['Malam hari'],mode:'Online'},
     {id:2,nim:'049100102',initial:'DP',name:'Dimas Prakoso',prodi:'Sistem Informasi',distance:1.2,courses:['Algoritma & Pemrograman','Sistem Operasi'],topics:['Struktur data','Perulangan'],times:['Akhir pekan','Malam hari'],mode:'Online'},
@@ -67,9 +73,175 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     {id:9,nim:'049100109',initial:'AR',name:'Anisa Rahma',prodi:'Manajemen',distance:2.8,courses:['Pengantar Manajemen'],topics:['Manajemen waktu'],times:['Akhir pekan'],mode:'Online'},
     {id:10,nim:'049100110',initial:'RP',name:'Reza Pratama',prodi:'Agribisnis',distance:1.9,courses:['Statistika'],topics:['Analisis data'],times:['Malam hari'],mode:'Offline'}
   ];
+
+  const NOTIFICATION_META = {
+    connection_request: { icon: "user-plus", page: "matching" },
+    connection_accepted: { icon: "user-check", page: "matching" },
+    connection_rejected: { icon: "user-x", page: "matching" },
+    direct_message: { icon: "message-circle", page: "matching" },
+    forum_comment: { icon: "messages-square", page: "forum" },
+    group_join_request: { icon: "users-round", page: "groups" },
+    group_join_approved: { icon: "check-circle-2", page: "groups" },
+    group_join_rejected: { icon: "users-round", page: "groups" },
+  };
+
+  function notificationDate(value) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "Waktu tidak tersedia" : date.toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+  }
+
+  function renderNotifications() {
+    const panel = $("#notification-panel");
+    const list = $("#notification-list");
+    const badge = $("#notif-count");
+    const button = $("#notif-btn");
+    const unread = state.notifications.filter(item => !item.read_at).length;
+    if (badge) {
+      badge.hidden = unread === 0;
+      badge.textContent = unread > 99 ? "99+" : String(unread);
+    }
+    if (button) {
+      button.setAttribute("aria-label", unread ? `Notifikasi, ${unread} belum dibaca` : "Notifikasi");
+    }
+    const summary = $("#notification-summary");
+    if (summary) summary.textContent = unread ? `${unread} belum dibaca` : "Semua notifikasi sudah dibaca";
+    const markAll = $("#notif-mark-all");
+    if (markAll) markAll.disabled = unread === 0;
+    if (!panel || !list) return;
+    list.innerHTML = state.notifications.length ? state.notifications.map(item => {
+      const meta = NOTIFICATION_META[item.notification_type] || { icon: "bell", page: "home" };
+      return `
+        <button type="button" class="notification-item ${item.read_at ? "" : "unread"}" data-notification-id="${escapeText(item.id)}">
+          <span class="notification-icon"><i data-lucide="${escapeText(meta.icon)}"></i></span>
+          <span class="notification-content">
+            <strong>${escapeText(item.title)}</strong>
+            <span>${escapeText(item.body)}</span>
+            <small>${escapeText(notificationDate(item.created_at))}</small>
+          </span>
+          ${item.read_at ? "" : '<span class="notification-unread-dot" aria-label="Belum dibaca"></span>'}
+        </button>`;
+    }).join("") : '<div class="notification-empty">Belum ada notifikasi. Aktivitas koneksi, pesan, forum, dan grup akan muncul di sini.</div>';
+    $$("[data-notification-id]").forEach(itemButton => {
+      itemButton.addEventListener("click", () => openNotification(itemButton.dataset.notificationId));
+    });
+    icons();
+  }
+
+  async function loadNotifications() {
+    const list = $("#notification-list");
+    if (list && state.notifications.length === 0) list.innerHTML = '<div class="notification-empty">Memuat notifikasi...</div>';
+    try {
+      state.notifications = await listMyNotifications({ limit: 40 });
+      renderNotifications();
+      return state.notifications;
+    } catch (error) {
+      console.error("Notification load failed:", error);
+      if (list) list.innerHTML = '<div class="notification-empty">Notifikasi belum dapat dimuat. Periksa koneksi lalu coba lagi.</div>';
+      throw error;
+    }
+  }
+
+  async function openNotification(notificationId) {
+    const notification = state.notifications.find(item => item.id === notificationId);
+    if (!notification) return;
+    if (!notification.read_at) {
+      try {
+        const result = await markMyNotificationRead(notification.id);
+        notification.read_at = result?.read_at || new Date().toISOString();
+      } catch (error) {
+        console.error("Notification read receipt failed:", error);
+        toast(error?.message || "Status notifikasi belum dapat diperbarui.");
+      }
+    }
+    const panel = $("#notification-panel");
+    panel.hidden = true;
+    $("#notif-btn").setAttribute("aria-expanded", "false");
+    renderNotifications();
+
+    const route = NOTIFICATION_META[notification.notification_type]?.page || "home";
+    try {
+      if (route === "matching") {
+        await navigate("matching");
+        if (notification.notification_type === "direct_message" && notification.reference_id) {
+          const summaries = await listMyConnectionSummaries();
+          state.connectionSummaries = summaries;
+          renderConnectionPanel();
+          renderMatches();
+          await openDirectChat(notification.reference_id);
+        }
+      } else if (route === "forum") {
+        await navigate("forum");
+        if (notification.reference_id) await openForumThread(notification.reference_id);
+      } else if (route === "groups") {
+        await navigate("groups");
+        if (notification.notification_type === "group_join_request" && notification.reference_id) {
+          await openGroupDetails(notification.reference_id);
+        }
+      } else {
+        navigate("home");
+      }
+    } catch (error) {
+      console.error("Notification navigation failed:", error);
+      toast(error?.message || "Tujuan notifikasi belum dapat dibuka.");
+    }
+  }
+
+  async function markAllNotificationsRead() {
+    const button = $("#notif-mark-all");
+    button.disabled = true;
+    try {
+      await markAllMyNotificationsRead();
+      state.notifications = state.notifications.map(item => ({
+        ...item,
+        read_at: item.read_at || new Date().toISOString(),
+      }));
+      renderNotifications();
+      toast("Semua notifikasi ditandai sudah dibaca.");
+    } catch (error) {
+      console.error("Mark all notifications read failed:", error);
+      toast(error?.message || "Notifikasi belum dapat diperbarui.");
+      button.disabled = false;
+    }
+  }
+
+  function initNotificationRealtime() {
+    if (!currentUserId) return;
+    try {
+      state.notificationChannel = subscribeToMyNotifications(
+        currentUserId,
+        () => loadNotifications().catch(() => {}),
+        (status, error) => {
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            console.warn("Notification realtime status:", status, error);
+          }
+        }
+      );
+    } catch (error) {
+      console.warn("Notification realtime is unavailable:", error);
+    }
+  }
+
+  async function toggleNotificationPanel() {
+    const panel = $("#notification-panel");
+    const button = $("#notif-btn");
+    const opening = panel.hidden;
+    panel.hidden = !opening;
+    button.setAttribute("aria-expanded", String(opening));
+    if (opening) await loadNotifications().catch(() => {});
+  }
+
+  $("#notif-btn").addEventListener("click", toggleNotificationPanel);
+  $("#notif-mark-all").addEventListener("click", markAllNotificationsRead);
+  document.addEventListener("click", event => {
+    if (!event.target.closest(".top-actions")) {
+      $("#notification-panel").hidden = true;
+      $("#notif-btn").setAttribute("aria-expanded", "false");
+    }
+  });
+
   function toast(message){const el=$('#toast');el.textContent=message;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),2500)}
   function icons(){if(window.lucide)lucide.createIcons()}
-  function navigate(page){state.page=page;$$('.page-section').forEach(s=>s.classList.toggle('active',s.id==='page-'+page));$$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));const labels={home:'Beranda',matching:'Matching',forum:'Forum',groups:'Grup Belajar',info:'Informasi UT',profile:'Profil Saya',verification:'Verifikasi Mahasiswa'};$('#crumb-current').textContent=labels[page]||'Beranda';window.scrollTo({top:0,behavior:'smooth'});if(page==='home'&&state.map)setTimeout(()=>state.map.invalidateSize(),80);if(page==='verification')loadVerification();if(page==='forum')loadForum();if(page==='groups')loadGroups();if(page==='matching')loadMatching();icons()}
+  function navigate(page){state.page=page;$$('.page-section').forEach(s=>s.classList.toggle('active',s.id==='page-'+page));$$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));const labels={home:'Beranda',matching:'Matching',forum:'Forum',groups:'Grup Belajar',info:'Informasi UT',profile:'Profil Saya',verification:'Verifikasi Mahasiswa'};$('#crumb-current').textContent=labels[page]||'Beranda';window.scrollTo({top:0,behavior:'smooth'});if(page==='home'&&state.map)setTimeout(()=>state.map.invalidateSize(),80);let pageLoad=null;if(page==='verification')pageLoad=loadVerification();if(page==='forum')pageLoad=loadForum();if(page==='groups')pageLoad=loadGroups();if(page==='matching')pageLoad=loadMatching();icons();return pageLoad}
   $$('[data-page]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));$$('[data-go]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.go)));
   function visibleStudents(){return students.filter(s=>s.distance<=state.radius&&(!state.search||s.nim.includes(state.search)))}
   function renderNearby(){const list=$('#nearby-list');const items=visibleStudents().slice(0,5);list.innerHTML=items.length?items.map(s=>`<div class="person-row"><div class="person-avatar">${s.initial}</div><div class="person-meta"><strong>${state.connected.has(s.id)?escapeText(s.name):`Mahasiswa ${s.initial}`}</strong><span>${s.prodi}</span></div><span class="distance">~${Math.round(s.distance*10)/10} km</span></div>`).join(''):`<div class="empty-state"><div class="empty-icon"><i data-lucide="user-search"></i></div><h3>Belum ada hasil</h3><p>Tidak ditemukan mahasiswa dalam radius atau pencarian yang dipilih.</p></div>`;icons()}
@@ -1265,6 +1437,6 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     if(activeVerificationPreviewUrl){URL.revokeObjectURL(activeVerificationPreviewUrl);activeVerificationPreviewUrl=null}
   }
   const guide=`<div style="display:grid;gap:14px"><div><b style="font-size:11px">01 · Lengkapi profil</b><p class="section-note">Daftar dengan data akademik yang diperlukan. Verifikasi identitas harus dilakukan melalui layanan yang sah pada versi produksi.</p></div><div><b style="font-size:11px">02 · Atur lokasi secara sadar</b><p class="section-note">Pilih lokasi perkiraan dan tentukan apakah ingin tampil di radar. Jangan tampilkan alamat rumah atau koordinat presisi kepada pengguna lain.</p></div><div><b style="font-size:11px">03 · Temukan teman belajar</b><p class="section-note">Gunakan radius dan preferensi mata kuliah untuk melihat rekomendasi yang relevan.</p></div><div><b style="font-size:11px">04 · Bangun koneksi</b><p class="section-note">Kirim permintaan connect. Chat hanya tersedia setelah kedua pihak menyetujui koneksi.</p></div><div><b style="font-size:11px">05 · Belajar bersama</b><p class="section-note">Gunakan forum untuk peer help atau bergabung dan membuat kelompok belajar.</p></div><p class="tiny muted" style="padding:10px;background:#f7f9fc;border-radius:9px">Catatan: Matching, koneksi, dan chat langsung tersedia untuk mahasiswa terverifikasi. Peta lokasi pada beranda masih menggunakan data simulasi.</p></div>`;
-  $$('[data-open-guide]').forEach(b=>b.addEventListener('click',()=>openModal('Panduan UT Connect',guide)));$('#modal-close').addEventListener('click',closeModal);$('#modal-cancel').addEventListener('click',closeModal);$('#modal-confirm').addEventListener('click',async()=>{if(modalAction){const confirmButton=$('#modal-confirm');confirmButton.disabled=true;try{const result=await modalAction();if(result===false)return;modalAction=null;closeModal();toast(modalSuccessMessage)}catch(error){console.error('Modal action failed:',error);toast(error.message||'Tindakan gagal. Silakan coba lagi.')}finally{confirmButton.disabled=false}return}closeModal();toast('Panduan ditutup.')});$('#modal-backdrop').addEventListener('click',e=>{if(e.target.id==='modal-backdrop')closeModal()});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});$('#notif-btn').addEventListener('click',()=>toast('Belum ada notifikasi baru.'));$('#edit-profile').addEventListener('click',()=>openModal('Edit profil',`<p class="section-note">Form edit profil ditampilkan sebagai rancangan UI. Penyimpanan dan verifikasi perubahan belum terhubung ke backend.</p><div class="field"><label>Nama tampilan</label><input class="text-input" value="Andi Bintang"></div><div class="field"><label>Program studi</label><input class="text-input" value="Sistem Informasi" disabled></div><div class="field"><label>Preferensi belajar</label><select class="select"><option>Online · Malam hari</option><option>Online · Akhir pekan</option><option>Offline</option></select></div>`,`Tutup`));
-  renderNearby();loadForum();loadGroups();loadInformation();loadVerification();initMap();icons();
+  $$('[data-open-guide]').forEach(b=>b.addEventListener('click',()=>openModal('Panduan UT Connect',guide)));$('#modal-close').addEventListener('click',closeModal);$('#modal-cancel').addEventListener('click',closeModal);$('#modal-confirm').addEventListener('click',async()=>{if(modalAction){const confirmButton=$('#modal-confirm');confirmButton.disabled=true;try{const result=await modalAction();if(result===false)return;modalAction=null;closeModal();toast(modalSuccessMessage)}catch(error){console.error('Modal action failed:',error);toast(error.message||'Tindakan gagal. Silakan coba lagi.')}finally{confirmButton.disabled=false}return}closeModal();toast('Panduan ditutup.')});$('#modal-backdrop').addEventListener('click',e=>{if(e.target.id==='modal-backdrop')closeModal()});document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();$('#notification-panel').hidden=true;$('#notif-btn').setAttribute('aria-expanded','false')}});$('#edit-profile').addEventListener('click',()=>openModal('Edit profil',`<p class="section-note">Form edit profil ditampilkan sebagai rancangan UI. Penyimpanan dan verifikasi perubahan belum terhubung ke backend.</p><div class="field"><label>Nama tampilan</label><input class="text-input" value="Andi Bintang"></div><div class="field"><label>Program studi</label><input class="text-input" value="Sistem Informasi" disabled></div><div class="field"><label>Preferensi belajar</label><select class="select"><option>Online · Malam hari</option><option>Online · Akhir pekan</option><option>Offline</option></select></div>`,`Tutup`));
+  renderNearby();loadForum();loadGroups();loadInformation();loadVerification();initMap();loadNotifications().catch(()=>{});initNotificationRealtime();icons();
 }
