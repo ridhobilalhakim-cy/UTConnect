@@ -1029,6 +1029,182 @@ test('group admin can approve a pending membership request', async ({ page }) =>
 });
 
 
+test('active group member can read, send and pin group chat messages', async ({ page }) => {
+  const groupId = 'group-chat-001';
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+    studyGroups: [{
+      id: groupId, created_by: USER.id, name: 'Ruang Diskusi UT', description: 'Diskusi materi bersama.',
+      course_id: null, course: null, mode: 'online', capacity: 10, access_type: 'open',
+      schedule_text: 'Malam hari', online_url: null, offline_area_label: null, is_archived: false,
+      created_at: '2026-10-30T10:00:00.000Z',
+    }],
+    groupMembers: [
+      { group_id: groupId, user_id: USER.id, role: 'admin', status: 'active', created_at: '2026-10-01T10:00:00.000Z', joined_at: '2026-10-01T10:00:00.000Z' },
+    ],
+    groupMessages: [{
+      id: 'group-message-seed-001', group_id: groupId, sender_id: USER.id, reply_to_id: null,
+      body: 'Selamat datang di ruang diskusi.', mentioned_user_ids: [], pinned_at: null, pinned_by: null,
+      created_at: '2026-10-30T10:00:00.000Z',
+    }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="groups"]').first().click();
+  await page.locator('[data-group-open="' + groupId + '"]').click();
+  await expect(page.locator('#modal-content')).toContainText('Selamat datang di ruang diskusi.');
+  await page.locator('#group-message-input').fill('Saya siap belajar bersama.');
+  await page.locator('#group-message-form button[type="submit"]').click();
+
+  await expect(page.locator('#group-message-list')).toContainText('Saya siap belajar bersama.');
+  expect(state.groupMessageSendCalls).toHaveLength(1);
+  expect(state.groupMessageSendCalls[0].sender_id).toBe(USER.id);
+
+  await page.locator('[data-group-message-pin="group-message-seed-001"]').click();
+  await expect(page.locator('#group-message-list')).toContainText('Pesan disematkan');
+  expect(state.groupMessagePinCalls).toHaveLength(1);
+  expect(state.groupMessagePinCalls[0].p_actor_id).toBe(USER.id);
+});
+
+test('active group member can upload and access a private study material', async ({ page }) => {
+  const groupId = 'group-materials-001';
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+    studyGroups: [{
+      id: groupId, created_by: USER.id, name: 'Materi Perkuliahan', description: 'Berbagi bahan belajar.',
+      course_id: null, course: null, mode: 'online', capacity: 10, access_type: 'open',
+      schedule_text: null, online_url: null, offline_area_label: null, is_archived: false,
+      created_at: '2026-10-30T10:00:00.000Z',
+    }],
+    groupMembers: [
+      { group_id: groupId, user_id: USER.id, role: 'admin', status: 'active', created_at: '2026-10-01T10:00:00.000Z', joined_at: '2026-10-01T10:00:00.000Z' },
+    ],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="groups"]').first().click();
+  await page.locator('[data-group-open="' + groupId + '"]').click();
+  await page.locator('[data-group-tab="materials"]').click();
+  await page.locator('#group-material-title').fill('Ringkasan pertemuan pertama');
+  await page.locator('#group-material-file').setInputFiles({
+    name: 'Ringkasan.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-1.4\nUT Connect test file'),
+  });
+  await page.locator('#group-material-form button[type="submit"]').click();
+
+  await expect(page.locator('.group-material-list')).toContainText('Ringkasan pertemuan pertama');
+  await expect(page.locator('.group-material-list a')).toContainText('Unduh');
+  expect(state.groupMaterialUploadCalls).toHaveLength(1);
+  expect(state.groupMaterials).toHaveLength(1);
+  expect(state.groupMaterials[0].uploaded_by).toBe(USER.id);
+  expect(state.groupMaterials[0].storage_path).toContain(groupId + '/' + USER.id + '/');
+});
+
+test('active group member can create a poll and cast one group agenda vote', async ({ page }) => {
+  const groupId = 'group-agenda-001';
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+    studyGroups: [{
+      id: groupId, created_by: USER.id, name: 'Agenda Belajar', description: 'Atur target kelompok.',
+      course_id: null, course: null, mode: 'online', capacity: 10, access_type: 'open',
+      schedule_text: null, online_url: null, offline_area_label: null, is_archived: false,
+      created_at: '2026-10-30T10:00:00.000Z',
+    }],
+    groupMembers: [
+      { group_id: groupId, user_id: USER.id, role: 'admin', status: 'active', created_at: '2026-10-01T10:00:00.000Z', joined_at: '2026-10-01T10:00:00.000Z' },
+    ],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="groups"]').first().click();
+  await page.locator('[data-group-open="' + groupId + '"]').click();
+  await page.locator('[data-group-tab="agenda"]').click();
+  await page.locator('#group-agenda-type').selectOption('poll');
+  await page.locator('#group-agenda-title').fill('Kapan waktu diskusi?');
+  await page.locator('#group-poll-options-input').fill('Sabtu malam\nMinggu pagi');
+  await page.locator('#group-agenda-form button[type="submit"]').click();
+
+  await expect(page.locator('.group-agenda-card')).toContainText('Kapan waktu diskusi?');
+  await page.locator('[data-group-poll-vote="group-agenda-e2e-1"][data-poll-option="Sabtu malam"]').click();
+  await expect(page.locator('.group-agenda-card')).toContainText('1 suara');
+  expect(state.groupAgendaCreateCalls).toHaveLength(1);
+  expect(state.groupAgendaCreateCalls[0].item_type).toBe('poll');
+  expect(state.groupAgendaItems[0].poll_options).toEqual(['Sabtu malam', 'Minggu pagi']);
+  expect(state.groupPollVotes).toHaveLength(1);
+  expect(state.groupPollVotes[0].user_id).toBe(USER.id);
+});
+
+test('admin of a private group can invite a verified student by NIM', async ({ page }) => {
+  const groupId = 'group-private-001';
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+    studyGroups: [{
+      id: groupId, created_by: USER.id, name: 'Kelompok Undangan', description: 'Ruang privat.',
+      course_id: null, course: null, mode: 'online', capacity: 10, access_type: 'private',
+      schedule_text: null, online_url: null, offline_area_label: null, is_archived: false,
+      created_at: '2026-10-30T10:00:00.000Z',
+    }],
+    groupMembers: [
+      { group_id: groupId, user_id: USER.id, role: 'admin', status: 'active', created_at: '2026-10-01T10:00:00.000Z', joined_at: '2026-10-01T10:00:00.000Z' },
+    ],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="groups"]').first().click();
+  await page.locator('[data-group-open="' + groupId + '"]').click();
+  await page.locator('[data-group-tab="invites"]').click();
+  await page.locator('#group-invite-nim').fill('049123456');
+  await page.locator('#group-invite-form button[type="submit"]').click();
+
+  await expect(page.locator('.group-invites-panel')).toContainText('Undangan menunggu jawaban');
+  expect(state.groupInviteCalls).toHaveLength(1);
+  expect(state.groupInviteCalls[0]).toEqual({ action: 'invite_by_nim', group_id: groupId, nim: '049123456' });
+  expect(state.groupInvites).toHaveLength(1);
+});
+
+test('verified student can accept a private group invitation from their inbox', async ({ page }) => {
+  const groupId = 'group-private-incoming-001';
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+    studyGroups: [{
+      id: groupId, created_by: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', name: 'Kelompok Privat UT',
+      description: 'Undangan belajar privat.', course_id: null, course: null, mode: 'online',
+      capacity: 10, access_type: 'private', schedule_text: null, online_url: null, offline_area_label: null,
+      is_archived: false, created_at: '2026-10-30T10:00:00.000Z',
+    }],
+    myGroupInvitations: [{
+      invite_id: 'group-invite-e2e-001', group_id: groupId, group_name: 'Kelompok Privat UT',
+      group_description: 'Undangan belajar privat.', invited_at: '2026-10-30T11:00:00.000Z',
+    }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="groups"]').first().click();
+  await expect(page.locator('.group-invitation-row')).toContainText('Kelompok Privat UT');
+  await page.locator('[data-group-invite-accept="' + groupId + '"]').click();
+
+  await expect(page.locator('.group-invitation-row')).toHaveCount(0);
+  expect(state.groupJoinCalls).toHaveLength(1);
+  expect(state.groupJoinCalls[0].p_group_id).toBe(groupId);
+  expect(state.groupMembers.some(member => member.group_id === groupId && member.user_id === USER.id && member.status === 'active')).toBe(true);
+});
+
 test('verified student sees real nearby map results from the secure endpoint', async ({ page }) => {
   const state = await mockSupabase(page, {
     profile: { ...PROFILE, verification_status: 'verified' },
