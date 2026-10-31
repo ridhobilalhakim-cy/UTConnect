@@ -8,7 +8,7 @@ Project status at inspection: ACTIVE_HEALTHY
 
 ## Remote migration history
 
-The connected staging project reported these nine applied migration entries:
+The connected staging project reported these ten applied migration entries:
 
 | Version | Name |
 |---|---|
@@ -21,6 +21,7 @@ The connected staging project reported these nine applied migration entries:
 | 20261031052849 | add_admin_roles_and_information_post_management |
 | 20261031071140 | student_verification_workflow |
 | 20261031101336 | secure_enable_group_join_workflow_rpcs |
+| 20261031102733 | secure_matching_and_connection_workflows |
 
 Live introspection found the public application tables with RLS enabled, plus private NIM search and student-verification tables. PostGIS is enabled. The deployed `complete-student-registration` Edge Function was last confirmed as ACTIVE version 4 with JWT verification enabled.
 
@@ -38,8 +39,8 @@ Latest live introspection returned four rows in `profiles` and four rows in `use
 
 - Login and registration page share one Supabase client module and storage key.
 - Dashboard is protected by session and profile lookup.
-- Information UT, Student Verification, Forum Diskusi, and Grup Belajar now call Supabase service modules. The forum supports verified-only posts and comments. Groups support verified-only discovery/creation, joining, approval requests, and admin review.
-- Matching, chat, group messages/materials/agenda, map markers, and notifications remain demo/simulated rather than live multi-user modules.
+- Information UT, Student Verification, Forum Diskusi, Grup Belajar, and Matching/Connections now call Supabase service modules. The forum supports verified-only posts/comments; groups support verified-only discovery/creation/join/admin review; matching supports owner-scoped preferences, radar-consent candidate search, and connection requests/decisions.
+- Direct chat/messages, group messages/materials/agenda, home map markers, and notifications remain demo/simulated rather than live multi-user modules.
 - Google OAuth provider setup has not been verified end-to-end in this audit.
 - The live database uses NIM digest rather than displaying plaintext NIM. Do not expose real student NIM/location until registration and access-control tests have passed.
 
@@ -80,3 +81,18 @@ Latest live introspection returned four rows in `profiles` and four rows in `use
 - Live counts after implementation: 0 study groups, 0 group members, 0 group invites, and 0 active courses. No test rows were created in the live database.
 - Four new Playwright test scenarios were added for unverified gating, verified group creation, approval-based join requests, and admin approval. The current repository defines 17 tests total; these four are not marked passing until CI confirms the latest commit.
 - Real-account group creation/join/approval and current Netlify deployment remain external acceptance tests.
+
+
+## Matching & Connections state (checked 2026-10-31)
+
+- The new migration 20261031102733_secure_matching_and_connection_workflows is applied to staging.
+- public.find_matching_students requires an authenticated, verified caller and supports only 1,000, 3,000, or 5,000 metres. It wraps the existing find_nearby_students RPC, which filters verified candidates to users with show_in_radar = true, excludes self and mutual blocks, and returns a jittered approximate distance. The new wrapper does not return marker coordinates.
+- The wrapper returns at most ten rows with candidate ID for connection addressing, initials, program, approximate distance, active course names, topic tags, interests, and study times. Full names and NIM digests are not returned.
+- private.match_search_events is a private RLS-enabled table with no authenticated/anon privileges. The matching RPC rate-limits each user to 30 search requests per 10 minutes.
+- matching_preferences and profile_courses retain their existing owner-only RLS policies. Authenticated users can only read and modify their own preferences/course links.
+- The existing connections_insert_request policy requires the signed-in verified sender, a different verified recipient, pending status, and no block. The migration grants authenticated INSERT only; direct UPDATE remains unavailable.
+- get_my_connection_summaries exposes only a user's own connection rows and the other participant's initials/program. respond_connection_request verifies the signed-in user is the recipient of a pending request and re-checks both verification states and mutual block status before changing the result.
+- The three new SECURITY DEFINER RPCs are intentionally callable by authenticated users. Supabase security advisors report these as warnings; they use the current session identity and return or modify only caller-authorized data.
+- Direct messaging is still not integrated. An accepted connection is not yet a live chat channel.
+
+Latest data counts: 0 matching preference rows, 0 profile-course links, 0 connection records, 0 direct messages, and 0 matching search events. There are four profiles (one verified and three pending), four radar-opt-in location rows, and zero active courses. No matching preferences, connections, or search events were created as test data.
