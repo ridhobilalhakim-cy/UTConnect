@@ -14,6 +14,7 @@ These migrations have been applied on Supabase project `hqyusbyndtlfypdbmatw` (S
 | 20261031071140 | student_verification_workflow |
 | 20261031101336 | secure_enable_group_join_workflow_rpcs |
 | 20261031102733 | secure_matching_and_connection_workflows |
+| 20261031104922 | secure_direct_message_read_receipts |
 
 The matching RPC SQL source is retained as `20261030232434_student_registration_profile_location_rpc_v1.sql`, but the file name timestamp is a local artifact name and not the remote migration version. Treat the remote migration history above as authoritative for the existing staging project.
 
@@ -28,3 +29,5 @@ The group workflow RPC migration hardens `join_study_group` and `respond_group_j
 
 
 The Matching & Connections migration adds private search-event logging and guarded public RPCs for nearby matching, per-user connection summaries, and recipient-only request decisions. It grants INSERT (not UPDATE) on public.connections to authenticated; the existing RLS insert policy remains the authorization boundary. Matching results omit full names and precise coordinates; the service checks auth.uid() and student verification. See 20261031102733_secure_matching_and_connection_workflows.sql.
+
+The Direct Messaging security migration is retained as `20261031104922_secure_direct_message_read_receipts.sql`. It restricts direct-message SELECT/INSERT to participants of an accepted connection who both remain verified and are not mutually blocked. Authenticated users receive only column-level UPDATE permission on `read_at`; message body and sender identity are not updateable by the browser role.
