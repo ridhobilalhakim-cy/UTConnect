@@ -884,7 +884,6 @@ test('verified student sees real nearby map results from the secure endpoint', a
       consented_at: '2026-10-31T10:00:00.000Z',
     },
     nearbyResults: [{
-      student_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       initials: 'DP',
       program: 'Sistem Informasi',
       approx_distance_m: 550,
@@ -916,7 +915,6 @@ test('pending student cannot search the nearby radar', async ({ page }) => {
       consented_at: '2026-10-31T10:00:00.000Z',
     },
     nearbyResults: [{
-      student_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       initials: 'DP',
       program: 'Sistem Informasi',
       approx_distance_m: 500,
@@ -944,7 +942,6 @@ test('verified student NIM search is sent only in the authenticated request body
       consented_at: '2026-10-31T10:00:00.000Z',
     },
     nearbyResults: [{
-      student_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       initials: 'DP',
       program: 'Sistem Informasi',
       approx_distance_m: 1200,
@@ -1047,7 +1044,6 @@ test('verified student can search privacy-limited matches and send a connection 
   const state = await mockSupabase(page, {
     profile: { ...PROFILE, verification_status: 'verified' },
     matchingCandidates: [{
-      student_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       initials: 'RA',
       program: 'Manajemen',
       approx_distance_m: 1250,
