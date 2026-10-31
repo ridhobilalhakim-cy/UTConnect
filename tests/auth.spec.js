@@ -1691,6 +1691,74 @@ test('verified student can open a chat inbox notification and mark it read', asy
 });
 
 
+test('student can open an Information UT publication notification in the correct menu', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+    informationPosts: [{
+      id: 'information-notification-001',
+      author_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      category: 'seminar',
+      audience: 'verified_students',
+      title: 'Webinar Akademik UT',
+      body: 'Informasi kegiatan akademik untuk mahasiswa.',
+      source_url: null,
+      is_published: true,
+      published_at: '2026-11-01T08:00:00.000Z',
+      created_at: '2026-11-01T08:00:00.000Z',
+      updated_at: '2026-11-01T08:00:00.000Z',
+    }],
+    notifications: [{
+      id: 'notification-information-001',
+      user_id: USER.id,
+      notification_type: 'information_post',
+      title: 'Informasi UT baru',
+      body: 'Informasi baru: Webinar Akademik UT',
+      reference_id: 'information-notification-001',
+      read_at: null,
+      created_at: '2026-11-01T08:00:00.000Z',
+    }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('#notif-btn').click();
+  await page.locator('[data-notification-id="notification-information-001"]').click();
+
+  await expect(page.locator('#page-info')).toHaveClass(/active/);
+  await expect(page.locator('#info-grid')).toContainText('Webinar Akademik UT');
+  expect(state.notificationReadCalls).toEqual(['notification-information-001']);
+});
+
+test('student can open a verification decision notification in the correct menu', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'pending' },
+    verificationStatus: { profile_status: 'rejected', latest_request: { status: 'rejected', review_note: 'Bukti registrasi semester berjalan belum terlihat.' } },
+    notifications: [{
+      id: 'notification-verification-001',
+      user_id: USER.id,
+      notification_type: 'student_verification',
+      title: 'Verifikasi mahasiswa perlu diperbaiki',
+      body: 'Buka halaman Verifikasi Mahasiswa untuk membaca catatan administrator.',
+      reference_id: USER.id,
+      read_at: null,
+      created_at: '2026-11-01T08:00:00.000Z',
+    }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('#notif-btn').click();
+  await page.locator('[data-notification-id="notification-verification-001"]').click();
+
+  await expect(page.locator('#page-verification')).toHaveClass(/active/);
+  await expect(page.locator('#verification-status-panel')).toContainText('Perlu perbaikan');
+  expect(state.notificationReadCalls).toEqual(['notification-verification-001']);
+});
+
 test('pending student cannot open private chat inbox', async ({ page }) => {
   const state = await mockSupabase(page, {
     profile: { ...PROFILE, verification_status: 'pending' },
