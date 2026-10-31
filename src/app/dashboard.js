@@ -105,6 +105,8 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     group_join_approved: { icon: "check-circle-2", page: "groups" },
     group_join_rejected: { icon: "users-round", page: "groups" },
     group_invite: { icon: "mail-plus", page: "groups" },
+    student_verification: { icon: "shield-check", page: "verification" },
+    information_post: { icon: "megaphone", page: "info" },
   };
 
   function notificationDate(value) {
@@ -197,8 +199,12 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
         } else if (notification.reference_id && ["group_message", "group_material", "group_agenda"].includes(notification.notification_type)) {
           await openGroupDetails(notification.reference_id);
         }
+      } else if (route === "info") {
+        await navigate("info");
+      } else if (route === "verification") {
+        await navigate("verification");
       } else {
-        navigate("home");
+        await navigate("home");
       }
     } catch (error) {
       console.error("Notification navigation failed:", error);
