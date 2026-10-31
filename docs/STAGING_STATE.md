@@ -32,8 +32,6 @@ The connected staging project reported these twenty applied migration entries:
 | 20261031134014 | group_members_realtime |
 | 20261031134443 | group_poll_realtime_touch |
 | 20261031135852 | group_membership_verification_guard |
-| 20261031124333 | group_workspace_workflows |
-| 20261031124407 | group_invite_inbox_limit |
 | 20261031133930 | group_workspace_realtime_and_invite_notifications |
 | 20261031134014 | group_members_realtime |
 | 20261031134443 | group_poll_realtime_touch |
@@ -95,7 +93,8 @@ Latest live introspection returned four rows in `profiles` and four rows in `use
 - Private invitations create a database notification of type `group_invite`. The dashboard notification opens the Groups page where the invitee can respond.
 - Realtime publication includes `group_messages`, `group_materials`, `group_agenda_items`, `group_invites`, `group_members`, and `notifications`. Realtime callbacks are scoped by group ID and remain subject to each table's RLS SELECT policy. Poll vote changes touch the agenda row so aggregate counts refresh for other active members.
 - Security migrations applied: `20261031124333_group_workspace_workflows`, `20261031124407_group_invite_inbox_limit`, `20261031133930_group_workspace_realtime_and_invite_notifications`, `20261031134014_group_members_realtime`, and `20261031134443_group_poll_realtime_touch`. The RPCs are SECURITY DEFINER but validate the signed-in actor; no direct authenticated writes to `group_members` or poll vote table are granted.
-- Migration `20261031135852_group_membership_verification_guard` updates the central RLS membership/admin helpers to require the account to remain currently verified; group contents and admin actions stop working if verification is revoked. It also hardens membership decisions, poll RPCs, invite inbox, and message pinning.\n- The Storage bucket remains private with a 50 MiB file limit and three Storage policies. The current group schema has no active course rows, so users can create general groups.
+- Migration `20261031135852_group_membership_verification_guard` updates the central RLS membership/admin helpers to require the account to remain currently verified; group contents and admin actions stop working if verification is revoked. It also hardens membership decisions, poll RPCs, invite inbox, and message pinning.
+- The Storage bucket remains private with a 50 MiB file limit and three Storage policies. The current group schema has no active course rows, so users can create general groups.
 - Live staging counts remain 0 study groups, 0 group members, 0 group invites, and 0 active courses. No group test records were retained in Supabase.
 - The repository now defines 35 Playwright scenarios, including five group workspace tests for chat/pin, material upload, poll creation/voting, private invite by NIM, and invite acceptance. They use mocked Supabase/Storage responses; CI for the latest PR commit is still pending. Mocked browser tests do not replace live two-account acceptance.
 - Outstanding real-account checks: two verified synthetic accounts to verify cross-account chat, signed file access, poll Realtime updates, invite notification delivery, member approval and private-invite acceptance. Netlify production deployment is still unconfirmed.
