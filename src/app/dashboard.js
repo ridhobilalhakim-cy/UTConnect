@@ -85,7 +85,7 @@ import {
   findNearbyStudents,
 } from "../services/home-map.js";
 import { listMyChatRooms, updateMyStudentProfile, uploadMyProfileAvatar, setMyProfileAvatarPreset, getProfileAvatarUrl } from "../services/profile.js";
-import { populateUTFacultyProgramSelects, resolveUTFaculty } from "../data/ut-programs.js";
+import { populateUTFacultyProgramSelects, resolveUTFaculty, resolveUTProgram } from "../data/ut-programs.js";
 
 export function initDashboard({ isAdmin = false, isVerified = false, verificationStatus = "pending", currentUserId = null, currentUserName = "Mahasiswa UT", currentProfile = {} } = {}) {
   window.L = L;
@@ -1664,8 +1664,35 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   }
   async function loadVerification() {
     const statusPanel = $("#verification-status-panel");
+    const submitPanel = $("#verification-submit-panel");
     const queuePanel = $("#verification-admin-panel");
-    if (!statusPanel) return;
+    const queue = $("#verification-queue");
+
+    // Administrators manage student reviews; their own student verification state is not applicable.
+    if (isAdmin) {
+      if (statusPanel) statusPanel.hidden = true;
+      if (submitPanel) submitPanel.hidden = true;
+      if (!queuePanel) return;
+
+      queuePanel.hidden = false;
+      if (queue) queue.innerHTML = '<div class="verification-loading">Memuat antrean...</div>';
+      try {
+        const items = await listStudentVerificationQueue();
+        renderVerificationQueue(items);
+        const count = $("#verification-queue-count");
+        if (count) count.textContent = String(items.length);
+      } catch (error) {
+        console.error("Administrator verification queue load failed:", error);
+        if (queue) queue.innerHTML = '<p class="section-note">Antrean belum dapat dimuat. Coba muat ulang.</p>';
+      }
+      return;
+    }
+
+    if (!statusPanel || !submitPanel) return;
+    statusPanel.hidden = false;
+    submitPanel.hidden = false;
+    if (queuePanel) queuePanel.hidden = true;
+
     statusPanel.innerHTML = '<div class="verification-loading">Memuat status verifikasi...</div>';
     try {
       const status = await getMyStudentVerificationStatus();
@@ -1677,23 +1704,10 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
         <div class="verification-steps"><span class="verification-step done">1. Lengkapi profil</span><span class="verification-step ${status?.latest_request ? "done" : ""}">2. Kirim bukti</span><span class="verification-step ${profileStatus === "verified" ? "done" : ""}">3. Pemeriksaan admin</span></div>
       `;
       renderVerificationSubmission(status);
-      if (isAdmin && queuePanel) {
-        queuePanel.hidden = false;
-        $("#verification-queue").innerHTML = '<div class="verification-loading">Memuat antrean...</div>';
-        const items = await listStudentVerificationQueue();
-        renderVerificationQueue(items);
-        $("#verification-queue-count").textContent = String(items.length);
-      } else if (queuePanel) {
-        queuePanel.hidden = true;
-      }
     } catch (error) {
       console.error("Student verification load failed:", error);
       statusPanel.innerHTML = `<div class="verification-result rejected"><span class="verification-symbol">!</span><div><strong>Status belum dapat dimuat</strong><p>${escapeText(error?.message || "Periksa koneksi lalu coba lagi.")}</p><button class="btn btn-secondary btn-sm" id="verification-retry">Coba lagi</button></div></div>`;
       $("#verification-retry")?.addEventListener("click", loadVerification);
-      if (isAdmin && queuePanel) {
-        queuePanel.hidden = false;
-        $("#verification-queue").innerHTML = '<p class="section-note">Antrean belum dapat dimuat.</p>';
-      }
     }
   }
   $("#verification-refresh")?.addEventListener("click", loadVerification);
@@ -1934,7 +1948,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     const status = $("#profileStatusTag");
     if (status) status.textContent = isAdmin ? "Role: ADMINISTRATOR" : "Status: " + String(profile.verification_status || "pending").toUpperCase();
     const faculty = $("#profileFaculty"); if (faculty) faculty.textContent = resolveUTFaculty(profile.faculty) || profile.faculty || "-";
-    const program = $("#profileProgram"); if (program) program.textContent = profile.program || "-";
+    const program = $("#profileProgram"); if (program) program.textContent = resolveUTProgram(profile.faculty, profile.program) || profile.program || "-";
     const semester = $("#profileSemester"); if (semester) semester.textContent = profile.semester || "-";
     const bio = $("#profileBio"); if (bio) bio.textContent = profile.bio || (isAdmin ? "Administrator UT Connect" : "Mahasiswa Universitas Terbuka");
     $("#profileFullName").textContent = name;
@@ -2029,7 +2043,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     }));
   }
     function escapeText(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-  let modalAction=null,modalSuccessMessage='Perubahan diterapkan pada sesi demo.';function openModal(title,content,confirm='Mengerti',action=null,successMessage='Perubahan diterapkan pada sesi demo.'){ modalAction=action;modalSuccessMessage=successMessage;$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal-confirm').textContent=confirm;$('#modal-confirm').style.display='';$('#modal-confirm').disabled=false;$('#modal-cancel').textContent='Tutup';$('#modal-backdrop').classList.add('open'); }
+  let modalAction=null,modalSuccessMessage='Perubahan berhasil diterapkan.';function openModal(title,content,confirm='Mengerti',action=null,successMessage='Perubahan berhasil diterapkan.'){ modalAction=action;modalSuccessMessage=successMessage;$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal-confirm').textContent=confirm;$('#modal-confirm').style.display='';$('#modal-confirm').disabled=false;$('#modal-cancel').textContent='Tutup';$('#modal-backdrop').classList.add('open'); }
   function closeModal(){
     closeGroupWorkspace().catch(error => console.warn("Group workspace cleanup failed:", error));
     if(state.activeChatChannel){
