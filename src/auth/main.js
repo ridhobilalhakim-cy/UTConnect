@@ -1,5 +1,6 @@
 import { supabase } from "../lib/supabase.js";
 import L from "leaflet";
+import { populateUTFacultyProgramSelects } from "../data/ut-programs.js";
 import "leaflet/dist/leaflet.css";
 
 window.L = L;
@@ -7,6 +8,7 @@ window.L = L;
 (() => {
   const $ = (id) => document.getElementById(id);
   const supabaseClient = supabase;
+  populateUTFacultyProgramSelects($("faculty"), $("program"));
   const L = window.L;
   let map = null, marker = null, chosenLocation = null, mapReady = false, activeUser = null;
   let handlingSession = false;
