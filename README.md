@@ -21,7 +21,7 @@ This is the official consolidated source tree for the current UT Connect staging
 ## Developer environment (not required by website visitors)
 
 - Node.js 22.12+ and npm are needed only when developing/building source code.
-- `npm install` installs pinned direct dependencies. A lockfile is still pending because this environment cannot resolve `registry.npmjs.org`; do not create one manually. The GitHub Actions bootstrap workflow generates it in an online runner and uploads it with the build artifact.
+- `package-lock.json` is committed to the repository. CI validates dependency installation with `npm ci`; keep the lockfile committed whenever dependencies change.
 - `npm run dev` starts the local Vite development server.
 - `npm run build` creates static output in `dist/`.
 - `npm run preview` previews the built site.
@@ -30,7 +30,7 @@ This is the official consolidated source tree for the current UT Connect staging
 
 ## Deployment without installing tools on each teammate's computer
 
-Recommended: push this repository to GitHub, then connect the repository to Netlify. Netlify runs the build command remotely (`npm install && npm run build`) and publishes `dist/`. Team members and judges only open the final HTTPS URL. They do not install Node, Python, or anything else.
+Recommended: push this repository to GitHub, then connect the repository to Netlify. Netlify runs the build command remotely (`npm ci && npm run build`) and publishes `dist/`, using the committed lockfile. Team members and judges only open the final HTTPS URL. They do not install Node, Python, or anything else.
 
 Do **not** drag this source folder into Netlify Drop as though it were a prebuilt website. If using manual drag-and-drop, upload only the generated `dist/` folder after a successful build.
 
@@ -54,9 +54,9 @@ After deployment, set Supabase Auth Site URL and Redirect URLs to the actual HTT
 4. The remote database has six applied migrations, but the first five SQL bodies have not yet been reconstructed into local source control. See `docs/STAGING_STATE.md` and `supabase/migrations/REMOTE_MIGRATIONS.md`.
 5. Package installation is still blocked in this execution environment: DNS cannot resolve `registry.npmjs.org`. No lockfile or production bundle was generated here. The remote build bootstrap is documented in `docs/PHASE05_DEPENDENCY_BUILD_GATE.md`.
 
-## Next acceptance gate
+## Verification and next acceptance gate
 
-A GitHub Actions bootstrap workflow is included at `.github/workflows/verify-build.yml`. The first successful run creates a `package-lock.json`, runs source checks and the Vite build, then uploads the generated lockfile and `dist/` as an artifact. Commit that lockfile to the repository and rerun CI before connecting the repository to Netlify. Then deploy to a staging URL and test signup, login, Google OAuth, profile completion, redirect, reload/session restoration, protected route, and logout using two separate test accounts. Only after the Auth acceptance gate passes should feature modules begin connecting to the backend.
+GitHub Actions run #4 passed on 2026-10-31 (commit `4b58e41`): lockfile-based dependency install, source checks, Vite production build, Chromium install, and all five mocked Playwright auth tests. The next gate is Netlify staging deployment, followed by real Supabase auth tests (signup, Google OAuth, profile completion, redirect, reload/session restoration, protected route, and logout) using two separate test accounts. Only after the Auth acceptance gate passes should feature modules begin connecting to the backend.
 
 ## Browser E2E tests
 
