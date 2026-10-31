@@ -374,3 +374,24 @@ export async function unsubscribeFromGroupMessages(channel) {
   if (!channel) return;
   await supabase.removeChannel(channel);
 }
+
+export function subscribeToGroupWorkspace(groupId, handlers = {}) {
+  if (!groupId) return null;
+  const channel = supabase.channel(`group-workspace-${groupId}-${crypto.randomUUID()}`);
+  const tables = [
+    ["group_messages", handlers.onMessages],
+    ["group_materials", handlers.onMaterials],
+    ["group_agenda_items", handlers.onAgenda],
+    ["group_invites", handlers.onInvites],
+  ];
+  for (const [table, callback] of tables) {
+    if (typeof callback !== "function") continue;
+    channel.on("postgres_changes", {
+      event: "*",
+      schema: "public",
+      table,
+      filter: `group_id=eq.${groupId}`,
+    }, callback);
+  }
+  return channel.subscribe();
+}
