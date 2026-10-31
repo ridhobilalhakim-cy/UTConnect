@@ -99,7 +99,7 @@ Latest live introspection returned four rows in `profiles` and four rows in `use
 - Migration `20261031135852_group_membership_verification_guard` updates the central RLS membership/admin helpers to require the account to remain currently verified; group contents and admin actions stop working if verification is revoked. It also hardens membership decisions, poll RPCs, invite inbox, and message pinning.
 - Migration `20261031140523_group_materials_verified_delete_guard` also requires current verified active group membership to delete a material, including for its uploader. Admin/co-admin deletion remains scoped to active verified group admins.\n- The Storage bucket remains private with a 50 MiB file limit and three Storage policies. The current group schema has no active course rows, so users can create general groups.
 - Live staging counts remain 0 study groups, 0 group members, 0 group invites, and 0 active courses. No group test records were retained in Supabase.
-- The repository now defines 35 Playwright scenarios, including five group workspace tests for chat/pin, material upload, poll creation/voting, private invite by NIM, and invite acceptance. They use mocked Supabase/Storage responses; CI for the latest PR commit is still pending. Mocked browser tests do not replace live two-account acceptance.
+- The repository now defines 43 Playwright scenarios, including five group workspace tests for chat/pin, material upload, poll creation/voting, private invite by NIM, and invite acceptance. They use mocked Supabase/Storage responses; latest PR-head CI run #230 passed all 43 scenarios. Mocked browser tests do not replace live two-account acceptance.
 - Outstanding real-account checks: two verified synthetic accounts to verify cross-account chat, signed file access, poll Realtime updates, invite notification delivery, member approval and private-invite acceptance. Netlify production deployment is still unconfirmed.
 
 ## Matching & Connections state (checked 2026-10-31)
@@ -137,7 +137,7 @@ Latest data counts: 0 matching preference rows, 0 profile-course links, 0 connec
 - The table is included in the `supabase_realtime` publication. The browser subscribes to INSERT/UPDATE events for the active connection and removes the channel when the chat dialog closes. A manual refresh path remains available if Realtime disconnects.
 - The chat action appears only on accepted connection rows. The UI loads the latest 60 messages, displays initials/program rather than full identity, escapes message content, supports up to 5,000 characters, and marks unread incoming messages as read.
 - Live verification: one temporary SQL transaction created a synthetic accepted connection/message, switched to an authenticated recipient context, successfully updated `read_at`, then changed the connection to pending and confirmed the messages were no longer visible. The transaction ended with ROLLBACK; no synthetic record or profile status change remains.
-- Latest real counts remain 0 connections and 0 direct messages; there is one verified profile and three pending profiles. Two mocked browser tests were added, but CI has not yet confirmed them. Real two-account chat and Realtime testing is still required.
+- Latest real counts remain 0 connections and 0 direct messages; there is one verified profile and three pending profiles. The current PR-head CI run #230 passes the mocked browser tests; real two-account chat and Realtime testing is still required. Real two-account chat and Realtime testing is still required.
 
 ## Home Map state (checked 2026-10-31)
 
@@ -182,3 +182,14 @@ Latest data counts: 0 matching preference rows, 0 profile-course links, 0 connec
 - Editing a post that is already published does not emit another notification.
 - Dashboard notification routing now opens the Student Verification or Information UT page for these two notification types.
 - Rollback-only staging SQL checks confirmed both trigger paths and confirmed that editing an already-published Information UT post does not create a duplicate. All temporary rows and status changes were rolled back.
+
+
+## Latest PR validation and production deployment boundary — checked 2026-11-01
+
+- PR #4 remains OPEN and unmerged. Its latest checked head is `9b6e02fca72bdcc232d94771847fcaa80aae8776`.
+- GitHub Actions run #230 passed `npm run check`, Vite production build, and all 43 Playwright scenarios.
+- Netlify Deploy Preview was ready for that exact commit at `https://deploy-preview-4--cheery-puffpuff-ca0a08.netlify.app`.
+- The Netlify dashboard screenshot reports production deploys and Agent Runners paused due to operational credits; the already published production site remains live. No production deploy or merge was performed.
+- The live `public.information_posts` table contained one previously published row at the latest count check; the notification acceptance test did not leave test content.
+- The `public.notifications` table remained at zero rows after rollback-only trigger acceptance checks.
+- New migration `20261031174525_notifications_for_information_and_verification` adds notifications for verified/rejected student verification decisions and first publication of Information UT content. Editing an already-published post does not create duplicate notifications.
