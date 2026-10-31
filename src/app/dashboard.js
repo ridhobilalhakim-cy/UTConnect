@@ -48,6 +48,23 @@ import {
   createStudyGroup,
   joinStudyGroup,
   respondGroupJoinRequest,
+  listGroupMessages,
+  sendGroupMessage,
+  setGroupMessagePinned,
+  subscribeToGroupMessages,
+  listGroupMaterials,
+  uploadGroupMaterial,
+  deleteGroupMaterial,
+  listGroupAgendaItems,
+  createGroupAgendaItem,
+  updateGroupAgendaItem,
+  deleteGroupAgendaItem,
+  getGroupPollResults,
+  castGroupPollVote,
+  listMyGroupInvitations,
+  listGroupInvites,
+  inviteGroupMemberByNim,
+  cancelGroupInvite,
 } from "../services/groups.js";
 import {
   listMyNotifications,
@@ -66,7 +83,7 @@ export function initDashboard({ isAdmin = false, isVerified = false, verificatio
   window.L = L;
   const lucide = window.lucide;
 const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root.querySelectorAll(s)];
-  const state={page:'home',radius:3000,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,myMarker:null,center:null,myLocation:null,nearbyStudents:[],homeMapRequestId:0,connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumCourses:[],groups:[],groupCourses:[],groupMemberships:new Map(),groupMembers:[],matchingCourses:[],matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredCourseIds:[],matchRadius:3000};
+  const state={page:'home',radius:3000,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,myMarker:null,center:null,myLocation:null,nearbyStudents:[],homeMapRequestId:0,connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumCourses:[],groups:[],groupCourses:[],groupMemberships:new Map(),groupMembers:[],groupInvitations:[],activeGroupChannel:null,activeGroupId:null,groupWorkspace:{messages:[],materials:[],agenda:[],invites:[],pollResults:{}},matchingCourses:[],matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredCourseIds:[],matchRadius:3000};
   const NOTIFICATION_META = {
     connection_request: { icon: "user-plus", page: "matching" },
     connection_accepted: { icon: "user-check", page: "matching" },
