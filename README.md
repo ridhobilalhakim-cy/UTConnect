@@ -60,7 +60,7 @@ After deployment, set Supabase Auth Site URL and Redirect URLs to the actual HTT
 
 ## Verification and next acceptance gate
 
-GitHub Actions run #32 passed on 2026-10-31 (commit `3dd13ca`): source checks, Vite production build, Chromium installation, and ten mocked Playwright tests. The suite includes authentication, Information UT admin/student flows, evidence submission, admin approval, and rejection-reason validation. A subsequent filename-sanitization fix is being checked in run #33.
+GitHub Actions run #33 passed on 2026-10-31 (commit `f904117`): source checks, Vite production build, Chromium installation, and ten mocked Playwright tests. The suite includes authentication, Information UT admin/student flows, evidence submission, admin approval, and rejection-reason validation.
 
 The live Supabase database was separately checked with authenticated SQL role contexts: an assigned administrator resolves as admin and can insert an information post; a non-admin student profile resolves as non-admin and its insert is rejected by RLS. The test insert was rolled back, leaving the Information UT feed empty.
 
