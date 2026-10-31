@@ -67,7 +67,6 @@ Response shape:
   "radius": 3000,
   "results": [
     {
-      "student_id": "00000000-0000-0000-0000-000000000000",
       "initials": "AB",
       "program": "Sistem Informasi",
       "approx_distance_m": 500,
@@ -79,7 +78,7 @@ Response shape:
 }
 ```
 
-The UUID and coordinates above are examples only, not real student records or places. Marker coordinates are jittered by PostGIS for visual display only; they must never be used for routing, address lookup, or precision navigation. Exact coordinates are read by the location owner only through the owner-scoped Edge Function. Students whose show_in_radar preference is off are excluded as candidates, but they may still search from their own saved location.
+The coordinates above are examples only, not real student records or places. The Home Map response intentionally omits student IDs. Marker coordinates are jittered by PostGIS for visual display only; they must never be used for routing, address lookup, or precision navigation. Exact coordinates are read by the location owner only through the owner-scoped Edge Function. Students whose show_in_radar preference is off are excluded as candidates, but they may still search from their own saved location.
 
 Both functions return Cache-Control: no-store. The Home Map does not render synthetic student profiles or guessed markers.
 
