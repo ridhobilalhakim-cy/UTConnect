@@ -127,7 +127,7 @@ Latest data counts: 0 matching preference rows, 0 profile-course links, 0 connec
 ## Home Map state (checked 2026-10-31)
 
 - Remote migrations 20261031121632_home_map_location_workflow and 20261031121933_home_map_hidden_viewer_search are applied; their SQL sources are retained in supabase/migrations/.
-- Edge Functions manage-my-location v1 and nearby-students v1 are ACTIVE with JWT verification enabled. The source and Deno import maps are retained under supabase/functions/.
+- Edge Function manage-my-location v1 and nearby-students v2 are ACTIVE with JWT verification enabled. The source and Deno import maps are retained under supabase/functions/.
 - Database functions get_my_location, save_my_location, set_my_location_visibility, consume_nearby_search_limit, and find_nearby_students have EXECUTE grants only for service_role; direct authenticated/anon execution is revoked.
 - The user_locations table has RLS enabled with a self-row policy. The frontend uses the Edge Function boundary; it does not query another student's exact coordinate.
 - The owner-only location endpoint derives the owner ID from the validated session and returns exact location only to that owner. The nearby endpoint requires a verified profile, limits radius to 1/3/5 km, enforces a 30-search/minute server limit, and applies the existing five-per-minute NIM search limit.
