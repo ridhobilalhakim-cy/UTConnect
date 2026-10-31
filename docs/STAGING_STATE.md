@@ -37,9 +37,10 @@ The live introspection returned one row in `profiles` and one in `user_locations
 
 - Login and registration page share one Supabase client module and storage key.
 - Dashboard is protected by session and profile lookup.
-- Dashboard interaction code is still a demonstration shell; live data integrations are pending.
+- Information UT and Student Verification now call Supabase service modules; Student Verification provides evidence upload/status and an admin review queue.
+- Matching, chat, forum, groups, map markers, and notifications remain demo/simulated rather than live multi-user modules.
 - Google OAuth provider setup has not been verified end-to-end in this audit.
-- Do not use real student NIM/location until registration and access-control tests have passed.
+- The live database uses NIM digest rather than displaying plaintext NIM. Do not expose real student NIM/location until registration and access-control tests have passed.
 
 
 ## Student Verification state (checked 2026-10-31)
