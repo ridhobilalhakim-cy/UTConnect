@@ -98,6 +98,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     group_join_request: { icon: "users-round", page: "groups" },
     group_join_approved: { icon: "check-circle-2", page: "groups" },
     group_join_rejected: { icon: "users-round", page: "groups" },
+    group_invite: { icon: "mail-plus", page: "groups" },
   };
 
   function notificationDate(value) {
