@@ -193,3 +193,29 @@ Latest data counts: 0 matching preference rows, 0 profile-course links, 0 connec
 - The live `public.information_posts` table contained one previously published row at the latest count check; the notification acceptance test did not leave test content.
 - The `public.notifications` table remained at zero rows after rollback-only trigger acceptance checks.
 - New migration `20261031174525_notifications_for_information_and_verification` adds notifications for verified/rejected student verification decisions and first publication of Information UT content. Editing an already-published post does not create duplicate notifications.
+
+
+## Two-account Supabase staging acceptance — checked 2026-11-01
+
+A rollback-only SQL acceptance run passed using three synthetic identities inside one database transaction and `SET LOCAL ROLE authenticated` with synthetic JWT subjects:
+
+- A sent a connection request; B accepted it.
+- Both users resolved one dedicated room through `get_my_chat_rooms()`.
+- A sent a direct message; B read it and updated its read receipt.
+- A created an approval-based study group and the database trigger assigned A as active group admin.
+- B requested membership; A approved B; B sent a group message that A could read.
+- A pending/non-member C could not read the private direct message or group messages and could not insert a group message.
+- Notification rows were visible only to their owner.
+
+The transaction ended in `ROLLBACK`. Follow-up counts were unchanged: 5 auth users, 4 profiles, 0 connections, 0 direct messages, 0 study groups, 0 group messages and 0 notifications. The reusable script is `supabase/tests/two_account_acceptance.rollback.sql`.
+
+This validates database/RLS/RPC behavior with synthetic JWT subjects. It does not validate real browser Auth sessions, cross-account WebSocket/Realtime delivery, Google OAuth/email, or signed Storage download URLs.
+
+## Cloudflare Pages staging preparation — checked 2026-11-01
+
+- Added `wrangler.toml` for the static Vite Pages output at `./dist` and a compatibility date.
+- Added `docs/CLOUDFLARE_PAGES_STAGING.md` with the repository, build command, Node version, staging Supabase environment variables, branch strategy, Auth redirect checklist and acceptance gates.
+- `public/_headers` carries the existing security headers to Pages builds.
+- GitHub Actions run #239 passed source checks, production build and all 43 Playwright scenarios for the branch containing this preparation.
+- No Cloudflare Pages project was created or connected in this session; Cloudflare access/plugin connection is unavailable. The Pages project still needs to be created in the Cloudflare dashboard and GitHub authorized there.
+- No Supabase Auth URL, Google OAuth setting, custom domain, DNS, or production hosting setting was changed. Netlify production remains untouched.
