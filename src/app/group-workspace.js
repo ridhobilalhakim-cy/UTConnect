@@ -356,6 +356,41 @@ async function reloadAgenda() {
   groupPollResults = Object.fromEntries(entries);
 }
 
+function renderMembers(container) {
+  if (!isManager()) {
+    container.innerHTML = '<div class="group-empty">Daftar permohonan hanya tersedia untuk admin grup.</div>';
+    return;
+  }
+  const pending = groupMembers.filter(member => member.status === "pending");
+  const rows = pending.map((member, index) =>
+    '<article class="group-invite-row"><div><strong>Permohonan masuk #' + (index + 1) +
+    '</strong><small>Menunggu keputusan admin</small></div><div class="group-request-actions">' +
+    '<button class="btn btn-primary btn-sm" data-group-member-decision="approve" data-group-member-id="' + safe(member.user_id) + '">Setujui</button>' +
+    '<button class="btn btn-secondary btn-sm" data-group-member-decision="reject" data-group-member-id="' + safe(member.user_id) + '">Tolak</button>' +
+    '</div></article>'
+  ).join("");
+  const activeCount = groupMembers.filter(member => member.status === "active").length;
+  container.innerHTML = '<div class="group-members-panel">' +
+    '<p class="group-chat-note">' + activeCount + ' anggota aktif. Identitas anggota tidak ditampilkan di daftar pengelolaan ini.</p>' +
+    (rows || '<div class="group-empty">Tidak ada permohonan anggota yang menunggu persetujuan.</div>') +
+    '</div>';
+
+  container.querySelectorAll("[data-group-member-decision]").forEach(button => button.addEventListener("click", async () => {
+    button.disabled = true;
+    try {
+      await respondGroupJoinRequest(currentUserId, activeGroup.id, button.dataset.groupMemberId, button.dataset.groupMemberDecision === "approve");
+      const refreshed = await refreshHandler();
+      if (Array.isArray(refreshed)) groupMembers = refreshed.filter(member => member.group_id === activeGroup.id);
+      toastHandler(button.dataset.groupMemberDecision === "approve" ? "Permohonan anggota disetujui." : "Permohonan anggota ditolak.");
+      render();
+    } catch (error) {
+      toastHandler(error?.message || "Keputusan anggota belum berhasil disimpan.");
+    } finally {
+      button.disabled = false;
+    }
+  }));
+}
+
 async function renderInvites(container) {
   if (!canInvite()) {
     container.innerHTML = '<div class="group-empty">Undangan hanya dapat dikelola admin kelompok privat.</div>';
@@ -431,6 +466,7 @@ export async function openGroupWorkspace(options) {
   activeGroup = options.group;
   activeMembership = options.membership;
   currentUserId = options.currentUserId;
+  groupMembers = Array.isArray(options.members) ? options.members : [];
   toastHandler = options.toast || (() => {});
   refreshHandler = options.refresh || (async () => {});
   openModalHandler = options.openModal;
@@ -456,5 +492,11 @@ export async function closeGroupWorkspace() {
   activeGroup = null;
   activeMembership = null;
   currentUserId = null;
+  groupMessages = [];
+  groupMaterials = [];
+  groupAgenda = [];
+  groupPollResults = {};
+  groupInvites = [];
+  groupMembers = [];
   activeTab = "chat";
 }
