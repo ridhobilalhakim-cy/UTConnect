@@ -1870,10 +1870,6 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     $("#message-room-view").hidden = false;
     renderMessageRooms();
 
-    $("#message-room-form").onsubmit = async event => {
-      event.preventDefault();
-      await submitDirectChatMessage();
-    };
     $("#message-room-refresh").onclick = async () => {
       $("#message-room-status").textContent = "Memuat ulang...";
       try {
@@ -1929,7 +1925,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     submitDirectChatMessage();
   });
 
-  // Profile editor uses the authenticated update RPC; avatar uploads are stored in a private-to-owner path.
+  // Profile editor uses the authenticated update RPC; avatar uploads are owner-write and publicly served profile images.
   function renderProfileSummary() {
     const profile = state.profile || {};
     const name = profile.full_name || currentUserName || "Mahasiswa UT";
