@@ -100,7 +100,7 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
       return route.fulfill(jsonResponse(state.courses));
     }
     if (path.endsWith('/rest/v1/matching_preferences')) {
-      if (method === 'GET') return route.fulfill(jsonResponse(state.matchingPreferences));
+      if (method === 'GET') return route.fulfill(jsonResponse(state.matchingPreferences ? [state.matchingPreferences] : []));
       if (method === 'POST') {
         state.matchingPreferenceSaveCalls += 1;
         state.matchingPreferences = request.postDataJSON();
