@@ -1247,6 +1247,29 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     }
   }
 
+  async function acceptGroupInvitation(groupId) {
+    if (!isVerified) { toast("Verifikasi mahasiswa diperlukan untuk menerima undangan."); return; }
+    try {
+      const status = await joinStudyGroup(groupId);
+      if (status !== "active") throw new Error("Undangan belum dapat diterima. Periksa kembali status grup.");
+      await loadGroups({ showLoading: false });
+      toast("Undangan diterima. Kamu sekarang menjadi anggota kelompok.");
+      openGroupDetails(groupId);
+    } catch (error) {
+      toast(error?.message || "Undangan belum berhasil diterima.");
+    }
+  }
+
+  async function declineGroupInvitation(inviteId) {
+    try {
+      await cancelGroupInvite(inviteId);
+      await loadGroups({ showLoading: false });
+      toast("Undangan kelompok ditolak.");
+    } catch (error) {
+      toast(error?.message || "Undangan belum berhasil ditolak.");
+    }
+  }
+
   function groupDate(value) {
     if (!value) return "-";
     const date = new Date(value);
