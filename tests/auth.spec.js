@@ -196,15 +196,15 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
             updated.push({ id: notification.id, read_at: notification.read_at });
             state.notificationReadCalls.push(notification.id);
           }
-        } else {
-          for (const notification of state.notifications) {
-            if (notification.user_id === USER.id && notification.read_at == null) {
-              notification.read_at = input.read_at;
-              updated.push({ id: notification.id });
-            }
-          }
-          state.notificationBulkReadCalls += 1;
+          return route.fulfill(jsonResponse(updated[0] || null));
         }
+        for (const notification of state.notifications) {
+          if (notification.user_id === USER.id && notification.read_at == null) {
+            notification.read_at = input.read_at;
+            updated.push({ id: notification.id });
+          }
+        }
+        state.notificationBulkReadCalls += 1;
         return route.fulfill(jsonResponse(updated));
       }
     }
