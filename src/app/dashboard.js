@@ -14,7 +14,6 @@ import {
   reviewStudentVerificationRequest,
 } from "../services/verification.js";
 import {
-  listActiveForumCourses,
   listForumPosts,
   createForumPost,
   deleteForumPost,
@@ -24,11 +23,8 @@ import {
   listForumAuthorProfiles,
 } from "../services/forum.js";
 import {
-  listActiveMatchingCourses,
   getMyMatchingPreferences,
-  getMyMatchingCourseIds,
   saveMyMatchingPreferences,
-  replaceMyMatchingCourseIds,
   findMatchingStudents,
   listMyConnectionSummaries,
   sendConnectionRequest,
@@ -42,7 +38,6 @@ import {
   unsubscribeFromDirectMessages,
 } from "../services/chat.js";
 import {
-  listActiveStudyCourses,
   listStudyGroups,
   listMyGroupMemberships,
   listVisibleGroupMembers,
@@ -85,13 +80,13 @@ import {
   findNearbyStudents,
 } from "../services/home-map.js";
 import { listMyChatRooms, updateMyStudentProfile, uploadMyProfileAvatar, setMyProfileAvatarPreset, getProfileAvatarUrl } from "../services/profile.js";
-import { populateUTFacultyProgramSelects, resolveUTFaculty, resolveUTProgram } from "../data/ut-programs.js";
+import { UT_PROGRAMS, populateUTFacultyProgramSelects, resolveUTFaculty, resolveUTProgram } from "../data/ut-programs.js";
 
 export function initDashboard({ isAdmin = false, isVerified = false, verificationStatus = "pending", currentUserId = null, currentUserName = "Mahasiswa UT", currentProfile = {} } = {}) {
   window.L = L;
   const lucide = window.lucide;
 const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root.querySelectorAll(s)];
-  const state={page:'home',radius:3000,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,myMarker:null,center:null,myLocation:null,nearbyStudents:[],homeMapRequestId:0,connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumCourses:[],forumAuthors:new Map(),profile:{...currentProfile},chatRooms:[],activeChatRoom:null,groups:[],groupCourses:[],groupMemberships:new Map(),groupMembers:[],groupInvitations:[],activeGroupChannel:null,activeGroupId:null,groupWorkspace:{messages:[],materials:[],agenda:[],invites:[],pollResults:{}},matchingCourses:[],matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredCourseIds:[],matchRadius:3000};
+  const state={page:'home',radius:3000,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,myMarker:null,center:null,myLocation:null,nearbyStudents:[],homeMapRequestId:0,connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumAuthors:new Map(),profile:{...currentProfile},chatRooms:[],activeChatRoom:null,groups:[],groupMemberships:new Map(),groupMembers:[],groupInvitations:[],activeGroupChannel:null,activeGroupId:null,groupWorkspace:{messages:[],materials:[],agenda:[],invites:[],pollResults:{}},matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredPrograms:[]matchRadius:3000};
   const NOTIFICATION_META = {
     connection_request: { icon: "user-plus", page: "matching" },
     connection_accepted: { icon: "user-check", page: "matching" },
@@ -681,27 +676,23 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     icons();
   }
 
-  function populateMatchingCourses(courses) {
-    const courseFilter = $("#filter-course");
-    const preferredCourses = $("#preferred-courses");
-    const filterValue = courseFilter?.value || "";
-    if (courseFilter) {
-      courseFilter.innerHTML = '<option value="">Semua mata kuliah</option>' + courses.map(course =>
-        `<option value="${escapeText(course.course_name)}">${escapeText(course.course_name)}${course.course_code ? ` · ${escapeText(course.course_code)}` : ""}</option>`
-      ).join("");
-      courseFilter.value = filterValue;
+  function populateMatchingPrograms() {
+    const programFilter = $("#filter-program");
+    const preferredPrograms = $("#preferred-programs");
+    const filterValue = programFilter?.value || "";
+    const options = UT_PROGRAMS.map(program =>
+      `<option value="${escapeText(program)}">${escapeText(program)}</option>`
+    ).join("");
+    if (programFilter) {
+      programFilter.innerHTML = '<option value="">Semua program studi</option>' + options;
+      programFilter.value = filterValue;
     }
-    if (preferredCourses) {
-      preferredCourses.innerHTML = courses.map(course =>
-        `<option value="${escapeText(course.id)}">${escapeText(course.course_code ? `${course.course_code} · ${course.course_name}` : course.course_name)}</option>`
-      ).join("");
-      [...preferredCourses.options].forEach(option => {
-        option.selected = state.preferredCourseIds.includes(option.value);
+    if (preferredPrograms) {
+      preferredPrograms.innerHTML = options;
+      [...preferredPrograms.options].forEach(option => {
+        option.selected = state.preferredPrograms.includes(option.value);
       });
-      preferredCourses.disabled = courses.length === 0;
     }
-    const note = $("#matching-course-note");
-    if (note) note.hidden = courses.length > 0;
   }
 
   function splitPreferenceTags(value, label) {
@@ -719,8 +710,8 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     [...$("#preference-study-times").options].forEach(option => {
       option.selected = preferredTimes.has(option.value);
     });
-    [...$("#preferred-courses").options].forEach(option => {
-      option.selected = state.preferredCourseIds.includes(option.value);
+    [...$("#preferred-programs").options].forEach(option => {
+      option.selected = state.preferredPrograms.includes(option.value);
     });
   }
 
@@ -774,16 +765,16 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   }
 
   function renderMatches() {
-    const course = $("#filter-course").value;
+    const selectedProgram = $("#filter-program").value;
     const topic = $("#filter-topic").value.trim().toLowerCase();
     const time = $("#filter-time").value;
     const filtered = state.matchCandidates.filter(student => {
-      const courses = student.course_names || [];
+      const program = student.program || "";
       const topics = student.topic_tags || [];
       const interests = student.interests || [];
       const times = student.study_times || [];
-      const searchable = [...courses, ...topics, ...interests].join(" ").toLowerCase();
-      return (!course || courses.includes(course))
+      const searchable = [program, ...topics, ...interests].join(" ").toLowerCase();
+      return (!selectedProgram || program === selectedProgram)
         && (!topic || searchable.includes(topic))
         && (!time || times.includes(time));
     });
@@ -791,11 +782,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     $("#match-count").textContent = `${filtered.length} mahasiswa dalam radius ${Number(state.matchRadius) / 1000} km · data Supabase`;
     $("#match-results").innerHTML = filtered.length ? filtered.map(student => {
       const connection = getConnectionFor(student.student_id);
-      const tags = [
-        ...(student.course_names || []),
-        ...(student.topic_tags || []),
-        ...(student.interests || []),
-      ];
+      const tags = [student.program, ...(student.topic_tags || []), ...(student.interests || [])].filter(Boolean);
       let action = `<button type="button" class="btn btn-primary btn-sm" data-connect="${escapeText(student.student_id)}">Connect</button>`;
       let label = "Belum terhubung";
       if (connection?.status === "accepted") {
@@ -815,12 +802,12 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
             <div class="person-meta"><strong>Mahasiswa UT · ${escapeText(student.initials || "UT")}</strong><span>${escapeText(student.program || "Program studi tidak tersedia")} · ${escapeText(matchingDistance(student.approx_distance_m))}</span></div>
             <span class="match-score">Relevan</span>
           </div>
-          <div class="match-tags">${tags.length ? tags.map(tag => `<span class="tag">${escapeText(tag)}</span>`).join("") : '<span class="tiny muted">Belum mengisi topik atau mata kuliah.</span>'}</div>
+          <div class="match-tags">${tags.length ? tags.map(tag => `<span class="tag">${escapeText(tag)}</span>`).join("") : '<span class="tiny muted">Belum mengisi program studi atau topik.</span>'}</div>
           <div class="match-card-foot"><span class="tiny muted">${escapeText((student.study_times || []).join(", ") || label)}</span>${action}</div>
         </article>`;
     }).join("") : '<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon"><i data-lucide="users"></i></div><h3>Belum ada rekomendasi yang sesuai</h3><p>Belum ada mahasiswa terverifikasi yang memenuhi radius, persetujuan radar, dan filter yang dipilih. Coba ubah radius atau preferensi.</p></div>';
 
-    $$("[data-connect]").forEach(button => button.addEventListener("click", () => createConnection(button.dataset.connect, button)));
+    $$("#match-results [data-connect]").forEach(button => button.addEventListener("click", () => createConnection(button.dataset.connect, button)));
     icons();
   }
 
@@ -861,17 +848,14 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     }
     if (showLoading) $("#match-results").innerHTML = '<div class="verification-loading">Memuat preferensi dan koneksi...</div>';
     try {
-      const [courses, preferences, preferredCourseIds, connections] = await Promise.all([
-        listActiveMatchingCourses(),
+      const [preferences, connections] = await Promise.all([
         getMyMatchingPreferences(currentUserId),
-        getMyMatchingCourseIds(currentUserId),
         listMyConnectionSummaries(),
       ]);
-      state.matchingCourses = courses;
-      state.matchingPreferences = preferences;
-      state.preferredCourseIds = preferredCourseIds;
+      state.matchingPreferences = preferences || {};
+      state.preferredPrograms = Array.isArray(preferences?.preferred_programs) ? preferences.preferred_programs : [];
       state.connectionSummaries = connections;
-      populateMatchingCourses(courses);
+      populateMatchingPrograms();
       renderMatchingPreferences();
       renderConnectionPanel();
       await searchMatchingStudents({ showLoading: false });
@@ -892,11 +876,10 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       const topicTags = splitPreferenceTags($("#preference-topics").value, "Topik");
       const interests = splitPreferenceTags($("#preference-interests").value, "Minat");
       const studyTimes = [...$("#preference-study-times").selectedOptions].map(option => option.value);
-      const courseIds = [...$("#preferred-courses").selectedOptions].map(option => option.value);
-      await saveMyMatchingPreferences({ topicTags, interests, studyTimes });
-      await replaceMyMatchingCourseIds(courseIds);
-      state.matchingPreferences = { topic_tags: topicTags, interests, study_times: studyTimes };
-      state.preferredCourseIds = courseIds;
+      const preferredPrograms = [...$("#preferred-programs").selectedOptions].map(option => option.value);
+      await saveMyMatchingPreferences({ topicTags, interests, studyTimes, preferredPrograms });
+      state.matchingPreferences = { topic_tags: topicTags, interests, study_times: studyTimes, preferred_programs: preferredPrograms };
+      state.preferredPrograms = preferredPrograms;
       renderMatchingPreferences();
       toast("Preferensi belajar berhasil disimpan.");
       await searchMatchingStudents({ showLoading: false });
@@ -944,10 +927,10 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   $("#match-radius").addEventListener("change", () => searchMatchingStudents());
   $("#refresh-matches").addEventListener("click", () => loadMatching({ showLoading: false }));
   $("#filter-topic").addEventListener("input", renderMatches);
-  $("#filter-course").addEventListener("change", renderMatches);
+  $("#filter-program").addEventListener("change", renderMatches);
   $("#filter-time").addEventListener("change", renderMatches);
   $("#reset-match").addEventListener("click", () => {
-    $("#filter-course").value = "";
+    $("#filter-program").value = "";
     $("#filter-topic").value = "";
     $("#filter-time").value = "";
     renderMatches();
@@ -974,14 +957,12 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     }
     icons();
   }
-  function populateForumCourses(courses) {
-    const select = $("#post-course");
-    const notice = $("#forum-course-notice");
+  function populateForumPrograms() {
+    const select = $("#post-program");
     if (!select) return;
-    select.innerHTML = '<option value="">Diskusi umum</option>' + courses.map(course =>
-      `<option value="${escapeText(course.id)}">${escapeText(course.course_name)}${course.course_code ? ` · ${escapeText(course.course_code)}` : ""}</option>`
+    select.innerHTML = '<option value="">Diskusi umum</option>' + UT_PROGRAMS.map(program =>
+      `<option value="${escapeText(program)}">${escapeText(program)}</option>`
     ).join("");
-    if (notice) notice.hidden = courses.length > 0;
   }
   function renderForum() {
     const list = $("#post-list");
@@ -995,7 +976,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       const ownPost = post.author_id === currentUserId;
       const author = ownPost ? currentUserName : (state.forumAuthors.get(post.author_id)?.full_name || "Mahasiswa UT");
       const typeLabel = FORUM_POST_TYPES[post.post_type] || "Diskusi";
-      const courseLabel = post.course?.course_name || "Diskusi umum";
+      const courseLabel = post.program || post.course?.course_name || "Diskusi umum";
       const deleteButton = ownPost
         ? `<button type="button" class="btn btn-quiet btn-sm forum-delete" data-forum-delete="${escapeText(post.id)}"><i data-lucide="trash-2"></i>Hapus</button>`
         : "";
@@ -1021,12 +1002,11 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     renderForumAccess();
     if (showLoading) $("#post-list").innerHTML = '<div class="verification-loading">Memuat diskusi mahasiswa...</div>';
     try {
-      const [courses, posts] = await Promise.all([listActiveForumCourses(), listForumPosts()]);
-      state.forumCourses = courses;
+      const posts = await listForumPosts();
       state.forumPosts = posts;
       const authorProfiles = await listForumAuthorProfiles(posts.map(post => post.author_id));
       state.forumAuthors = new Map(authorProfiles.map(profile => [profile.user_id, profile]));
-      populateForumCourses(courses);
+      populateForumPrograms();
       renderForum();
     } catch (error) {
       console.error("Forum load failed:", error);
@@ -1040,7 +1020,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     const title = $("#post-title").value.trim();
     const body = $("#post-content").value.trim();
     const postType = $("#post-type").value;
-    const courseId = $("#post-course").value || null;
+    const program = $("#post-program").value || null;
     if (title.length < 3 || title.length > 140) { toast("Judul diskusi harus 3–140 karakter."); return; }
     if (!body || body.length > 5000) { toast("Isi diskusi wajib diisi dan maksimal 5.000 karakter."); return; }
     if (!Object.hasOwn(FORUM_POST_TYPES, postType)) { toast("Jenis diskusi tidak valid."); return; }
@@ -1048,11 +1028,11 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     button.disabled = true;
     button.textContent = "Mempublikasikan...";
     try {
-      await createForumPost({ title, body, postType, courseId });
+      await createForumPost({ title, body, postType, program });
       $("#post-title").value = "";
       $("#post-content").value = "";
       $("#post-type").value = "need_help";
-      $("#post-course").value = "";
+      $("#post-program").value = "";
       await loadForum({ showLoading: false });
       toast("Diskusi berhasil dipublikasikan.");
     } catch (error) {
@@ -1172,7 +1152,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   function renderGroups() {
     const search = $("#group-search")?.value.trim().toLowerCase() || "";
     const filtered = state.groups.filter(group => {
-      const courseName = group.course?.course_name || "Kelompok umum";
+      const courseName = group.program || group.course?.course_name || "Kelompok umum";
       const matchesMode = state.groupFilter === "Semua" || group.mode === state.groupFilter.toLowerCase();
       const matchesSearch = !search || `${group.name} ${courseName}`.toLowerCase().includes(search);
       return matchesMode && matchesSearch;
@@ -1183,7 +1163,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       '<div class="group-request-actions"><button class="btn btn-primary btn-sm" data-group-invite-accept="' + escapeText(invite.group_id) + '">Terima</button><button class="btn btn-secondary btn-sm" data-group-invite-decline="' + escapeText(invite.invite_id) + '">Tolak</button></div></article>'
     ).join("");
     $("#group-list").innerHTML = invitationHtml + (filtered.map(group => {
-      const courseName = group.course?.course_name || "Kelompok umum";
+      const courseName = group.program || group.course?.course_name || "Kelompok umum";
       const membership = state.groupMemberships.get(group.id);
       const isActiveMember = membership?.status === "active";
       const isPending = membership?.status === "pending";
@@ -1242,7 +1222,6 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     renderGroupAccess();
     if (!isVerified) {
       state.groups = [];
-      state.groupCourses = [];
       state.groupMemberships = new Map();
       state.groupMembers = [];
       state.groupInvitations = [];
@@ -1252,14 +1231,12 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
 
     if (showLoading) $("#group-list").innerHTML = '<div class="verification-loading">Memuat grup belajar...</div>';
     try {
-      const [groups, courses, memberships, invitations] = await Promise.all([
+      const [groups, memberships, invitations] = await Promise.all([
         listStudyGroups(),
-        listActiveStudyCourses(),
         listMyGroupMemberships(currentUserId),
         listMyGroupInvitations(),
       ]);
       state.groups = groups;
-      state.groupCourses = courses;
       state.groupMemberships = new Map(memberships.map(item => [item.group_id, item]));
       state.groupMembers = await listVisibleGroupMembers(groups.map(group => group.id));
       state.groupInvitations = invitations;
@@ -1356,47 +1333,56 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
 
   function openCreateGroupForm() {
     if (!isVerified) { toast("Verifikasi mahasiswa diperlukan untuk membuat kelompok."); return; }
-    const courseOptions = state.groupCourses.map(course =>
-      `<option value="${escapeText(course.id)}">${escapeText(course.course_code ? `${course.course_code} · ${course.course_name}` : course.course_name)}</option>`
+    const programOptions = UT_PROGRAMS.map(program =>
+      `<option value="${escapeText(program)}">${escapeText(program)}</option>`
     ).join("");
     const content = `
       <p class="section-note">Kelompok akan tersimpan di UT Connect. Pembuat otomatis menjadi admin pertama.</p>
-      <div class="field"><label for="new-group-name">Nama kelompok</label><input id="new-group-name" class="text-input" minlength="3" maxlength="100" placeholder="Contoh: Belajar Sistem Operasi Bersama"></div>
+      <div class="field"><label for="new-group-name">Nama kelompok</label><input id="new-group-name" class="text-input" minlength="3" maxlength="100" placeholder="Contoh: Belajar Sistem Informasi Bersama"></div>
       <div class="field"><label for="new-group-description">Deskripsi (opsional)</label><textarea id="new-group-description" class="text-input" rows="3" maxlength="1500" placeholder="Tujuan dan fokus belajar kelompok"></textarea></div>
-      <div class="field"><label for="new-group-course">Mata kuliah</label><select id="new-group-course" class="select"><option value="">Kelompok umum${state.groupCourses.length ? "" : " · katalog mata kuliah belum tersedia"}</option>${courseOptions}</select></div>
+      <div class="field"><label for="new-group-program">Program studi (opsional)</label><select id="new-group-program" class="select"><option value="">Kelompok umum</option>${programOptions}</select></div>
       <div class="field"><label for="new-group-mode">Mode pertemuan</label><select id="new-group-mode" class="select"><option value="online">Online</option><option value="offline">Offline</option></select></div>
       <div class="field"><label for="new-group-access">Akses kelompok</label><select id="new-group-access" class="select"><option value="open">Terbuka · langsung bergabung</option><option value="approval">Persetujuan admin · perlu ditinjau</option></select></div>
       <div class="field"><label for="new-group-capacity">Kapasitas (2–100 anggota)</label><input id="new-group-capacity" class="text-input" type="number" min="2" max="100" value="10"></div>
       <div class="field"><label for="new-group-schedule">Jadwal (opsional)</label><input id="new-group-schedule" class="text-input" maxlength="300" placeholder="Contoh: Sabtu, 19.00 WIB"></div>
-      <div class="field"><label for="new-group-online-url">Tautan online (opsional)</label><input id="new-group-online-url" class="text-input" type="url" maxlength="500" placeholder="https://meet.google.com/..."></div>
-      <div class="field"><label for="new-group-offline-area">Area pertemuan offline (opsional)</label><input id="new-group-offline-area" class="text-input" maxlength="160" placeholder="Contoh: Area layanan belajar UPBJJ"></div>`;
+      <div class="field"><label for="new-group-online-url">Tautan pertemuan (wajib untuk mode Online)</label><input id="new-group-online-url" class="text-input" type="url" maxlength="500" placeholder="https://meet.google.com/..."></div>
+      <div class="field"><label for="new-group-offline-area">Area pertemuan (wajib untuk mode Offline)</label><input id="new-group-offline-area" class="text-input" maxlength="160" placeholder="Contoh: Area layanan belajar UPBJJ"></div>`;
     openModal("Buat kelompok belajar", content, "Buat kelompok", async () => {
       const name = $("#new-group-name").value.trim();
       const description = $("#new-group-description").value.trim();
-      const courseId = $("#new-group-course").value || null;
+      const program = $("#new-group-program").value || null;
       const mode = $("#new-group-mode").value;
       const accessType = $("#new-group-access").value;
       const capacity = Number($("#new-group-capacity").value);
       const schedule = $("#new-group-schedule").value.trim();
       const onlineUrl = $("#new-group-online-url").value.trim();
       const offlineArea = $("#new-group-offline-area").value.trim();
-
       if (name.length < 3 || name.length > 100) { toast("Nama kelompok harus 3–100 karakter."); return false; }
       if (description.length > 1500) { toast("Deskripsi maksimal 1.500 karakter."); return false; }
       if (!Number.isInteger(capacity) || capacity < 2 || capacity > 100) { toast("Kapasitas harus antara 2 dan 100 anggota."); return false; }
-      if (mode === "online" && onlineUrl && !/^https?:\/\//i.test(onlineUrl)) { toast("Tautan online harus diawali http:// atau https://."); return false; }
-
+      if (mode === "online" && !onlineUrl) { toast("Tautan meeting wajib diisi untuk kelompok online."); return false; }
+      if (mode === "offline" && !offlineArea) { toast("Area pertemuan wajib diisi untuk kelompok offline."); return false; }
+      if (mode === "online") {
+        try {
+          const parsed = new URL(onlineUrl);
+          if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("protocol");
+        } catch {
+          toast("Masukkan tautan meeting yang valid dan diawali https:// atau http://.");
+          return false;
+        }
+      }
       try {
         await createStudyGroup({
           name,
           description: description || null,
-          course_id: courseId,
+          course_id: null,
+          program,
           mode,
           capacity,
           access_type: accessType,
           schedule_text: schedule || null,
-          online_url: mode === "online" && onlineUrl ? onlineUrl : null,
-          offline_area_label: mode === "offline" && offlineArea ? offlineArea : null,
+          online_url: mode === "online" ? onlineUrl : null,
+          offline_area_label: mode === "offline" ? offlineArea : null,
         });
         await loadGroups({ showLoading: false });
         return true;

@@ -935,7 +935,8 @@ test('verified student can publish a forum post and add a comment', async ({ pag
 
   await page.locator('[data-page="forum"]').first().click();
   await expect(page.locator('#forum-compose')).toBeVisible();
-  await expect(page.locator('#post-course')).toContainText('Diskusi umum');
+  await expect(page.locator('#post-program')).toContainText('Diskusi umum');
+  await expect(page.locator('#post-program')).toContainText('Sistem Informasi');
   await page.locator('#post-title').fill('Memahami perulangan bersarang');
   await page.locator('#post-type').selectOption('need_help');
   await page.locator('#post-content').fill('Bagaimana menentukan kondisi berhenti pada perulangan bersarang?');
@@ -1013,19 +1014,49 @@ test('verified student can create a persisted general study group', async ({ pag
   await page.locator('#create-group').click();
   await page.locator('#new-group-name').fill('Kelompok Belajar Sistem Informasi');
   await page.locator('#new-group-description').fill('Belajar bersama dan membahas materi perkuliahan.');
-  await page.locator('#new-group-course').selectOption('');
+  await page.locator('#new-group-program').selectOption('Sistem Informasi');
   await page.locator('#new-group-mode').selectOption('online');
   await page.locator('#new-group-access').selectOption('open');
   await page.locator('#new-group-capacity').fill('12');
   await page.locator('#new-group-schedule').fill('Sabtu, 19.00 WIB');
+  await page.locator('#new-group-online-url').fill('https://meet.google.com/abc-defg-hij');
   await page.locator('#modal-confirm').click();
 
   await expect(page.locator('.group-card')).toContainText('Kelompok Belajar Sistem Informasi');
-  await expect(page.locator('.group-card')).toContainText('Kelompok umum');
+  await expect(page.locator('.group-card')).toContainText('Sistem Informasi');
   expect(state.groupCreateCalls).toBe(1);
   expect(state.studyGroups[0].created_by).toBe(USER.id);
   expect(state.studyGroups[0].access_type).toBe('open');
   expect(state.groupMembers.some(member => member.group_id === 'group-e2e-001' && member.user_id === USER.id && member.role === 'admin')).toBe(true);
+});
+
+test('verified student cannot create an online group without a meeting URL', async ({ page }) => {
+  const state = await mockSupabase(page, { profile: { ...PROFILE, verification_status: 'verified' } });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+  await page.locator('[data-page="groups"]').first().click();
+  await page.locator('#create-group').click();
+  await page.locator('#new-group-name').fill('Kelompok Tanpa Tautan');
+  await page.locator('#modal-confirm').click();
+  await expect(page.locator('#toast')).toContainText('Tautan meeting wajib diisi');
+  expect(state.groupCreateCalls).toBe(0);
+});
+
+test('verified student cannot create an offline group without a meeting area', async ({ page }) => {
+  const state = await mockSupabase(page, { profile: { ...PROFILE, verification_status: 'verified' } });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+  await page.locator('[data-page="groups"]').first().click();
+  await page.locator('#create-group').click();
+  await page.locator('#new-group-name').fill('Kelompok Offline Tanpa Area');
+  await page.locator('#new-group-mode').selectOption('offline');
+  await page.locator('#modal-confirm').click();
+  await expect(page.locator('#toast')).toContainText('Area pertemuan wajib diisi');
+  expect(state.groupCreateCalls).toBe(0);
 });
 
 test('verified student can request to join an approval-based study group', async ({ page }) => {
@@ -1426,13 +1457,9 @@ test('unverified student cannot access matching search or connection controls', 
   expect(state.connectionCreateCalls).toHaveLength(0);
 });
 
-test('verified student can save personal matching preferences and selected courses', async ({ page }) => {
+test('verified student can save personal matching preferences and preferred programmes', async ({ page }) => {
   const state = await mockSupabase(page, {
     profile: { ...PROFILE, verification_status: 'verified' },
-    courses: [
-      { id: 'course-001', course_code: 'MSIM4201', course_name: 'Sistem Operasi', is_active: true },
-      { id: 'course-002', course_code: 'MSIM4301', course_name: 'Algoritma Pemrograman', is_active: true },
-    ],
   });
   await page.goto('/');
   await page.locator('#loginEmail').fill(USER.email);
@@ -1443,7 +1470,8 @@ test('verified student can save personal matching preferences and selected cours
   await page.locator('#preference-topics').fill('struktur data, algoritma');
   await page.locator('#preference-interests').fill('belajar kelompok, persiapan UAS');
   await page.locator('#preference-study-times').selectOption(['Malam hari', 'Akhir pekan']);
-  await page.locator('#preferred-courses').selectOption(['course-001']);
+  await expect(page.locator('#preferred-programs')).toContainText('Sistem Informasi');
+  await page.locator('#preferred-programs').selectOption(['Sistem Informasi']);
   await page.locator('#save-matching-preferences').click();
 
   await expect(page.locator('#toast')).toContainText('Preferensi belajar berhasil disimpan');
@@ -1451,8 +1479,9 @@ test('verified student can save personal matching preferences and selected cours
   expect(state.matchingPreferences.topic_tags).toEqual(['struktur data', 'algoritma']);
   expect(state.matchingPreferences.interests).toEqual(['belajar kelompok', 'persiapan UAS']);
   expect(state.matchingPreferences.study_times).toEqual(['Malam hari', 'Akhir pekan']);
-  expect(state.profileCourseIds).toEqual(['course-001']);
-  expect(state.profileCourseInsertCalls).toBe(1);
+  expect(state.matchingPreferences.preferred_programs).toEqual(['Sistem Informasi']);
+  expect(state.profileCourseIds).toEqual([]);
+  expect(state.profileCourseInsertCalls).toBe(0);
   expect(state.matchingSearchCalls.length).toBeGreaterThan(0);
 });
 

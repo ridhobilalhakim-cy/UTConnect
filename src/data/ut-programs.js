@@ -48,6 +48,7 @@ export const UT_FACULTY_PROGRAMS = Object.freeze({
 });
 
 export const UT_FACULTIES = Object.freeze(Object.keys(UT_FACULTY_PROGRAMS));
+export const UT_PROGRAMS = Object.freeze(Object.values(UT_FACULTY_PROGRAMS).flat());
 
 const UT_PROGRAM_ALIASES = Object.freeze({
   "Ilmu Administrasi Negara": "Ilmu Administrasi Publik",

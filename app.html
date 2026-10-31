@@ -108,7 +108,7 @@
           <aside class="surface filter-panel">
             <h2 class="section-title">Preferensi belajar</h2>
             <p class="section-note">Preferensi ini tersimpan pada akunmu dan hanya dapat kamu ubah sendiri.</p>
-            <div class="field"><label for="preferred-courses">Mata kuliah yang diikuti</label><select id="preferred-courses" class="select" multiple size="4"></select><small class="field-help" id="matching-course-note">Katalog mata kuliah aktif belum tersedia. Preferensi topik dan minat tetap bisa disimpan.</small></div>
+            <div class="field"><label for="preferred-programs">Program studi yang ingin ditemui</label><select id="preferred-programs" class="select" multiple size="4"></select><small class="field-help" id="matching-program-note">Pilih satu atau lebih program studi UT untuk menyesuaikan rekomendasi teman belajar.</small></div>
             <div class="field"><label for="preference-topics">Topik yang ingin dipelajari atau dikuasai</label><textarea id="preference-topics" class="text-input" rows="2" maxlength="720" placeholder="Contoh: perulangan, struktur data, analisis sistem"></textarea><small class="field-help">Pisahkan setiap topik dengan koma.</small></div>
             <div class="field"><label for="preference-interests">Minat belajar</label><textarea id="preference-interests" class="text-input" rows="2" maxlength="720" placeholder="Contoh: belajar kelompok, persiapan UAS"></textarea><small class="field-help">Pisahkan setiap minat dengan koma.</small></div>
             <div class="field"><label for="preference-study-times">Waktu belajar yang disukai</label><select id="preference-study-times" class="select" multiple size="4"><option value="Pagi hari">Pagi hari</option><option value="Siang hari">Siang hari</option><option value="Malam hari">Malam hari</option><option value="Akhir pekan">Akhir pekan</option></select></div>
@@ -116,7 +116,7 @@
             <div class="matching-filter-divider"></div>
             <h2 class="section-title">Saring rekomendasi</h2>
             <div class="field"><label for="match-radius">Radius pencarian</label><select id="match-radius" class="select"><option value="1000">1 km</option><option value="3000" selected>3 km</option><option value="5000">5 km</option></select></div>
-            <div class="field"><label for="filter-course">Mata kuliah</label><select id="filter-course" class="select"><option value="">Semua mata kuliah</option></select></div>
+            <div class="field"><label for="filter-program">Program studi</label><select id="filter-program" class="select"><option value="">Semua program studi</option></select></div>
             <div class="field"><label for="filter-topic">Topik atau minat</label><input id="filter-topic" class="text-input" type="search" placeholder="Cari topik atau minat"></div>
             <div class="field"><label for="filter-time">Waktu belajar</label><select id="filter-time" class="select"><option value="">Semua waktu</option><option value="Pagi hari">Pagi hari</option><option value="Siang hari">Siang hari</option><option value="Malam hari">Malam hari</option><option value="Akhir pekan">Akhir pekan</option></select></div>
             <button class="btn btn-secondary" style="width:100%;margin-top:15px" id="apply-match"><i data-lucide="sliders-horizontal"></i>Terapkan filter</button>
@@ -164,7 +164,7 @@
             <div class="field forum-compose-title"><label for="post-title">Judul diskusi</label><input class="text-input" id="post-title" type="text" maxlength="140" placeholder="Contoh: Bagaimana memahami perulangan bersarang?" required></div>
             <div class="forum-compose-grid">
               <div class="field"><label for="post-type">Jenis diskusi</label><select class="select" id="post-type"><option value="need_help">Butuh bantuan</option><option value="can_help">Bisa membantu</option><option value="discussion">Diskusi umum</option></select></div>
-              <div class="field"><label for="post-course">Mata kuliah (opsional)</label><select class="select" id="post-course"><option value="">Diskusi umum</option></select></div>
+              <div class="field"><label for="post-program">Program studi (opsional)</label><select class="select" id="post-program"><option value="">Diskusi umum</option></select></div>
             </div>
             <div class="field"><label for="post-content">Isi diskusi</label><textarea class="textarea" id="post-content" placeholder="Jelaskan konteks pertanyaan atau pemahaman yang ingin kamu bagikan..." rows="4" maxlength="5000"></textarea></div>
             <div class="compose-foot"><p class="tiny muted" id="forum-course-notice">Belum ada katalog mata kuliah aktif. Diskusi tetap dapat dibuat sebagai diskusi umum.</p><button class="btn btn-primary" id="publish-post"><i data-lucide="send"></i>Publikasikan</button></div>
