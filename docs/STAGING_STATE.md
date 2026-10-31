@@ -51,7 +51,7 @@ Latest live introspection returned four rows in `profiles` and four rows in `use
 - Student upload is restricted to the caller's own folder and pending/rejected profiles without an outstanding request.
 - Admin queue/review functions check the signed-in user and administrator role. Review decisions update profiles.verification_status and add a review event.
 - Authenticated role cannot directly UPDATE profiles.verification_status.
-- Latest counts: 4 profiles total; 1 verified, 3 pending, 0 rejected; 0 submitted verification requests; 0 review events.
+- Latest counts: 4 profiles total; 1 verified, 3 pending, 0 rejected; 1 verification request approved; 1 approved review event; 0 requests awaiting review.
 - The UI now integrates these existing services. Actual browser upload/download with real accounts still needs acceptance testing. Evidence acceptance and retention rules remain a project policy decision.
 
 
@@ -61,6 +61,6 @@ Latest live introspection returned four rows in `profiles` and four rows in `use
 - SELECT and INSERT are restricted to verified users; inserts require author_id = auth.uid(). UPDATE and DELETE policies are scoped to the original author.
 - Active courses are readable but the catalogue currently contains 0 active courses. The forum therefore permits general discussions without a course link.
 - Latest table counts: 0 forum posts, 0 forum comments, 0 active courses.
-- Latest profile counts: 1 verified, 3 pending, 0 rejected. No forum or comment test data was inserted into Supabase.
+- Latest profile counts: 1 verified, 3 pending, 0 rejected. One approved verification request and one corresponding review event exist. No forum or comment test data was inserted into Supabase.
 - Profile RLS limits profile reads to the current user, so the forum UI masks other students' names instead of querying private profile data.
 - The frontend forum module is covered by mocked Playwright tests; real-account browser acceptance is still outstanding.
