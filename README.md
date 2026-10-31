@@ -64,9 +64,9 @@ After deployment, set Supabase Auth Site URL and Redirect URLs to the actual HTT
 
 ## Verification and next acceptance gate
 
-Latest confirmed successful GitHub Actions run for the complete Group workspace is **run #171** on commit `3fb584e089c87c552f805842974b5fb3be9aa813`: source checks and Vite production build passed, and all 35 Playwright tests passed. This includes group chat/pinning, private materials, agenda polls, private invitations and invite acceptance. Workflow: https://github.com/ridhobilalhakim-cy/UTConnect/actions/runs/41208606720. Later branch changes mainly clean up migration-history/status documentation; the newest PR-head CI run remains the merge gate.
+Latest confirmed PR-head GitHub Actions run is **#230** on commit `9b6e02fca72bdcc232d94771847fcaa80aae8776`: source checks, Vite production build, and all 43 Playwright tests passed. Workflow: https://github.com/ridhobilalhakim-cy/UTConnect/actions/runs/41226183647. Browser tests mock Supabase/Storage and do not replace two-account live acceptance.
 
-The live Supabase database was separately checked with authenticated SQL role contexts: an assigned administrator resolves as admin and can insert an Information UT post; a non-admin student profile resolves as non-admin and its insert is rejected by RLS. The test insert was rolled back, leaving the Information UT feed empty.
+The live Supabase database was separately checked with authenticated SQL role contexts: an assigned administrator resolves as admin and can insert an Information UT post; a non-admin student profile resolves as non-admin and its insert is rejected by RLS. The test insert was rolled back. A separate staging inspection on 2026-11-01 found one published Information UT row already present.
 
 The next acceptance gate is real-account acceptance for Home Map and Group workspace using two verified synthetic staging accounts, two-party connections/chat/notifications, and final Netlify deployment verification. Playwright tests mock Supabase/Storage; they do not prove live OAuth/email, cross-account Realtime, real Storage access, or the deployed Netlify URL. Staging currently has only one verified profile, so a second verified synthetic account is required before live cross-account acceptance. The Edge Functions currently allow wildcard CORS; configure explicit app-origin allowlists before public release.
 
@@ -83,7 +83,7 @@ npm run build
 npm run test:e2e
 ```
 
-The repository now defines 35 Playwright scenarios covering login/register, session/recovery, Information UT, Student Verification, Forum Diskusi, Grup Belajar, Matching/Connections, Direct Messaging, Notifications, and Home Map. Run #171 passed all 35 tests, including five Group workspace scenarios covering group chat/pinning, private material upload, agenda polls, private invitation by NIM, and invite acceptance. Later commits after #171 only clean up documentation and migration-history records; the newest PR-head CI run is being rechecked. Google OAuth, real email delivery, live cross-account Edge Function behavior, Netlify deployment, and real Supabase RLS are verified separately rather than inferred from mocked tests.
+The repository now defines 43 Playwright scenarios covering login/register, session/recovery, Information UT, Student Verification, Forum Diskusi, Grup Belajar, Matching/Connections, Direct Messaging, Notifications, and Home Map. PR-head run #230 passed all 43 scenarios, including group chat/pinning, private materials, agenda polls, private invitations, profile/avatar workflows, administrator role display, and routing of chat, Information UT and verification notifications. Google OAuth, real email delivery, live cross-account Edge Function behavior, production deployment and live two-account Storage/Realtime are separate acceptance checks; they are not inferred from mocked tests.
 
 
 ## Notifications state (checked 2026-10-31)
