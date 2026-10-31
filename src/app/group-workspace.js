@@ -478,12 +478,9 @@ export async function openGroupWorkspace(options) {
   }
   if (epoch !== workspaceEpoch || !activeGroup) return;
   openModalHandler("Ruang kelompok belajar", workspaceShell(), "Tutup");
-  await loadWorkspaceData();
-  if (epoch !== workspaceEpoch || !activeGroup) return;
-  render();
   activeChannel = subscribeToGroupWorkspace(activeGroup.id, {
     onMessages: () => {
-      if (activeTab === "chat") reloadMessages().catch(error => toastHandler(error.message));
+      reloadMessages().catch(error => toastHandler(error.message));
     },
     onMaterials: async () => {
       try {
@@ -520,6 +517,9 @@ export async function openGroupWorkspace(options) {
       }
     },
   });
+  await loadWorkspaceData();
+  if (epoch !== workspaceEpoch || !activeGroup) return;
+  render();
 }
 
 export async function closeGroupWorkspace() {
