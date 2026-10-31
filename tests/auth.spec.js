@@ -199,7 +199,7 @@ test('administrator can publish an Information UT post through Supabase', async 
   await page.locator('#loginPassword').fill('ContohPassword123!');
   await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
 
-  await expect(page).toHaveURL(/\\/app\\.html$/);
+  await expect(page).toHaveURL(/\/app\.html$/);
   await expect(page.locator('#topUserMeta')).toHaveText('Administrator UT Connect');
   await page.locator('[data-page="info"]').first().click();
   await expect(page.locator('#share-info')).toBeVisible();
