@@ -1019,7 +1019,6 @@ test('verified student can create a persisted general study group', async ({ pag
   await page.locator('#new-group-access').selectOption('open');
   await page.locator('#new-group-capacity').fill('12');
   await page.locator('#new-group-schedule').fill('Sabtu, 19.00 WIB');
-  await page.locator('#new-group-online-url').fill('https://meet.google.com/abc-defg-hij');
   await page.locator('#modal-confirm').click();
 
   await expect(page.locator('.group-card')).toContainText('Kelompok Belajar Sistem Informasi');
@@ -1028,35 +1027,6 @@ test('verified student can create a persisted general study group', async ({ pag
   expect(state.studyGroups[0].created_by).toBe(USER.id);
   expect(state.studyGroups[0].access_type).toBe('open');
   expect(state.groupMembers.some(member => member.group_id === 'group-e2e-001' && member.user_id === USER.id && member.role === 'admin')).toBe(true);
-});
-
-test('verified student cannot create an online group without a meeting URL', async ({ page }) => {
-  const state = await mockSupabase(page, { profile: { ...PROFILE, verification_status: 'verified' } });
-  await page.goto('/');
-  await page.locator('#loginEmail').fill(USER.email);
-  await page.locator('#loginPassword').fill('ContohPassword123!');
-  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
-  await page.locator('[data-page="groups"]').first().click();
-  await page.locator('#create-group').click();
-  await page.locator('#new-group-name').fill('Kelompok Tanpa Tautan');
-  await page.locator('#modal-confirm').click();
-  await expect(page.locator('#toast')).toContainText('Tautan meeting wajib diisi');
-  expect(state.groupCreateCalls).toBe(0);
-});
-
-test('verified student cannot create an offline group without a meeting area', async ({ page }) => {
-  const state = await mockSupabase(page, { profile: { ...PROFILE, verification_status: 'verified' } });
-  await page.goto('/');
-  await page.locator('#loginEmail').fill(USER.email);
-  await page.locator('#loginPassword').fill('ContohPassword123!');
-  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
-  await page.locator('[data-page="groups"]').first().click();
-  await page.locator('#create-group').click();
-  await page.locator('#new-group-name').fill('Kelompok Offline Tanpa Area');
-  await page.locator('#new-group-mode').selectOption('offline');
-  await page.locator('#modal-confirm').click();
-  await expect(page.locator('#toast')).toContainText('Area pertemuan wajib diisi');
-  expect(state.groupCreateCalls).toBe(0);
 });
 
 test('verified student can request to join an approval-based study group', async ({ page }) => {

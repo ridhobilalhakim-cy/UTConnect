@@ -86,7 +86,7 @@ export function initDashboard({ isAdmin = false, isVerified = false, verificatio
   window.L = L;
   const lucide = window.lucide;
 const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root.querySelectorAll(s)];
-  const state={page:'home',radius:3000,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,myMarker:null,center:null,myLocation:null,nearbyStudents:[],homeMapRequestId:0,connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumAuthors:new Map(),profile:{...currentProfile},chatRooms:[],activeChatRoom:null,groups:[],groupMemberships:new Map(),groupMembers:[],groupInvitations:[],activeGroupChannel:null,activeGroupId:null,groupWorkspace:{messages:[],materials:[],agenda:[],invites:[],pollResults:{}},matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredPrograms:[]matchRadius:3000};
+  const state={page:'home',radius:3000,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,myMarker:null,center:null,myLocation:null,nearbyStudents:[],homeMapRequestId:0,connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumAuthors:new Map(),profile:{...currentProfile},chatRooms:[],activeChatRoom:null,groups:[],groupMemberships:new Map(),groupMembers:[],groupInvitations:[],activeGroupChannel:null,activeGroupId:null,groupWorkspace:{messages:[],materials:[],agenda:[],invites:[],pollResults:{}},matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredPrograms:[],matchRadius:3000};
   const NOTIFICATION_META = {
     connection_request: { icon: "user-plus", page: "matching" },
     connection_accepted: { icon: "user-check", page: "matching" },
@@ -1345,8 +1345,8 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       <div class="field"><label for="new-group-access">Akses kelompok</label><select id="new-group-access" class="select"><option value="open">Terbuka · langsung bergabung</option><option value="approval">Persetujuan admin · perlu ditinjau</option></select></div>
       <div class="field"><label for="new-group-capacity">Kapasitas (2–100 anggota)</label><input id="new-group-capacity" class="text-input" type="number" min="2" max="100" value="10"></div>
       <div class="field"><label for="new-group-schedule">Jadwal (opsional)</label><input id="new-group-schedule" class="text-input" maxlength="300" placeholder="Contoh: Sabtu, 19.00 WIB"></div>
-      <div class="field"><label for="new-group-online-url">Tautan pertemuan (wajib untuk mode Online)</label><input id="new-group-online-url" class="text-input" type="url" maxlength="500" placeholder="https://meet.google.com/..."></div>
-      <div class="field"><label for="new-group-offline-area">Area pertemuan (wajib untuk mode Offline)</label><input id="new-group-offline-area" class="text-input" maxlength="160" placeholder="Contoh: Area layanan belajar UPBJJ"></div>`;
+      <div class="field"><label for="new-group-online-url">Tautan pertemuan online (opsional)</label><input id="new-group-online-url" class="text-input" type="url" maxlength="500" placeholder="https://meet.google.com/..."></div>
+      <div class="field"><label for="new-group-offline-area">Area pertemuan offline (opsional)</label><input id="new-group-offline-area" class="text-input" maxlength="160" placeholder="Contoh: Area layanan belajar UPBJJ"></div>`;
     openModal("Buat kelompok belajar", content, "Buat kelompok", async () => {
       const name = $("#new-group-name").value.trim();
       const description = $("#new-group-description").value.trim();
@@ -1360,9 +1360,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       if (name.length < 3 || name.length > 100) { toast("Nama kelompok harus 3–100 karakter."); return false; }
       if (description.length > 1500) { toast("Deskripsi maksimal 1.500 karakter."); return false; }
       if (!Number.isInteger(capacity) || capacity < 2 || capacity > 100) { toast("Kapasitas harus antara 2 dan 100 anggota."); return false; }
-      if (mode === "online" && !onlineUrl) { toast("Tautan meeting wajib diisi untuk kelompok online."); return false; }
-      if (mode === "offline" && !offlineArea) { toast("Area pertemuan wajib diisi untuk kelompok offline."); return false; }
-      if (mode === "online") {
+      if (mode === "online" && onlineUrl) {
         try {
           const parsed = new URL(onlineUrl);
           if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("protocol");
