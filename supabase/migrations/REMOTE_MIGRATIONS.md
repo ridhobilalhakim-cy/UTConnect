@@ -58,7 +58,4 @@ The Group workspace migration set is retained in these source files:
 The `manage-group-invites` Edge Function is deployed as version 1 with JWT verification. It HMACs NIM on the server, resolves only verified profiles, creates/cancels invitations through actor-checked RPCs, and returns no invitee UUID to the browser. The private `group-materials` Storage bucket remains non-public; active group membership and the existing object policies govern upload/read/delete, and the client uses short-lived signed download URLs.
 
 
-The Group membership verification guard is retained as `20261031135852_group_membership_verification_guard.sql`. It updates the central active-member/admin RLS helpers so group access is granted only while the signed-in account is still verified, and hardens the related decision, poll, invite-inbox and message-pin RPCs against stale memberships after verification is revoked.
-
-
 The final Group membership verification guard is retained as `20261031135852_group_membership_verification_guard.sql`. It makes active-member and admin helper checks require the current account to remain a verified student, and hardens the membership decision, poll, invitation inbox, pin, and invitation-cancellation RPCs so previously active membership does not preserve access after verification is revoked.
