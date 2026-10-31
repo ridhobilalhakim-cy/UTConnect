@@ -1,10 +1,10 @@
-# Build and verification status — Information UT / Student Verification / Forum Diskusi
+# Build and verification status — Information UT / Student Verification / Forum Diskusi / Grup Belajar
 
 Date: 2026-10-31
 
 ## Latest CI result
 
-GitHub Actions run #50: **SUCCESS**  
+Latest previously confirmed GitHub Actions run #50: **SUCCESS** (pre-Grup Belajar integration)  
 Commit: `ec7eacf3b136b29f4887843654cb4c41268ed7bd`  
 Workflow: `Verify UT Connect build`
 
@@ -12,8 +12,9 @@ Workflow: `Verify UT Connect build`
 - `npm run check` — PASS.
 - `npm run build` — PASS; Vite generated the production site in `dist/`.
 - Playwright Chromium installation — PASS.
-- Browser E2E — **13 passed**.
+- Browser E2E — **13 passed** on that commit.
 - Forum create/comment flows and verified-only access checks included.
+- The current repository now defines 17 Playwright tests; four new Grup Belajar scenarios were added after run #50 and their CI outcome is not yet confirmed.
 
 Workflow run: https://github.com/ridhobilalhakim-cy/UTConnect/actions/runs/41191070350
 
@@ -63,11 +64,11 @@ This environment could not independently resolve the public Netlify domain. The 
 2. Test Google sign-in and profile completion using each team's actual account.
 3. Test Information UT create/edit/publish/unpublish/delete from a real admin browser session and confirm student read visibility.
 4. Define and publish the evidence acceptance and retention policy before opening Student Verification to the public.
-5. Integrate Groups, Matching/Connections, Chat, notifications, and map access one service at a time.
+5. Run and review CI for the new Grup Belajar integration, then perform real-account group creation/join/admin-approval acceptance tests. Matching/Connections, Chat, notifications, and map access remain future integration milestones.
 
 ## Source-control caveats
 
-- The remote staging project has eight recorded migrations. The first five original SQL bodies and the student_verification_workflow SQL body still need reconstruction/review in repository source. Do not re-run them blindly against the live staging database.
+- The remote staging project has nine recorded migrations. The first five original SQL bodies and the student_verification_workflow SQL body still need reconstruction/review in repository source. Do not re-run them blindly against the live staging database.
 - The registration Edge Function mirror in GitHub does not automatically deploy source edits to Supabase.
 - Never put the Supabase service-role key, secret keys, or NIM HMAC secret in browser code or public GitHub files.
 
@@ -129,3 +130,25 @@ Security boundary:
 Live database counts at the latest check: 0 forum posts, 0 forum comments, and 0 active courses. One of four profiles is verified; three are pending. The private verification tables contain one approved request and one approved review event. No live forum test records were inserted.
 
 The 13 Playwright tests use mocked Supabase HTTP routes and synthetic data. They prove client-side flows but do not prove live posting/commenting across real accounts. Real-browser acceptance against Supabase and confirmation of the Netlify deployment are still required.
+
+
+## Grup Belajar milestone — implementation added 2026-10-31
+
+The Groups page now reads and writes through `src/services/groups.js` and the existing `public.study_groups` / `public.group_members` schema.
+
+- Verified students can discover non-archived groups and create a group. The database trigger assigns the creator as the first active admin.
+- Group creation supports a general group (no course), optional active course, online/offline mode, open/approval access, capacity (2–100), optional schedule, and optional meeting URL/area label.
+- Open groups accept eligible users immediately. Approval groups create a pending membership request; active group admins/co-admins can approve or reject requests.
+- The group UI shows generic member/request labels rather than other profile names because profile RLS does not expose another student's identity to the current user.
+- The current active course catalogue is empty, so the UI deliberately permits general groups rather than presenting invented courses.
+- Private groups can be discovered by invitees through existing RLS, but the UI for sending/managing private invitations is not included. Group chat, agenda, and material upload are also not included.
+
+Database security update:
+- Migration `20261031101336_secure_enable_group_join_workflow_rpcs` is applied to staging.
+- `join_study_group` and `respond_group_join_request` now reject a caller whose `p_actor_id` differs from `auth.uid()`.
+- EXECUTE is granted to `authenticated` (and service_role), revoked from `PUBLIC` and `anon`; the existing database capacity, verification, and active-admin checks remain authoritative.
+- Supabase's security advisor reports a SECURITY DEFINER warning for these two RPCs because authenticated users are intentionally permitted to call these narrowly scoped functions. The functions validate the caller and do not allow direct group_members table writes.
+
+Latest live staging counts after the migration and code changes: 0 study_groups, 0 group_members, 0 group_invites, and 0 active courses. No group test data has been inserted into Supabase. There is one verified profile and three pending profiles; verified-only group UI and database policies therefore currently restrict access to the single verified profile.
+
+The four new group Playwright tests use mocked Supabase responses. They cover the verification gate, group creation, approval-based join request, and admin approval. They have not been counted as passing until an Actions run for the latest code confirms them. Real-user group creation and join workflows remain an acceptance test.
