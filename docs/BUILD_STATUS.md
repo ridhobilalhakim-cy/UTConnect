@@ -47,9 +47,9 @@ The 13 mocked Playwright tests cover auth UI/session behavior, admin Information
 
 At the last database check:
 - 3 administrator roles exist.
-- 3 student profiles exist; all 3 are `pending`.
-- 0 profiles are `verified`.
-- One of the three administrator accounts has not completed its student profile and must finish registration before accessing the dashboard.
+- 4 student profiles exist; 1 is `verified` and 3 are `pending`.
+- 0 profiles are `rejected`.
+- One of the four profiles is verified; administrator roles remain separate from student verification status.
 
 ## What this does and does not prove
 
@@ -67,7 +67,7 @@ This environment could not independently resolve the public Netlify domain. The 
 
 ## Source-control caveats
 
-- The remote staging project has eight recorded migrations. The first five original SQL bodies still need reconstruction/review in repository source. Do not re-run them blindly against the live staging database.
+- The remote staging project has eight recorded migrations. The first five original SQL bodies and the student_verification_workflow SQL body still need reconstruction/review in repository source. Do not re-run them blindly against the live staging database.
 - The registration Edge Function mirror in GitHub does not automatically deploy source edits to Supabase.
 - Never put the Supabase service-role key, secret keys, or NIM HMAC secret in browser code or public GitHub files.
 
@@ -104,7 +104,7 @@ Important limitations:
 
 At the last live database check:
 - 3 profiles are pending.
-- 0 profiles are verified.
+- 1 profile is verified.
 - 0 verification requests are awaiting review.
 - 0 review events have been recorded.
 
