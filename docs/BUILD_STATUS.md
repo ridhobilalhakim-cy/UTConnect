@@ -1,22 +1,22 @@
-# Build and verification status — Information UT / Student Verification / Forum Diskusi / Grup Belajar / Matching & Connections / Direct Messaging / Notifications
+# Build and verification status — UT Connect web app integrations
 
 Date: 2026-10-31
 
 ## Latest CI result
 
-Latest previously confirmed GitHub Actions run #50: **SUCCESS** (pre-Grup Belajar integration)  
-Commit: `ec7eacf3b136b29f4887843654cb4c41268ed7bd`  
-Workflow: `Verify UT Connect build`
+Latest confirmed GitHub Actions run #119: **SUCCESS** (2026-10-31).
+Commit: 6801fd15c4ebc4b4ef1fffcc6a206e07ec29d7c1
 
-- Dependency install with committed `package-lock.json` — PASS.
-- `npm run check` — PASS.
-- `npm run build` — PASS; Vite generated the production site in `dist/`.
+- Dependency installation with committed lockfile — PASS.
+- npm run check — PASS (2 HTML pages, local imports, one shared Supabase client, and 13 JS/test modules syntax-checked).
+- npm run build — PASS; Vite generated the production site in dist/.
 - Playwright Chromium installation — PASS.
-- Browser E2E — **13 passed** on that commit.
-- Forum create/comment flows and verified-only access checks included.
-- The current repository now defines 26 Playwright tests: four Grup Belajar, five Matching/Connections, two Direct Messaging, and two Notifications scenarios were added after run #50. The 13 added tests have not yet been confirmed by a successful CI run.
+- Browser end-to-end suite — **30 passed, 0 failed**.
+- Home Map scenarios cover authenticated nearby results, NIM request-body handling, radar opt-out while browsing remains available, and pending-student gating.
 
-Workflow run: https://github.com/ridhobilalhakim-cy/UTConnect/actions/runs/41191070350
+Workflow run: https://github.com/ridhobilalhakim-cy/UTConnect/actions/runs/41201332750
+
+These browser tests use mocked Supabase HTTP responses and synthetic fixtures. A passing run verifies browser wiring and production bundle construction, not the live behavior of two real staging accounts, third-party OAuth/email, or deployment to Netlify.
 
 ## Information UT milestone
 
@@ -216,3 +216,19 @@ Verification:
 - Temporary database transactions verified that all six event types create notifications and that authenticated users see only their own rows. A read receipt update succeeded; direct insert and title update privileges were absent. All synthetic database changes were rolled back.
 - Two mocked Playwright tests cover opening a direct-message notification and marking all notifications read. The current suite defines 26 tests; the two new scenarios are not counted as passing until a current CI run confirms them.
 - Live staging has zero stored notification records, zero connection/message/forum/group test data, one verified student and three pending students. Real cross-account notification and Realtime behavior remains an acceptance test after a second verified test account is available.
+
+## Home Map milestone — integrated 2026-10-31
+
+The Home Map is now connected through src/services/home-map.js to two authenticated Edge Functions:
+
+- manage-my-location: reads only the signed-in user's own exact location, validates explicit consent, saves GPS/manual coordinates, and updates radar visibility.
+- nearby-students: requires a verified student profile, validates 1/3/5 km radius, HMACs an optional NIM in the Edge Function, enforces server-side rate limits, and returns no more than ten jittered markers with initials, program, and rounded distance.
+
+Database functions for exact location and nearby search are executable only by service_role. The user_locations table has RLS enabled and a self-row policy. A student who hides their radar marker can still search for other students; their own profile is excluded from candidate results.
+
+Supabase staging has applied migrations 20261031121632_home_map_location_workflow and 20261031121933_home_map_hidden_viewer_search. Edge Functions manage-my-location v1 and nearby-students v1 are ACTIVE with JWT verification enabled. Exact location responses and nearby results use Cache-Control: no-store.
+
+The dashboard removed its static Bandung center, fabricated student profiles, dummy NIMs, and simulated markers. Students can refresh GPS, choose a map point with confirmation, set radar visibility, select 1/3/5 km, and search a nine-digit NIM. NIM is sent in the authenticated POST body and is not placed in the URL or browser storage.
+
+Outstanding acceptance gates: use two verified synthetic staging accounts to confirm location consent, radar visibility, approximate marker privacy, server-side NIM lookup, and the hidden-viewer search behavior. The current staging project has only one verified profile, so multi-account map behavior has not yet been exercised against live data. Configure a strict CORS origin allowlist before public release. Netlify deployment is not inferred from CI success.
+
