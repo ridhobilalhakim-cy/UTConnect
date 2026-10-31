@@ -1185,9 +1185,11 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
           <div class="group-sub">${capacityText}</div>
           <div class="group-foot"><span class="tiny group-pending-count">${pendingCount ? `${pendingCount} permohonan masuk` : ""}</span>${action}</div>
         </article>`;
-    }).join("") || '<div class="empty-state" style="grid-column:1/-1"><h3>Belum ada kelompok belajar</h3><p>Buat kelompok baru atau coba kata kunci dan filter lain.</p></div>';
+    }).join("") || '<div class="empty-state" style="grid-column:1/-1"><h3>Belum ada kelompok belajar</h3><p>Buat kelompok baru atau coba kata kunci dan filter lain.</p></div>');
 
-    $$("[data-group-join]").forEach(button => button.addEventListener("click", () => requestGroupJoin(button.dataset.groupJoin, button)));
+    $("[data-group-invite-accept]").forEach(button => button.addEventListener("click", () => acceptGroupInvitation(button.dataset.groupInviteAccept)));
+    $("[data-group-invite-decline]").forEach(button => button.addEventListener("click", () => declineGroupInvitation(button.dataset.groupInviteDecline)));
+    $("[data-group-join]").forEach(button => button.addEventListener("click", () => requestGroupJoin(button.dataset.groupJoin, button)));
     $$("[data-group-open]").forEach(button => button.addEventListener("click", () => openGroupDetails(button.dataset.groupOpen)));
     icons();
   }
