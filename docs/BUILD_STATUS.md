@@ -2,38 +2,71 @@
 
 Date: 2026-10-31
 
-## Passed locally in GitHub Actions
+## Latest CI result
 
-GitHub Actions run #4: **SUCCESS**  
-Commit: `4b58e41eddfeef15f3882f892918b1facf394438`  
+GitHub Actions run #21: **SUCCESS**  
+Commit: `5c45899b1afd5843fb7b4fae596f0da08eb7d3de`  
 Workflow: `Verify UT Connect build`
 
-- `package-lock.json` exists in the repository and dependency installation completed successfully.
+- Dependency install with committed `package-lock.json` — PASS.
 - `npm run check` — PASS.
 - `npm run build` — PASS; Vite generated the production site in `dist/`.
-- Playwright Chromium setup — PASS.
-- Browser E2E — **5 passed**:
-  1. Login and registration are separate views.
-  2. Guest cannot open the protected dashboard.
-  3. Email login restores session and logout clears it.
-  4. Forgot-password sends a non-enumerating recovery request.
-  5. Password recovery validates confirmation and updates the password.
-- CI artifact `utconnect-build-4` was uploaded successfully.
+- Playwright Chromium installation — PASS.
+- Browser E2E — **7 passed**.
+- CI artifact `utconnect-build-21` uploaded successfully.
+
+Workflow run: https://github.com/ridhobilalhakim-cy/UTConnect/actions/runs/41178754676
+
+## Information UT milestone
+
+The Information UT page now uses the Supabase `public.information_posts` table rather than a hardcoded sample array.
+
+Administrator actions available in the UI:
+- Create an information post.
+- Edit an existing post.
+- Publish a draft or unpublish an existing post.
+- Delete a post.
+- Select category, audience, and optional HTTP(S) source URL.
+
+Student feed behavior:
+- Students can read published posts allowed by the database audience policy.
+- Drafts are visible to administrators only.
+- The management button is hidden for non-admin accounts.
+- The production table currently has zero information posts; no sample posts have been inserted.
+
+The seven mocked Playwright tests cover auth UI/session behavior, admin Information UT create/edit/unpublish/republish/delete, and student read-only visibility. They verify client-side behavior but do not substitute for a real-browser test against live Supabase.
+
+## Supabase role and RLS verification
+
+- Three administrator assignments are present in `private.app_user_roles`.
+- `public.is_current_user_admin()` returned `true` for an assigned admin and `false` for a non-admin student profile.
+- An authenticated admin insert into `information_posts` passed RLS.
+- An authenticated non-admin student insert was rejected by RLS.
+- The admin insert acceptance test was rolled back; the live Information UT table remains empty.
+- Administrator privilege does not change `profiles.verification_status`.
+
+At the last database check:
+- 3 administrator roles exist.
+- 3 student profiles exist; all 3 are `pending`.
+- 0 profiles are `verified`.
+- One of the three administrator accounts has not completed its student profile and must finish registration before accessing the dashboard.
 
 ## What this does and does not prove
 
-These Playwright tests use mocked Supabase HTTP responses and synthetic student data. They verify client-side UI/auth flow behavior and a successful production build. They do **not** prove live Supabase Auth, actual email delivery, Google OAuth, deployed Edge Function behavior, production RLS, or real multi-user dashboard features.
+The CI browser tests use mocked Supabase HTTP responses and synthetic test data. They prove source integrity, build completion, and client UI behavior under the mocked responses. They do **not** prove live Google OAuth, real email delivery, the deployed Edge Function, end-to-end browser CRUD against the production Supabase API, or successful Netlify deployment.
 
-## Remaining before public staging
+This environment could not independently resolve the public Netlify domain. The Netlify production deployment therefore remains an external acceptance check; do not assume a passing GitHub Actions run proves that the latest commit is already live.
 
-1. Connect GitHub repository `ridhobilalhakim-cy/UTConnect` to Netlify.
-2. Use build command `npm ci && npm run build` and publish directory `dist` (also specified by `netlify.toml`).
-3. Add the actual HTTPS staging domain to Supabase Auth Site URL and Redirect URLs.
-4. Configure Google OAuth origins/redirects in Google Cloud and Supabase.
-5. Test signup, profile completion, login, session restore, protected route, logout, Google OAuth, and password recovery with test accounts.
-6. Keep multi-user feature claims on hold until each dashboard service is integrated and tested against live Supabase.
+## Remaining acceptance gates
 
-## Backend/source-control caveats
+1. Confirm Netlify has deployed the latest successful commit.
+2. Test Google sign-in and profile completion using each team's actual account.
+3. Test Information UT create/edit/publish/unpublish/delete from a real admin browser session and confirm student read visibility.
+4. Agree on a privacy-conscious, independently verifiable student evidence process before enabling any admin action that changes a student's status to `verified`.
+5. Integrate and test Forum, Groups, Matching/Connections, Chat, notifications, and map access one service at a time.
 
-- The deployed registration Edge Function is mirrored in this repository; repository edits do not automatically deploy it to Supabase.
-- The first five remote SQL migration bodies still need to be reconstructed and reviewed in source control. Do not blindly rerun SQL migrations on the existing staging project.
+## Source-control caveats
+
+- The remote staging project has seven recorded migrations. The first five original SQL bodies still need reconstruction/review in repository source. Do not re-run them blindly against the live staging database.
+- The registration Edge Function mirror in GitHub does not automatically deploy source edits to Supabase.
+- Never put the Supabase service-role key, secret keys, or NIM HMAC secret in browser code or public GitHub files.
