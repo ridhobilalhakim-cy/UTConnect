@@ -33,15 +33,6 @@ The connected staging project reported these twenty-one applied migration entrie
 | 20261031134443 | group_poll_realtime_touch |
 | 20261031135852 | group_membership_verification_guard |
 | 20261031140523 | group_materials_verified_delete_guard |
-| 20261031124333 | group_workspace_workflows |
-| 20261031124407 | group_invite_inbox_limit |
-| 20261031133930 | group_workspace_realtime_and_invite_notifications |
-| 20261031134014 | group_members_realtime |
-| 20261031134443 | group_poll_realtime_touch |
-| 20261031135852 | group_membership_verification_guard |
-| 20261031133930 | group_workspace_realtime_and_invite_notifications |
-| 20261031134014 | group_members_realtime |
-| 20261031134443 | group_poll_realtime_touch |
 
 Live introspection found the public application tables with RLS enabled, plus private NIM search and student-verification tables. PostGIS is enabled. The deployed `complete-student-registration` Edge Function was last confirmed as ACTIVE version 4 with JWT verification enabled.
 
