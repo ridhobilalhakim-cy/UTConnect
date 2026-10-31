@@ -247,3 +247,10 @@ The former group details modal is now a tabbed workspace for Chat grup, Materi, 
 Backend features: RLS-protected group messages with admin pinning; private Storage materials with 50 MiB limit and signed URLs; agenda schedule/target/task/note/poll items; private per-member poll voting with aggregate-only result RPCs; private-group invites by server-side NIM lookup; invitee inbox accept/decline; group invitation notifications; and RLS-filtered Realtime for messages, materials, agenda, invites and membership changes.
 
 The seven Group workspace security/realtime migrations and `manage-group-invites` Edge Function are applied/deployed in staging. No test accounts or group content have been written to live staging. The PR currently defines 35 mocked Playwright scenarios; the CI result must be rechecked for the latest PR head before merge. See `docs/STAGING_STATE.md`, `docs/API_CONTRACT.md`, and `supabase/migrations/REMOTE_MIGRATIONS.md`.
+
+
+## Reported user bug fixes — 2026-10-31
+
+PR #4 (`fix/20261031-student-bug-report`) adds the following UI and backend integrations: UT S1 faculty/programme registration selectors with server-side validation; corrected administrator role presentation; forum author identity and reply lookups; a dedicated accepted-connection chat inbox; persisted profile editing and avatar upload; and notifications for group chat/material/agenda inserts. The staging migration and registration Edge Function v5 are applied/deployed.
+
+CI run #186 for this PR has passed source checks and the production Vite build; its Playwright end-to-end step was still running at the time of this update. Do not treat this as a merge or production release until the full run passes and the PR is merged. Preview and live two-account acceptance remain separate checks.
