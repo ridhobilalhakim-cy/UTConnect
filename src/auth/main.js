@@ -10,6 +10,7 @@ window.L = L;
   const L = window.L;
   let map = null, marker = null, chosenLocation = null, mapReady = false, activeUser = null;
   let handlingSession = false;
+  let suppressRecoverySignOutNavigation = false;
   const initialParams = new URLSearchParams(window.location.search);
   let recoveryMode = initialParams.get("mode") === "recovery";
 
@@ -131,9 +132,10 @@ window.L = L;
       setTimeout(() => handleSession(session), 0);
     }
     if (event === "SIGNED_OUT") {
+      const shouldNavigateToLogin = !suppressRecoverySignOutNavigation;
       setTimeout(() => {
         activeUser = null;
-        showView("loginView");
+        if (shouldNavigateToLogin) showView("loginView");
       }, 0);
     }
   });
@@ -226,16 +228,22 @@ window.L = L;
       const client=await ensureSupabase();
       const {error}=await client.auth.updateUser({password});
       if(error) throw error;
+      suppressRecoverySignOutNavigation = true;
       const {error:signOutError}=await client.auth.signOut();
       if(signOutError){
+        suppressRecoverySignOutNavigation = false;
         alertBox("Password berhasil diperbarui. Sesi belum dapat ditutup otomatis; silakan keluar sebelum menggunakan akun kembali.","success");
         return;
       }
+      suppressRecoverySignOutNavigation = false;
       recoveryMode=false;
       window.history.replaceState(null,"","/?passwordUpdated=1");
       showView("loginView");
       alertBox("Password berhasil diperbarui. Silakan masuk dengan password baru.","success");
-    }catch(error){alertBox(error.message||"Password belum berhasil diperbarui. Minta tautan pemulihan baru jika tautan telah kedaluwarsa.","error");}
+    }catch(error){
+      suppressRecoverySignOutNavigation = false;
+      alertBox(error.message||"Password belum berhasil diperbarui. Minta tautan pemulihan baru jika tautan telah kedaluwarsa.","error");
+    }
     finally{busy("resetPasswordBtn",false);}
   });
 
