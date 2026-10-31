@@ -4,6 +4,7 @@ import {
   setGroupMessagePinned,
   subscribeToGroupMessages,
   unsubscribeFromGroupMessages,
+  respondGroupJoinRequest,
   listGroupMaterials,
   uploadGroupMaterial,
   deleteGroupMaterial,
@@ -23,6 +24,13 @@ let activeMembership = null;
 let currentUserId = null;
 let activeTab = "chat";
 let activeChannel = null;
+let workspaceEpoch = 0;
+let groupMessages = [];
+let groupMaterials = [];
+let groupAgenda = [];
+let groupPollResults = {};
+let groupInvites = [];
+let groupMembers = [];
 let toastHandler = () => {};
 let refreshHandler = async () => {};
 let openModalHandler = () => {};
@@ -58,6 +66,7 @@ function tabMarkup() {
     ["materials", "Materi", "folder-open"],
     ["agenda", "Agenda", "calendar-check"],
   ];
+  if (isManager()) tabs.push(["members", "Anggota", "users-round"]);
   if (activeGroup?.access_type === "private") tabs.push(["invites", "Undangan", "mail-plus"]);
   return '<nav class="group-workspace-tabs" aria-label="Fitur kelompok">' + tabs.map(item =>
     '<button type="button" class="group-workspace-tab ' + (activeTab === item[0] ? "active" : "") +
@@ -91,11 +100,12 @@ function render() {
   if (activeTab === "chat") renderChat(content);
   else if (activeTab === "materials") renderMaterials(content);
   else if (activeTab === "agenda") renderAgenda(content);
+  else if (activeTab === "members") renderMembers(content);
   else if (activeTab === "invites") renderInvites(content);
 }
 
 function renderChat(container) {
-  const messages = window.__utGroupMessages || [];
+  const messages = groupMessages;
   const messageList = messages.map(message => {
     const own = message.sender_id === currentUserId;
     const pinned = Boolean(message.pinned_at);
@@ -154,7 +164,7 @@ function renderChat(container) {
 async function reloadMessages() {
   if (!activeGroup) return;
   try {
-    window.__utGroupMessages = await listGroupMessages(activeGroup.id);
+    groupMessages = await listGroupMessages(activeGroup.id);
     if (activeTab === "chat") render();
   } catch (error) {
     toastHandler(error?.message || "Pesan kelompok belum dapat dimuat.");
@@ -162,7 +172,7 @@ async function reloadMessages() {
 }
 
 function renderMaterials(container) {
-  const materials = window.__utGroupMaterials || [];
+  const materials = groupMaterials;
   const rows = materials.map(item => {
     const canDelete = isManager() || item.uploaded_by === currentUserId;
     return '<article class="group-material-row"><div class="group-material-icon">PDF</div><div class="group-material-info"><strong>' +
@@ -191,7 +201,7 @@ function renderMaterials(container) {
     if (button) button.disabled = true;
     try {
       await uploadGroupMaterial(activeGroup.id, file, title);
-      window.__utGroupMaterials = await listGroupMaterials(activeGroup.id);
+      groupMaterials = await listGroupMaterials(activeGroup.id);
       toastHandler("Materi berhasil diunggah.");
       render();
     } catch (error) {
@@ -207,7 +217,7 @@ function renderMaterials(container) {
       button.disabled = true;
       try {
         await deleteGroupMaterial(button.dataset.groupMaterialDelete);
-        window.__utGroupMaterials = await listGroupMaterials(activeGroup.id);
+        groupMaterials = await listGroupMaterials(activeGroup.id);
         toastHandler("Materi berhasil dihapus.");
         render();
       } catch (error) {
@@ -220,8 +230,8 @@ function renderMaterials(container) {
 }
 
 function renderAgenda(container) {
-  const items = window.__utGroupAgenda || [];
-  const results = window.__utGroupPollResults || {};
+  const items = groupAgenda;
+  const results = groupPollResults;
   const cards = items.map(item => {
     const result = results[item.id] || { options: [], total_votes: 0 };
     const poll = item.item_type === "poll";
@@ -323,7 +333,7 @@ function renderAgenda(container) {
   container.querySelectorAll("[data-group-poll-vote]").forEach(button => button.addEventListener("click", async () => {
     button.disabled = true;
     try {
-      window.__utGroupPollResults[button.dataset.groupPollVote] =
+      groupPollResults[button.dataset.groupPollVote] =
         await castGroupPollVote(button.dataset.groupPollVote, button.dataset.pollOption);
       toastHandler("Suara kamu berhasil disimpan.");
       render();
@@ -337,13 +347,13 @@ function renderAgenda(container) {
 
 async function reloadAgenda() {
   if (!activeGroup) return;
-  window.__utGroupAgenda = await listGroupAgendaItems(activeGroup.id);
-  const polls = window.__utGroupAgenda.filter(item => item.item_type === "poll");
+  groupAgenda = await listGroupAgendaItems(activeGroup.id);
+  const polls = groupAgenda.filter(item => item.item_type === "poll");
   const entries = await Promise.all(polls.map(async item => [
     item.id,
     await getGroupPollResults(item.id),
   ]));
-  window.__utGroupPollResults = Object.fromEntries(entries);
+  groupPollResults = Object.fromEntries(entries);
 }
 
 async function renderInvites(container) {
@@ -351,7 +361,7 @@ async function renderInvites(container) {
     container.innerHTML = '<div class="group-empty">Undangan hanya dapat dikelola admin kelompok privat.</div>';
     return;
   }
-  const invites = window.__utGroupInvites || [];
+  const invites = groupInvites;
   const rows = invites.map(invite =>
     '<article class="group-invite-row"><div><strong>Undangan menunggu jawaban</strong><small>Dikirim ' +
     safe(dateLabel(invite.created_at)) + '</small></div><button class="btn btn-secondary btn-sm" data-group-invite-cancel="' +
@@ -372,7 +382,7 @@ async function renderInvites(container) {
     try {
       await inviteGroupMemberByNim(activeGroup.id, input.value.trim());
       input.value = "";
-      window.__utGroupInvites = await listGroupInvites(activeGroup.id);
+      groupInvites = await listGroupInvites(activeGroup.id);
       toastHandler("Undangan berhasil dikirim.");
       render();
     } catch (error) {
@@ -385,7 +395,7 @@ async function renderInvites(container) {
     button.disabled = true;
     try {
       await cancelGroupInvite(button.dataset.groupInviteCancel);
-      window.__utGroupInvites = await listGroupInvites(activeGroup.id);
+      groupInvites = await listGroupInvites(activeGroup.id);
       toastHandler("Undangan dibatalkan.");
       render();
     } catch (error) {
@@ -403,13 +413,13 @@ async function loadWorkspaceData() {
     listGroupAgendaItems(activeGroup.id),
     canInvite() ? listGroupInvites(activeGroup.id) : Promise.resolve([]),
   ]);
-  window.__utGroupMessages = results[0].status === "fulfilled" ? results[0].value : [];
-  window.__utGroupMaterials = results[1].status === "fulfilled" ? results[1].value : [];
-  window.__utGroupAgenda = results[2].status === "fulfilled" ? results[2].value : [];
-  window.__utGroupInvites = results[3].status === "fulfilled" ? results[3].value : [];
-  const polls = window.__utGroupAgenda.filter(item => item.item_type === "poll");
+  groupMessages = results[0].status === "fulfilled" ? results[0].value : [];
+  groupMaterials = results[1].status === "fulfilled" ? results[1].value : [];
+  groupAgenda = results[2].status === "fulfilled" ? results[2].value : [];
+  groupInvites = results[3].status === "fulfilled" ? results[3].value : [];
+  const polls = groupAgenda.filter(item => item.item_type === "poll");
   const pollResults = await Promise.allSettled(polls.map(item => getGroupPollResults(item.id)));
-  window.__utGroupPollResults = Object.fromEntries(polls.map((item, index) => [
+  groupPollResults = Object.fromEntries(polls.map((item, index) => [
     item.id,
     pollResults[index].status === "fulfilled" ? pollResults[index].value : { options: [], total_votes: 0 },
   ]));
