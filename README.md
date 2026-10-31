@@ -74,7 +74,7 @@ Student verification remains separate from administrator access. At the latest d
 
 ## Browser E2E tests
 
-The project includes Playwright tests for authentication, Information UT, Student Verification, Forum Diskusi, Grup Belajar, Matching/Connections, , Direct Messaging, and Notifications client flows. They use mocked Supabase HTTP responses, mocked Storage, and synthetic test records; they do not create accounts or read/write the live Supabase project.
+The project includes Playwright tests for authentication, Information UT, Student Verification, Forum Diskusi, Grup Belajar, Matching/Connections, Direct Messaging, and Notifications client flows. They use mocked Supabase HTTP responses, mocked Storage, and synthetic test records; they do not create accounts or read/write the live Supabase project.
 
 ```bash
 npm ci
