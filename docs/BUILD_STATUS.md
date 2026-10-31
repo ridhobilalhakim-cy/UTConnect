@@ -68,7 +68,7 @@ This environment could not independently resolve the public Netlify domain. The 
 
 ## Source-control caveats
 
-- The remote staging project has ten recorded migrations. The first five original SQL bodies and the student_verification_workflow SQL body still need reconstruction/review in repository source. Do not re-run them blindly against the live staging database.
+- The remote staging project has twelve recorded migrations. The first five original SQL bodies and the student_verification_workflow SQL body still need reconstruction/review in repository source. Do not re-run them blindly against the live staging database.
 - The registration Edge Function mirror in GitHub does not automatically deploy source edits to Supabase.
 - Never put the Supabase service-role key, secret keys, or NIM HMAC secret in browser code or public GitHub files.
 
@@ -176,7 +176,7 @@ Database and privacy boundary:
 
 Live staging counts after migration: 0 matching preferences, 0 profile-course links, 0 connections, 0 direct messages, and 0 matching search events. Four profiles exist, with one verified and three pending; all four current location records have radar visibility enabled, but only verified profiles are eligible for matching.
 
-The repository now defines 24 Playwright scenarios in total. Five new mocked tests cover the matching gate, preference save, privacy-limited search and connection request, incoming acceptance, and incoming rejection. Two further mocked tests cover opening an accepted chat, message history, read receipts, message sending, and pending-connection gating. Run #50 is the latest previously verified passing CI result and predates these latest changes; the 11 new group/matching/chat tests are not counted as passed until a current Actions result confirms them. Real-account flows and the latest Netlify deployment are still external acceptance checks.
+The repository now defines 26 Playwright scenarios in total. Five new mocked tests cover the matching gate, preference save, privacy-limited search and connection request, incoming acceptance, and incoming rejection. Two further mocked tests cover opening an accepted chat, message history, read receipts, message sending, and pending-connection gating. Two Notifications tests cover opening a direct-message notification and marking all notifications read. Run #50 is the latest previously verified passing CI result and predates these latest changes; the 13 new group/matching/chat/notification tests are not counted as passed until a current Actions result confirms them. Real-account flows and the latest Netlify deployment are still external acceptance checks.
 
 The Supabase security advisor intentionally flags the three new SECURITY DEFINER functions because authenticated users can execute them. Their function bodies validate the authenticated caller and constrain results/actions to that caller. The private search-event table has RLS enabled and no public table privileges. The advisor also reports leaked-password protection disabled; this is a separate Auth configuration item.
 
