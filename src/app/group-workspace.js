@@ -378,7 +378,7 @@ function renderMembers(container) {
   container.querySelectorAll("[data-group-member-decision]").forEach(button => button.addEventListener("click", async () => {
     button.disabled = true;
     try {
-      await respondGroupJoinRequest(currentUserId, activeGroup.id, button.dataset.groupMemberId, button.dataset.groupMemberDecision === "approve");
+      await respondGroupJoinRequest(activeGroup.id, button.dataset.groupMemberId, button.dataset.groupMemberDecision === "approve");
       const refreshed = await refreshHandler();
       if (Array.isArray(refreshed)) groupMembers = refreshed.filter(member => member.group_id === activeGroup.id);
       toastHandler(button.dataset.groupMemberDecision === "approve" ? "Permohonan anggota disetujui." : "Permohonan anggota ditolak.");
