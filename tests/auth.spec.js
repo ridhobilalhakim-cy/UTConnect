@@ -1027,7 +1027,7 @@ test('verified student can open an accepted connection chat, read messages and s
   await expect(page.locator('#direct-chat-messages')).toContainText('Siap, aku akan bahas materi Sistem Operasi.');
   expect(state.directMessageSendCalls).toHaveLength(1);
   expect(state.directMessageSendCalls[0]).toEqual({
-    connection_id: 'connection-chat-001',
+    connection_id: '11111111-1111-4111-8111-111111111111',
     sender_id: USER.id,
     body: 'Siap, aku akan bahas materi Sistem Operasi.',
   });
@@ -1073,7 +1073,7 @@ test('verified student can open a direct-message notification and mark it read',
     }],
     directMessages: [{
       id: 'direct-message-notification-001',
-      connection_id: 'connection-notification-001',
+      connection_id: '22222222-2222-4222-8222-222222222222',
       sender_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       body: 'Ada waktu untuk diskusi?',
       created_at: '2026-10-30T11:00:00.000Z',
