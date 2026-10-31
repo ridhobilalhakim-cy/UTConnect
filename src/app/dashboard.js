@@ -23,6 +23,17 @@ import {
   deleteForumComment,
 } from "../services/forum.js";
 import {
+  listActiveMatchingCourses,
+  getMyMatchingPreferences,
+  getMyMatchingCourseIds,
+  saveMyMatchingPreferences,
+  replaceMyMatchingCourseIds,
+  findMatchingStudents,
+  listMyConnectionSummaries,
+  sendConnectionRequest,
+  respondConnectionRequest,
+} from "../services/matching.js";
+import {
   listActiveStudyCourses,
   listStudyGroups,
   listMyGroupMemberships,
@@ -36,7 +47,7 @@ export function initDashboard({ isAdmin = false, isVerified = false, verificatio
   window.L = L;
   const lucide = window.lucide;
 const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root.querySelectorAll(s)];
-  const state={page:'home',radius:3,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,center:[-6.9175,107.6191],connected:new Set(),pending:new Set(),messages:{},infoItems:[],forumPosts:[],forumCourses:[],groups:[],groupCourses:[],groupMemberships:new Map(),groupMembers:[]};
+  const state={page:'home',radius:3,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,center:[-6.9175,107.6191],messages:{},infoItems:[],forumPosts:[],forumCourses:[],groups:[],groupCourses:[],groupMemberships:new Map(),groupMembers:[],matchingCourses:[],matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredCourseIds:[],matchRadius:3000};
   const students=[
     {id:1,nim:'049100101',initial:'RA',name:'Rina Amelia',prodi:'Manajemen',distance:.55,courses:['Pengantar Manajemen','Statistika'],topics:['Manajemen waktu'],times:['Malam hari'],mode:'Online'},
     {id:2,nim:'049100102',initial:'DP',name:'Dimas Prakoso',prodi:'Sistem Informasi',distance:1.2,courses:['Algoritma & Pemrograman','Sistem Operasi'],topics:['Struktur data','Perulangan'],times:['Akhir pekan','Malam hari'],mode:'Online'},
@@ -51,7 +62,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   ];
   function toast(message){const el=$('#toast');el.textContent=message;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),2500)}
   function icons(){if(window.lucide)lucide.createIcons()}
-  function navigate(page){state.page=page;$$('.page-section').forEach(s=>s.classList.toggle('active',s.id==='page-'+page));$$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));const labels={home:'Beranda',matching:'Matching',forum:'Forum',groups:'Grup Belajar',info:'Informasi UT',profile:'Profil Saya',verification:'Verifikasi Mahasiswa'};$('#crumb-current').textContent=labels[page]||'Beranda';window.scrollTo({top:0,behavior:'smooth'});if(page==='home'&&state.map)setTimeout(()=>state.map.invalidateSize(),80);if(page==='verification')loadVerification();if(page==='forum')loadForum();if(page==='groups')loadGroups();icons()}
+  function navigate(page){state.page=page;$$('.page-section').forEach(s=>s.classList.toggle('active',s.id==='page-'+page));$$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));const labels={home:'Beranda',matching:'Matching',forum:'Forum',groups:'Grup Belajar',info:'Informasi UT',profile:'Profil Saya',verification:'Verifikasi Mahasiswa'};$('#crumb-current').textContent=labels[page]||'Beranda';window.scrollTo({top:0,behavior:'smooth'});if(page==='home'&&state.map)setTimeout(()=>state.map.invalidateSize(),80);if(page==='verification')loadVerification();if(page==='forum')loadForum();if(page==='groups')loadGroups();if(page==='matching')loadMatching();icons()}
   $$('[data-page]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));$$('[data-go]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.go)));
   function visibleStudents(){return students.filter(s=>s.distance<=state.radius&&(!state.search||s.nim.includes(state.search)))}
   function renderNearby(){const list=$('#nearby-list');const items=visibleStudents().slice(0,5);list.innerHTML=items.length?items.map(s=>`<div class="person-row"><div class="person-avatar">${s.initial}</div><div class="person-meta"><strong>${state.connected.has(s.id)?escapeText(s.name):`Mahasiswa ${s.initial}`}</strong><span>${s.prodi}</span></div><span class="distance">~${Math.round(s.distance*10)/10} km</span></div>`).join(''):`<div class="empty-state"><div class="empty-icon"><i data-lucide="user-search"></i></div><h3>Belum ada hasil</h3><p>Tidak ditemukan mahasiswa dalam radius atau pencarian yang dipilih.</p></div>`;icons()}
@@ -59,8 +70,295 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   function renderMapMarkers(){if(!state.map)return;state.markers.forEach(m=>state.map.removeLayer(m));state.markers=[];visibleStudents().forEach((s,i)=>{const bearing=(s.id*137.5)*Math.PI/180;const latOffset=(Math.cos(bearing)*s.distance)/111.32;const lngOffset=(Math.sin(bearing)*s.distance)/(111.32*Math.cos(state.center[0]*Math.PI/180));const marker=L.marker([state.center[0]+latOffset,state.center[1]+lngOffset],{icon:L.divIcon({className:'',html:`<div class="map-marker"><span>${s.initial}</span></div>`,iconSize:[31,31],iconAnchor:[15,15]})}).addTo(state.map).bindPopup(`<b>${s.initial}</b><br><small>${s.prodi} · sekitar ${s.distance.toFixed(1)} km</small>`);state.markers.push(marker)});if(state.circle)state.circle.setRadius(state.radius*1000);$('#map-result').textContent=`Menampilkan ${visibleStudents().length} mahasiswa dalam radius ${state.radius} km · data simulasi.`;renderNearby()}
   $$('[data-radius]').forEach(b=>b.addEventListener('click',()=>{state.radius=Number(b.dataset.radius);$$('[data-radius]').forEach(x=>x.classList.toggle('active',x===b));renderMapMarkers()}));
   $('#nim-search').addEventListener('input',e=>{state.search=e.target.value.replace(/\D/g,'').slice(0,9);$('#clear-search').style.display=state.search?'inline-flex':'none';renderMapMarkers();if(state.search.length===9){const found=visibleStudents().find(s=>s.nim===state.search);if(found){toast(`Mahasiswa ditemukan: ${found.initial}`);if(state.map){const bearing=(found.id*137.5)*Math.PI/180;const latOffset=(Math.cos(bearing)*found.distance)/111.32;const lngOffset=(Math.sin(bearing)*found.distance)/(111.32*Math.cos(state.center[0]*Math.PI/180));state.map.setView([state.center[0]+latOffset,state.center[1]+lngOffset],16);if(state.markers[0])state.markers[0].openPopup()}}else toast(`NIM tidak ditemukan dalam radius ${state.radius} km`)} });$('#clear-search').addEventListener('click',()=>{$('#nim-search').value='';state.search='';$('#clear-search').style.display='none';renderMapMarkers()});$('#locate-btn').addEventListener('click',()=>toast('Lokasi demo digunakan. GPS belum diaktifkan pada prototype ini.'));
-  function renderMatches(){const course=$('#filter-course').value,topic=$('#filter-topic').value,time=$('#filter-time').value,mode=$('#filter-mode').value;const filtered=students.filter(s=>(!course||s.courses.includes(course))&&(!topic||s.topics.includes(topic))&&(!time||s.times.includes(time))&&(!mode||s.mode===mode));$('#match-count').textContent=`${filtered.length} rekomendasi berdasarkan preferensi · data simulasi`;$('#match-results').innerHTML=filtered.length?filtered.map(s=>`<article class="surface match-card"><div class="match-top"><div class="person-avatar">${s.initial}</div><div class="person-meta"><strong>${state.connected.has(s.id)?escapeText(s.name):`Mahasiswa ${s.initial}`}</strong><span>${s.prodi} · sekitar ${s.distance.toFixed(1)} km</span></div><span class="match-score">${s.courses.includes(course)&&course?'Cocok':'Relevan'}</span></div><div class="match-tags">${s.courses.map(c=>`<span class="tag">${c}</span>`).join('')}${s.topics.map(t=>`<span class="tag">${t}</span>`).join('')}</div><div class="match-card-foot"><span class="tiny muted">${s.mode} · ${s.times.join(', ')}</span>${state.connected.has(s.id)?`<button class="btn btn-primary btn-sm" data-chat="${s.id}"><i data-lucide="message-circle"></i>Chat</button>`:state.pending?.has(s.id)?`<div style="display:flex;align-items:center;gap:6px"><span class="tiny muted">Menunggu</span><button class="btn btn-secondary btn-sm" data-accept="${s.id}">Simulasikan diterima</button></div>`:`<button class="btn btn-primary btn-sm" data-connect="${s.id}">Connect</button>`}</div></article>`).join(''):`<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon"><i data-lucide="users"></i></div><h3>Belum ada rekomendasi yang sesuai</h3><p>Coba ubah preferensi mata kuliah, topik, atau waktu belajar.</p></div>`;$$('[data-connect]').forEach(b=>b.addEventListener('click',()=>{const id=Number(b.dataset.connect);state.pending.add(id);renderMatches();toast('Permintaan connect dicatat di sesi demo.')}));$$('[data-accept]').forEach(b=>b.addEventListener('click',()=>{const id=Number(b.dataset.accept);state.pending.delete(id);state.connected.add(id);renderMatches();toast('Koneksi demo disetujui. Tombol chat sekarang aktif.')}));$$('[data-chat]').forEach(b=>b.addEventListener('click',()=>openChat(Number(b.dataset.chat))));icons()}
-  $('#apply-match').addEventListener('click',renderMatches);$('#reset-match').addEventListener('click',()=>{$$('#page-matching select').forEach(s=>s.value='');renderMatches()});
+    function renderMatchingAccess() {
+    const notice = $("#match-access-notice");
+    const layout = $("#match-layout");
+    if (!notice || !layout) return;
+    if (!isVerified) {
+      notice.hidden = false;
+      notice.innerHTML = `
+        <div class="group-access-content">
+          <div class="group-access-icon"><i data-lucide="shield-check"></i></div>
+          <div><strong>Verifikasi mahasiswa diperlukan</strong><p>Matching dan permintaan koneksi hanya tersedia untuk akun mahasiswa UT yang sudah terverifikasi.</p><button type="button" class="link-btn" id="matching-verification-link">Buka halaman verifikasi</button></div>
+        </div>`;
+      layout.hidden = true;
+      $("#matching-verification-link")?.addEventListener("click", () => navigate("verification"));
+    } else {
+      notice.hidden = true;
+      notice.innerHTML = "";
+      layout.hidden = false;
+    }
+    icons();
+  }
+
+  function populateMatchingCourses(courses) {
+    const courseFilter = $("#filter-course");
+    const preferredCourses = $("#preferred-courses");
+    const filterValue = courseFilter?.value || "";
+    if (courseFilter) {
+      courseFilter.innerHTML = '<option value="">Semua mata kuliah</option>' + courses.map(course =>
+        `<option value="${escapeText(course.course_name)}">${escapeText(course.course_name)}${course.course_code ? ` · ${escapeText(course.course_code)}` : ""}</option>`
+      ).join("");
+      courseFilter.value = filterValue;
+    }
+    if (preferredCourses) {
+      preferredCourses.innerHTML = courses.map(course =>
+        `<option value="${escapeText(course.id)}">${escapeText(course.course_code ? `${course.course_code} · ${course.course_name}` : course.course_name)}</option>`
+      ).join("");
+      [...preferredCourses.options].forEach(option => {
+        option.selected = state.preferredCourseIds.includes(option.value);
+      });
+      preferredCourses.disabled = courses.length === 0;
+    }
+    const note = $("#matching-course-note");
+    if (note) note.hidden = courses.length > 0;
+  }
+
+  function splitPreferenceTags(value, label) {
+    const items = [...new Set(String(value || "").split(",").map(item => item.trim()).filter(Boolean))];
+    if (items.length > 12) throw new Error(`${label} maksimal 12 item.`);
+    if (items.some(item => item.length > 60)) throw new Error(`Setiap ${label.toLowerCase()} maksimal 60 karakter.`);
+    return items;
+  }
+
+  function renderMatchingPreferences() {
+    const preferences = state.matchingPreferences || {};
+    $("#preference-topics").value = (preferences.topic_tags || []).join(", ");
+    $("#preference-interests").value = (preferences.interests || []).join(", ");
+    const preferredTimes = new Set(preferences.study_times || []);
+    [...$("#preference-study-times").options].forEach(option => {
+      option.selected = preferredTimes.has(option.value);
+    });
+    [...$("#preferred-courses").options].forEach(option => {
+      option.selected = state.preferredCourseIds.includes(option.value);
+    });
+  }
+
+  function matchingDistance(meters) {
+    const distance = Number(meters);
+    if (!Number.isFinite(distance)) return "Jarak perkiraan";
+    if (distance < 1000) return `sekitar ${Math.max(100, Math.round(distance / 100) * 100)} m`;
+    const km = Math.round(distance / 500) / 2;
+    return `sekitar ${km.toLocaleString("id-ID", { maximumFractionDigits: 1 })} km`;
+  }
+
+  function getConnectionFor(studentId) {
+    return state.connectionSummaries.find(item => item.other_student_id === studentId) || null;
+  }
+
+  function renderConnectionPanel() {
+    const panel = $("#connection-panel");
+    const list = $("#connection-list");
+    if (!panel || !list) return;
+    const rows = state.connectionSummaries;
+    panel.hidden = rows.length === 0;
+    $("#connection-count").textContent = String(rows.length);
+    if (!rows.length) {
+      list.innerHTML = "";
+      return;
+    }
+    list.innerHTML = rows.map(connection => {
+      const identity = `Mahasiswa UT · ${escapeText(connection.initials || "UT")}`;
+      const incoming = connection.is_incoming && connection.status === "pending";
+      const labels = {
+        pending: connection.is_incoming ? "Permintaan masuk" : "Menunggu jawaban",
+        accepted: "Terhubung",
+        rejected: "Permintaan ditolak",
+        blocked: "Tidak tersedia",
+      };
+      const actions = incoming
+        ? `<div class="connection-actions"><button type="button" class="btn btn-primary btn-sm" data-connection-accept="${escapeText(connection.connection_id)}">Terima</button><button type="button" class="btn btn-secondary btn-sm" data-connection-reject="${escapeText(connection.connection_id)}">Tolak</button></div>`
+        : `<span class="connection-state">${escapeText(labels[connection.status] || "Status koneksi")}</span>`;
+      return `
+        <article class="connection-row">
+          <div class="person-avatar">${escapeText(connection.initials || "UT")}</div>
+          <div class="connection-person"><strong>${identity}</strong><span>${escapeText(connection.program || "Program studi tidak tersedia")}</span><small>${escapeText(forumDate(connection.created_at))}</small></div>
+          ${actions}
+        </article>`;
+    }).join("");
+    $$("[data-connection-accept]").forEach(button => button.addEventListener("click", () => confirmConnectionResponse(button.dataset.connectionAccept, true)));
+    $$("[data-connection-reject]").forEach(button => button.addEventListener("click", () => confirmConnectionResponse(button.dataset.connectionReject, false)));
+  }
+
+  function renderMatches() {
+    const course = $("#filter-course").value;
+    const topic = $("#filter-topic").value.trim().toLowerCase();
+    const time = $("#filter-time").value;
+    const filtered = state.matchCandidates.filter(student => {
+      const courses = student.course_names || [];
+      const topics = student.topic_tags || [];
+      const interests = student.interests || [];
+      const times = student.study_times || [];
+      const searchable = [...courses, ...topics, ...interests].join(" ").toLowerCase();
+      return (!course || courses.includes(course))
+        && (!topic || searchable.includes(topic))
+        && (!time || times.includes(time));
+    });
+
+    $("#match-count").textContent = `${filtered.length} mahasiswa dalam radius ${Number(state.matchRadius) / 1000} km · data Supabase`;
+    $("#match-results").innerHTML = filtered.length ? filtered.map(student => {
+      const connection = getConnectionFor(student.student_id);
+      const tags = [
+        ...(student.course_names || []),
+        ...(student.topic_tags || []),
+        ...(student.interests || []),
+      ];
+      let action = `<button type="button" class="btn btn-primary btn-sm" data-connect="${escapeText(student.student_id)}">Connect</button>`;
+      let label = "Belum terhubung";
+      if (connection?.status === "accepted") {
+        action = '<span class="connection-state">Terhubung</span>';
+        label = "Koneksi aktif";
+      } else if (connection?.status === "pending") {
+        action = '<span class="connection-state">Menunggu jawaban</span>';
+        label = connection.is_incoming ? "Permintaan masuk" : "Permintaan terkirim";
+      } else if (connection?.status === "rejected") {
+        action = '<span class="connection-state">Permintaan ditolak</span>';
+        label = "Permintaan sebelumnya ditolak";
+      }
+      return `
+        <article class="surface match-card">
+          <div class="match-top">
+            <div class="person-avatar">${escapeText(student.initials || "UT")}</div>
+            <div class="person-meta"><strong>Mahasiswa UT · ${escapeText(student.initials || "UT")}</strong><span>${escapeText(student.program || "Program studi tidak tersedia")} · ${escapeText(matchingDistance(student.approx_distance_m))}</span></div>
+            <span class="match-score">Relevan</span>
+          </div>
+          <div class="match-tags">${tags.length ? tags.map(tag => `<span class="tag">${escapeText(tag)}</span>`).join("") : '<span class="tiny muted">Belum mengisi topik atau mata kuliah.</span>'}</div>
+          <div class="match-card-foot"><span class="tiny muted">${escapeText((student.study_times || []).join(", ") || label)}</span>${action}</div>
+        </article>`;
+    }).join("") : '<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon"><i data-lucide="users"></i></div><h3>Belum ada rekomendasi yang sesuai</h3><p>Belum ada mahasiswa terverifikasi yang memenuhi radius, persetujuan radar, dan filter yang dipilih. Coba ubah radius atau preferensi.</p></div>';
+
+    $$("[data-connect]").forEach(button => button.addEventListener("click", () => createConnection(button.dataset.connect, button)));
+    icons();
+  }
+
+  async function loadConnectionSummaries() {
+    try {
+      state.connectionSummaries = await listMyConnectionSummaries();
+      renderConnectionPanel();
+      renderMatches();
+    } catch (error) {
+      console.error("Connection summary load failed:", error);
+      $("#connection-panel").hidden = true;
+    }
+  }
+
+  async function searchMatchingStudents({ showLoading = true } = {}) {
+    if (!isVerified) return;
+    state.matchRadius = Number($("#match-radius").value || 3000);
+    if (showLoading) $("#match-results").innerHTML = '<div class="verification-loading">Mencari mahasiswa terverifikasi di area sekitar...</div>';
+    try {
+      state.matchCandidates = await findMatchingStudents(state.matchRadius);
+      renderMatches();
+    } catch (error) {
+      console.error("Matching search failed:", error);
+      $("#match-results").innerHTML = `<div class="empty-state"><div class="empty-icon"><i data-lucide="alert-circle"></i></div><h3>Matching belum dapat dimuat</h3><p>${escapeText(error?.message || "Periksa koneksi lalu coba kembali.")}</p><button type="button" class="btn btn-secondary btn-sm" id="matching-retry">Coba lagi</button></div>`;
+      $("#matching-retry")?.addEventListener("click", () => searchMatchingStudents());
+      icons();
+    }
+  }
+
+  async function loadMatching({ showLoading = true } = {}) {
+    renderMatchingAccess();
+    if (!isVerified) {
+      state.matchCandidates = [];
+      state.connectionSummaries = [];
+      $("#match-results").innerHTML = "";
+      $("#connection-panel").hidden = true;
+      return;
+    }
+    if (showLoading) $("#match-results").innerHTML = '<div class="verification-loading">Memuat preferensi dan koneksi...</div>';
+    try {
+      const [courses, preferences, preferredCourseIds, connections] = await Promise.all([
+        listActiveMatchingCourses(),
+        getMyMatchingPreferences(currentUserId),
+        getMyMatchingCourseIds(currentUserId),
+        listMyConnectionSummaries(),
+      ]);
+      state.matchingCourses = courses;
+      state.matchingPreferences = preferences;
+      state.preferredCourseIds = preferredCourseIds;
+      state.connectionSummaries = connections;
+      populateMatchingCourses(courses);
+      renderMatchingPreferences();
+      renderConnectionPanel();
+      await searchMatchingStudents({ showLoading: false });
+    } catch (error) {
+      console.error("Matching load failed:", error);
+      $("#match-results").innerHTML = `<div class="empty-state"><div class="empty-icon"><i data-lucide="alert-circle"></i></div><h3>Matching belum dapat dimuat</h3><p>${escapeText(error?.message || "Periksa koneksi lalu coba kembali.")}</p><button type="button" class="btn btn-secondary btn-sm" id="matching-load-retry">Coba lagi</button></div>`;
+      $("#matching-load-retry")?.addEventListener("click", () => loadMatching());
+      icons();
+    }
+  }
+
+  async function saveMatchingPreferences() {
+    if (!isVerified) { toast("Verifikasi mahasiswa diperlukan untuk menyimpan preferensi."); return; }
+    const button = $("#save-matching-preferences");
+    button.disabled = true;
+    button.textContent = "Menyimpan...";
+    try {
+      const topicTags = splitPreferenceTags($("#preference-topics").value, "Topik");
+      const interests = splitPreferenceTags($("#preference-interests").value, "Minat");
+      const studyTimes = [...$("#preference-study-times").selectedOptions].map(option => option.value);
+      const courseIds = [...$("#preferred-courses").selectedOptions].map(option => option.value);
+      await saveMyMatchingPreferences({ topicTags, interests, studyTimes });
+      await replaceMyMatchingCourseIds(courseIds);
+      state.matchingPreferences = { topic_tags: topicTags, interests, study_times: studyTimes };
+      state.preferredCourseIds = courseIds;
+      renderMatchingPreferences();
+      toast("Preferensi belajar berhasil disimpan.");
+      await searchMatchingStudents({ showLoading: false });
+    } catch (error) {
+      console.error("Matching preference save failed:", error);
+      toast(error?.message || "Preferensi belum berhasil disimpan.");
+    } finally {
+      button.disabled = false;
+      button.innerHTML = '<i data-lucide="save"></i>Simpan preferensi';
+      icons();
+    }
+  }
+
+  async function createConnection(studentId, button) {
+    if (!isVerified) { toast("Verifikasi mahasiswa diperlukan untuk mengirim koneksi."); return; }
+    if (button) { button.disabled = true; button.textContent = "Mengirim..."; }
+    try {
+      await sendConnectionRequest(studentId);
+      await loadConnectionSummaries();
+      toast("Permintaan koneksi berhasil dikirim.");
+    } catch (error) {
+      console.error("Connection request failed:", error);
+      toast(error?.message || "Permintaan koneksi gagal. Periksa apakah pengguna masih tersedia.");
+      if (button) { button.disabled = false; button.textContent = "Coba lagi"; }
+    }
+  }
+
+  function confirmConnectionResponse(connectionId, accept) {
+    const label = accept ? "Terima" : "Tolak";
+    openModal(
+      `${label} permintaan koneksi?`,
+      `<p class="section-note">${accept ? "Mahasiswa tersebut akan masuk ke daftar koneksi kamu." : "Permintaan koneksi ini akan ditolak."} Keputusan hanya dapat dilakukan oleh penerima permintaan.</p>`,
+      label,
+      async () => {
+        await respondConnectionRequest(connectionId, accept);
+        await loadConnectionSummaries();
+        return true;
+      },
+      accept ? "Permintaan koneksi diterima." : "Permintaan koneksi ditolak."
+    );
+  }
+
+  $("#save-matching-preferences").addEventListener("click", saveMatchingPreferences);
+  $("#apply-match").addEventListener("click", () => searchMatchingStudents());
+  $("#match-radius").addEventListener("change", () => searchMatchingStudents());
+  $("#refresh-matches").addEventListener("click", () => loadMatching({ showLoading: false }));
+  $("#filter-topic").addEventListener("input", renderMatches);
+  $("#filter-course").addEventListener("change", renderMatches);
+  $("#filter-time").addEventListener("change", renderMatches);
+  $("#reset-match").addEventListener("click", () => {
+    $("#filter-course").value = "";
+    $("#filter-topic").value = "";
+    $("#filter-time").value = "";
+    renderMatches();
+  });
 
   const FORUM_POST_TYPES = { need_help: "Butuh bantuan", can_help: "Bisa membantu", discussion: "Diskusi umum" };
   function forumDate(value) {
@@ -793,5 +1091,5 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   function closeModal(){$('#modal-backdrop').classList.remove('open');if(activeVerificationPreviewUrl){URL.revokeObjectURL(activeVerificationPreviewUrl);activeVerificationPreviewUrl=null}}
   const guide=`<div style="display:grid;gap:14px"><div><b style="font-size:11px">01 · Lengkapi profil</b><p class="section-note">Daftar dengan data akademik yang diperlukan. Verifikasi identitas harus dilakukan melalui layanan yang sah pada versi produksi.</p></div><div><b style="font-size:11px">02 · Atur lokasi secara sadar</b><p class="section-note">Pilih lokasi perkiraan dan tentukan apakah ingin tampil di radar. Jangan tampilkan alamat rumah atau koordinat presisi kepada pengguna lain.</p></div><div><b style="font-size:11px">03 · Temukan teman belajar</b><p class="section-note">Gunakan radius dan preferensi mata kuliah untuk melihat rekomendasi yang relevan.</p></div><div><b style="font-size:11px">04 · Bangun koneksi</b><p class="section-note">Kirim permintaan connect. Chat hanya tersedia setelah kedua pihak menyetujui koneksi.</p></div><div><b style="font-size:11px">05 · Belajar bersama</b><p class="section-note">Gunakan forum untuk peer help atau bergabung dan membuat kelompok belajar.</p></div><p class="tiny muted" style="padding:10px;background:#f7f9fc;border-radius:9px">Catatan: halaman ini adalah prototype UI/UX dengan data simulasi. Integrasi akun, lokasi aman, koneksi, dan chat multi-user belum tersedia.</p></div>`;
   $$('[data-open-guide]').forEach(b=>b.addEventListener('click',()=>openModal('Panduan UT Connect',guide)));$('#modal-close').addEventListener('click',closeModal);$('#modal-cancel').addEventListener('click',closeModal);$('#modal-confirm').addEventListener('click',async()=>{if(modalAction){const confirmButton=$('#modal-confirm');confirmButton.disabled=true;try{const result=await modalAction();if(result===false)return;modalAction=null;closeModal();toast(modalSuccessMessage)}catch(error){console.error('Modal action failed:',error);toast(error.message||'Tindakan gagal. Silakan coba lagi.')}finally{confirmButton.disabled=false}return}closeModal();toast('Panduan ditutup.')});$('#modal-backdrop').addEventListener('click',e=>{if(e.target.id==='modal-backdrop')closeModal()});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});$('#notif-btn').addEventListener('click',()=>toast('Belum ada notifikasi baru.'));$('#edit-profile').addEventListener('click',()=>openModal('Edit profil',`<p class="section-note">Form edit profil ditampilkan sebagai rancangan UI. Penyimpanan dan verifikasi perubahan belum terhubung ke backend.</p><div class="field"><label>Nama tampilan</label><input class="text-input" value="Andi Bintang"></div><div class="field"><label>Program studi</label><input class="text-input" value="Sistem Informasi" disabled></div><div class="field"><label>Preferensi belajar</label><select class="select"><option>Online · Malam hari</option><option>Online · Akhir pekan</option><option>Offline</option></select></div>`,`Tutup`));
-  renderNearby();renderMatches();loadForum();loadGroups();loadInformation();loadVerification();initMap();icons();
+  renderNearby();loadForum();loadGroups();loadInformation();loadVerification();initMap();icons();
 }
