@@ -357,9 +357,9 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
           ${actions}
         </article>`;
     }).join("");
-    $("[data-connection-accept]").forEach(button => button.addEventListener("click", () => confirmConnectionResponse(button.dataset.connectionAccept, true)));
-    $("[data-connection-reject]").forEach(button => button.addEventListener("click", () => confirmConnectionResponse(button.dataset.connectionReject, false)));
-    $("[data-chat-open]").forEach(button => button.addEventListener("click", () => openDirectChat(button.dataset.chatOpen)));
+    $$("[data-connection-accept]").forEach(button => button.addEventListener("click", () => confirmConnectionResponse(button.dataset.connectionAccept, true)));
+    $$("[data-connection-reject]").forEach(button => button.addEventListener("click", () => confirmConnectionResponse(button.dataset.connectionReject, false)));
+    $$("[data-chat-open]").forEach(button => button.addEventListener("click", () => openDirectChat(button.dataset.chatOpen)));
   }
 
   function renderMatches() {
