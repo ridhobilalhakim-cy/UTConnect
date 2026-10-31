@@ -174,7 +174,7 @@ export async function listGroupMaterials(groupId) {
   return Promise.all(rows.map(async material => {
     const { data: signed, error: signedError } = await supabase
       .storage.from(GROUP_MATERIAL_BUCKET)
-      .createSignedUrl(material.storage_path, 90);
+      .createSignedUrl(material.storage_path, 600);
     return {
       ...material,
       download_url: signedError ? null : signed?.signedUrl || null,
@@ -217,7 +217,7 @@ export async function uploadGroupMaterial(groupId, file, title = "") {
   }
   const { data: signed } = await supabase.storage
     .from(GROUP_MATERIAL_BUCKET)
-    .createSignedUrl(storagePath, 90);
+    .createSignedUrl(storagePath, 600);
   return { ...data, download_url: signed?.signedUrl || null };
 }
 
