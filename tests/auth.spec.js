@@ -26,8 +26,8 @@ function jsonResponse(body, status = 200) {
   return { status, contentType: 'application/json', body: JSON.stringify(body) };
 }
 
-async function mockSupabase(page) {
-  const state = { loginCalls: 0, recoveryCalls: 0, passwordUpdates: 0, logoutCalls: 0 };
+async function mockSupabase(page, { isAdmin = false, informationPosts = [] } = {}) {
+  const state = { loginCalls: 0, recoveryCalls: 0, passwordUpdates: 0, logoutCalls: 0, informationPosts: [...informationPosts], informationCreateCalls: 0 };
   for (const pattern of [
     /^https:\/\/fonts\.googleapis\.com\//,
     /^https:\/\/fonts\.gstatic\.com\//,
@@ -67,6 +67,31 @@ async function mockSupabase(page) {
     if (path.endsWith('/auth/v1/logout') && method === 'POST') {
       state.logoutCalls += 1;
       return route.fulfill({ status: 204, body: '' });
+    }
+    if (path.endsWith('/rest/v1/rpc/is_current_user_admin') && method === 'POST') {
+      return route.fulfill(jsonResponse(isAdmin));
+    }
+    if (path.endsWith('/rest/v1/information_posts')) {
+      if (method === 'GET') return route.fulfill(jsonResponse(state.informationPosts));
+      if (method === 'POST') {
+        const input = request.postDataJSON();
+        const created = { id: 'info-e2e-001', author_id: USER.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), ...input };
+        state.informationCreateCalls += 1;
+        state.informationPosts.unshift(created);
+        return route.fulfill(jsonResponse(created, 201));
+      }
+      if (method === 'PATCH') {
+        const id = url.searchParams.get('id')?.replace(/^eq\\./, '');
+        const input = request.postDataJSON();
+        const index = state.informationPosts.findIndex(item => item.id === id);
+        if (index >= 0) state.informationPosts[index] = { ...state.informationPosts[index], ...input };
+        return route.fulfill(jsonResponse(state.informationPosts[index] || {}, 200));
+      }
+      if (method === 'DELETE') {
+        const id = url.searchParams.get('id')?.replace(/^eq\\./, '');
+        state.informationPosts = state.informationPosts.filter(item => item.id !== id);
+        return route.fulfill(jsonResponse({ id }, 200));
+      }
     }
     if (path.endsWith('/rest/v1/profiles') && method === 'GET') {
       return route.fulfill(jsonResponse([PROFILE]));
@@ -165,4 +190,55 @@ test('password recovery validates confirmation and updates the password', async 
   await expect(page.locator('#alertBox')).toContainText('Password berhasil diperbarui');
   expect(state.passwordUpdates).toBe(1);
   expect(state.logoutCalls).toBe(1);
+});
+
+test('administrator can publish an Information UT post through Supabase', async ({ page }) => {
+  const state = await mockSupabase(page, { isAdmin: true });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await expect(page).toHaveURL(/\\/app\\.html$/);
+  await expect(page.locator('#topUserMeta')).toHaveText('Administrator UT Connect');
+  await page.locator('[data-page="info"]').first().click();
+  await expect(page.locator('#share-info')).toBeVisible();
+  await page.locator('#share-info').click();
+
+  await page.locator('#info-title-input').fill('Jadwal Webinar UT');
+  await page.locator('#info-category-input').selectOption('seminar');
+  await page.locator('#info-body-input').fill('Webinar terbuka untuk mahasiswa Universitas Terbuka.');
+  await page.locator('#info-source-input').fill('https://ut.ac.id');
+  await page.locator('#modal-confirm').click();
+
+  await expect(page.locator('.info-card h3')).toHaveText('Jadwal Webinar UT');
+  expect(state.informationCreateCalls).toBe(1);
+  expect(state.informationPosts[0].is_published).toBe(true);
+});
+
+test('ordinary student can read public Information UT without admin controls', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    informationPosts: [{
+      id: 'info-public-001',
+      author_id: 'another-user',
+      category: 'academic',
+      audience: 'public',
+      title: 'Kalender Akademik',
+      body: 'Informasi kalender akademik untuk mahasiswa.',
+      source_url: null,
+      is_published: true,
+      published_at: '2026-10-01T00:00:00.000Z',
+      created_at: '2026-10-01T00:00:00.000Z',
+      updated_at: '2026-10-01T00:00:00.000Z',
+    }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="info"]').first().click();
+  await expect(page.locator('.info-card h3')).toHaveText('Kalender Akademik');
+  await expect(page.locator('#share-info')).toBeHidden();
+  expect(state.informationPosts).toHaveLength(1);
 });
