@@ -49,6 +49,19 @@ export const UT_FACULTY_PROGRAMS = Object.freeze({
 
 export const UT_FACULTIES = Object.freeze(Object.keys(UT_FACULTY_PROGRAMS));
 
+const UT_PROGRAM_ALIASES = Object.freeze({
+  "Ilmu Administrasi Negara": "Ilmu Administrasi Publik",
+  "Ilmu Administrasi Bisnis": "Administrasi Bisnis",
+  "Ilmu Hukum": "Hukum",
+  "Ilmu Perpustakaan": "Perpustakaan dan Sains Informasi",
+  "Ilmu dan Teknologi Pangan": "Teknologi Pangan",
+  "Pendidikan Bahasa Indonesia & Sastra Indonesia": "Pendidikan Bahasa dan Sastra Indonesia",
+  "Pendidikan Bahasa Indonesia dan Sastra Indonesia": "Pendidikan Bahasa dan Sastra Indonesia",
+  "Pendidikan Guru Sekolah Dasar": "Pendidikan Guru Sekolah Dasar (PGSD)",
+  "Pendidikan Guru Pendidikan Anak Usia Dini": "Pendidikan Guru Pendidikan Anak Usia Dini (PGPAUD)",
+  "Pendidikan Agama Islam": "Pendidikan Agama Islam (PAI)",
+});
+
 const UT_FACULTY_ALIASES = Object.freeze({
   FEB: "Fakultas Ekonomi dan Bisnis (FEB)",
   FKIP: "Fakultas Keguruan dan Ilmu Pendidikan (FKIP)",
@@ -66,14 +79,21 @@ export function resolveUTFaculty(value) {
   return UT_FACULTY_ALIASES[raw.toUpperCase()] || "";
 }
 
+export function resolveUTProgram(faculty, value) {
+  const normalizedFaculty = resolveUTFaculty(faculty);
+  const raw = String(value || "").trim();
+  const candidate = UT_PROGRAM_ALIASES[raw] || raw;
+  return UT_FACULTY_PROGRAMS[normalizedFaculty]?.includes(candidate) ? candidate : "";
+}
+
 export function isOfficialUTProgramme(faculty, program) {
-  return Boolean(UT_FACULTY_PROGRAMS[resolveUTFaculty(faculty)]?.includes(program));
+  return Boolean(resolveUTProgram(faculty, program));
 }
 
 export function populateUTFacultyProgramSelects(facultySelect, programSelect, options = {}) {
   if (!facultySelect || !programSelect) return;
   const selectedFaculty = resolveUTFaculty(options.faculty);
-  const selectedProgram = options.program || "";
+  const selectedProgram = resolveUTProgram(selectedFaculty, options.program);
   facultySelect.innerHTML = '<option value="">Pilih fakultas</option>' +
     UT_FACULTIES.map(name => `<option value="${name.replaceAll('"', '&quot;')}">${name}</option>`).join("");
   facultySelect.value = selectedFaculty;
@@ -84,7 +104,7 @@ export function populateUTFacultyProgramSelects(facultySelect, programSelect, op
     programSelect.innerHTML = '<option value="">Pilih program studi</option>' +
       programmes.map(name => `<option value="${name.replaceAll('"', '&quot;')}">${name}</option>`).join("");
     programSelect.disabled = programmes.length === 0;
-    programSelect.value = programmes.includes(preferred) ? preferred : "";
+    programSelect.value = resolveUTProgram(faculty, preferred);
   };
 
   updatePrograms(selectedProgram);
