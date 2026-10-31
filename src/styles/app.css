@@ -277,3 +277,57 @@
 .map-nearby-row .distance{white-space:nowrap}
 .map-nearby-empty{font-size:9px;line-height:1.65;color:var(--muted);padding:16px 12px;border:1px dashed #d9e3ee;border-radius:11px;background:#fbfdff}
 @media(max-width:900px){.map-privacy-controls{grid-template-columns:1fr}}
+
+/* Study group workspace */
+.group-invitation-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px;border:1px solid #e4ebf2;border-radius:12px;background:#fbfdff;margin-bottom:10px}
+.group-invitation-row strong{display:block;font-size:11px;color:var(--ink)}
+.group-invitation-row p{font-size:9px;color:var(--muted);margin:4px 0;line-height:1.5}
+.group-invitation-row small{font-size:8px;color:var(--muted)}
+.group-workspace-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 13px;border:1px solid var(--line);border-radius:11px;background:#fbfcfe}
+.group-workspace-summary strong{font-size:12px}
+.group-workspace-summary p{font-size:9px;color:var(--muted);margin:4px 0 0}
+.group-workspace-role{font-size:9px;font-weight:750;padding:6px 8px;border-radius:8px;background:#eef3f8;color:#53677d;white-space:nowrap}
+.group-workspace-tabs{display:flex;gap:6px;overflow-x:auto;margin:13px 0;border-bottom:1px solid var(--line);padding-bottom:8px}
+.group-workspace-tab{border:0;background:transparent;border-radius:8px;padding:8px 11px;color:#65758a;font-size:10px;font-weight:750;white-space:nowrap;cursor:pointer}
+.group-workspace-tab.active{background:#eaf1f8;color:var(--ut-blue)}
+.group-chat-note{font-size:9px;line-height:1.6;color:var(--muted);margin:0 0 10px}
+.group-message-list{display:flex;flex-direction:column;gap:8px;max-height:320px;overflow:auto;padding:4px 2px 12px}
+.group-message{max-width:88%;align-self:flex-start;padding:10px 12px;border:1px solid #e8eef4;border-radius:11px;background:#fbfdff}
+.group-message.own{align-self:flex-end;background:#eef5fb;border-color:#dce8f3}
+.group-message.pinned{border-color:#dfc77f}
+.group-message-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.group-message-meta strong{font-size:9px;color:var(--ut-blue)}
+.group-message-meta time{font-size:8px;color:var(--muted)}
+.group-message-meta button{font-size:8px;border:0;background:transparent;color:#63758a;text-decoration:underline;cursor:pointer}
+.group-message p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:10px;line-height:1.6;margin:7px 0 0;color:var(--ink)}
+.group-pinned-label{display:inline-block;font-size:8px;color:#856600;background:#fff5d8;border-radius:5px;padding:3px 5px;margin-top:6px}
+.group-message-form{display:flex;gap:8px;align-items:flex-end;padding-top:10px;border-top:1px solid var(--line)}
+.group-message-form textarea{flex:1;min-width:0;resize:vertical;border:1px solid var(--line);border-radius:9px;padding:10px;font:inherit;font-size:10px}
+.group-empty{padding:18px 12px;text-align:center;border:1px dashed #d8e2ec;border-radius:10px;color:var(--muted);font-size:9px;line-height:1.6}
+.group-material-form,.group-agenda-form,.group-invite-form{padding:12px;border:1px solid var(--line);border-radius:11px;background:#fbfcfe;margin-bottom:14px}
+.group-material-form .field,.group-agenda-form .field,.group-invite-form .field{margin-bottom:10px}
+.group-material-form input[type=file]{width:100%;font:inherit;font-size:10px;color:var(--muted)}
+.group-material-list,.group-agenda-list{display:grid;gap:8px}
+.group-material-row{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid #edf1f5;border-radius:10px}
+.group-material-icon{width:32px;height:34px;display:grid;place-items:center;border-radius:8px;background:#eef3f8;color:var(--ut-blue);font-size:8px;font-weight:800}
+.group-material-info{flex:1;min-width:0}
+.group-material-info strong{display:block;font-size:10px;overflow-wrap:anywhere}
+.group-material-info span,.group-invite-row small{display:block;font-size:8px;color:var(--muted);margin-top:4px}
+.group-file-unavailable{font-size:8px;color:#9a6b00}
+.group-agenda-form h4,.group-invites-panel h4{font-size:11px;margin:0 0 10px}
+.group-agenda-form-actions{display:flex;gap:7px;flex-wrap:wrap}
+.group-agenda-card{border:1px solid #e9eef4;border-radius:10px;padding:12px}
+.group-agenda-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.group-agenda-type{font-size:8px;text-transform:uppercase;letter-spacing:.04em;color:var(--ut-blue);font-weight:800}
+.group-agenda-head time{font-size:8px;color:var(--muted)}
+.group-agenda-card h4{font-size:11px;margin:8px 0 5px}
+.group-agenda-card>p{font-size:9px;line-height:1.6;color:var(--muted);white-space:pre-wrap;margin:0}
+.group-agenda-actions{display:flex;gap:7px;margin-top:10px}
+.group-poll-options{display:grid;gap:9px;margin-top:10px}
+.group-poll-option>div:first-child{display:flex;justify-content:space-between;gap:8px;font-size:9px}
+.group-poll-option>div:first-child strong{font-variant-numeric:tabular-nums}
+.group-poll-track{height:5px;background:#edf1f5;border-radius:6px;overflow:hidden;margin:5px 0}
+.group-poll-track span{display:block;height:100%;background:#5d88af;border-radius:6px}
+.group-poll-total{font-size:8px;color:var(--muted);margin:2px 0}
+.group-invite-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+@media(max-width:600px){.group-invitation-row{align-items:flex-start;flex-direction:column}.group-material-row{flex-wrap:wrap}.group-message{max-width:96%}}

@@ -8,7 +8,7 @@ Project status at inspection: ACTIVE_HEALTHY
 
 ## Remote migration history
 
-The connected staging project reported these fourteen applied migration entries:
+The connected staging project reported these twenty-one applied migration entries:
 
 | Version | Name |
 |---|---|
@@ -26,6 +26,13 @@ The connected staging project reported these fourteen applied migration entries:
 | 20261031111603 | secure_notifications_workflow |
 | 20261031121632 | home_map_location_workflow |
 | 20261031121933 | home_map_hidden_viewer_search |
+| 20261031124333 | group_workspace_workflows |
+| 20261031124407 | group_invite_inbox_limit |
+| 20261031133930 | group_workspace_realtime_and_invite_notifications |
+| 20261031134014 | group_members_realtime |
+| 20261031134443 | group_poll_realtime_touch |
+| 20261031135852 | group_membership_verification_guard |
+| 20261031140523 | group_materials_verified_delete_guard |
 
 Live introspection found the public application tables with RLS enabled, plus private NIM search and student-verification tables. PostGIS is enabled. The deployed `complete-student-registration` Edge Function was last confirmed as ACTIVE version 4 with JWT verification enabled.
 
@@ -74,18 +81,21 @@ Latest live introspection returned four rows in `profiles` and four rows in `use
 
 ## Grup Belajar state (checked 2026-10-31)
 
-- The group schema already existed in staging: `public.study_groups`, `public.group_members`, `public.group_invites`, `public.group_messages`, `public.group_agenda_items`, and `public.group_materials`. All group tables inspected in this audit have RLS enabled.
-- `study_groups` SELECT is limited to verified students and hides private groups from users who are neither active members nor invitees. INSERT requires a verified caller and `created_by = auth.uid()`. Group update/delete policies require an active admin/co-admin.
-- `group_members` has authenticated SELECT only; direct INSERT/UPDATE/DELETE is not granted to authenticated. Membership creation and approval are done through the database RPCs.
-- Trigger `trg_add_group_creator_as_admin` automatically inserts the creator as an active admin when a group is created.
-- Migration `20261031101336_secure_enable_group_join_workflow_rpcs` is applied. It hardens `join_study_group` and `respond_group_join_request` with `auth.uid() = p_actor_id` validation and grants EXECUTE to authenticated/service_role while revoking PUBLIC/anon.
-- Supabase advisors intentionally report a SECURITY DEFINER execution warning for these two RPCs because signed-in verified students need to call them. The actor check, group verification/capacity logic, and admin-role check remain in the function bodies; this warning is not evidence that anonymous callers can execute them.
-- Access modes are `open`, `approval`, and `private`; modes are `online` and `offline`; member statuses are `pending`, `active`, `rejected`, and `left`. The first two access modes are available in group creation UI; private invite management is not yet included.
-- Active course count is 0, so users may create general groups without associating a course.
-- Live counts after implementation: 0 study groups, 0 group members, 0 group invites, and 0 active courses. No test rows were created in the live database.
-- Four new Playwright test scenarios were added for unverified gating, verified group creation, approval-based join requests, and admin approval. The current repository defines 17 tests total; these four are not marked passing until CI confirms the latest commit.
-- Real-account group creation/join/approval and current Netlify deployment remain external acceptance tests.
-
+- The group schema already existed in staging: `public.study_groups`, `public.group_members`, `public.group_invites`, `public.group_messages`, `public.group_agenda_items`, and `public.group_materials`. RLS is enabled on these tables.
+- Verified students can discover eligible groups, create groups, join open groups, request approval, and receive admin decisions. The creator becomes the initial active admin through the existing database trigger.
+- The Group workspace is now integrated in the dashboard with tabs for **Chat grup**, **Materi**, **Agenda**, and (for private groups) **Undangan**. Group admins additionally see the **Anggota** tab to approve/reject pending join requests. The old details-only modal is replaced by this workspace.
+- Chat reads/sends through `group_messages`. Active group membership is required by RLS; admin pin/unpin uses `set_group_message_pin`, which checks `auth.uid() = p_actor_id` and active admin/co-admin membership.
+- Group materials use the existing private `group-materials` bucket (50 MB limit; PDF, DOC, DOCX, PPTX, XLSX, JPG, PNG). Metadata is written to `group_materials`; active members can receive short-lived signed download URLs. Upload/read/delete remain protected by Storage and table RLS policies.
+- Agenda supports `schedule`, `target`, `task`, `poll`, and `note`. Active members can create agenda entries. Creator/admin RLS policies govern update/delete. Poll choices are validated to 2–6 unique options; votes are stored in `group_agenda_votes` with one vote per user and aggregate-only results are returned through actor-checked RPCs.
+- Private invitation flow uses JWT-verified Edge Function `manage-group-invites` v1. The server validates the session, HMACs submitted NIM, resolves only verified profiles, and calls actor-checked invitation RPCs. The invitee UUID is not returned to the browser. Admin NIM lookup is limited to five per minute. Invitees see an owner-scoped invitation inbox and can accept or decline.
+- Private invitations create a database notification of type `group_invite`. The dashboard notification opens the Groups page where the invitee can respond.
+- Realtime publication includes `group_messages`, `group_materials`, `group_agenda_items`, `group_invites`, `group_members`, and `notifications`. Realtime callbacks are scoped by group ID and remain subject to each table's RLS SELECT policy. Poll vote changes touch the agenda row so aggregate counts refresh for other active members.
+- Security migrations applied: `20261031124333_group_workspace_workflows`, `20261031124407_group_invite_inbox_limit`, `20261031133930_group_workspace_realtime_and_invite_notifications`, `20261031134014_group_members_realtime`, and `20261031134443_group_poll_realtime_touch`. The RPCs are SECURITY DEFINER but validate the signed-in actor; no direct authenticated writes to `group_members` or poll vote table are granted.
+- Migration `20261031135852_group_membership_verification_guard` updates the central RLS membership/admin helpers to require the account to remain currently verified; group contents and admin actions stop working if verification is revoked. It also hardens membership decisions, poll RPCs, invite inbox, and message pinning.
+- Migration `20261031140523_group_materials_verified_delete_guard` also requires current verified active group membership to delete a material, including for its uploader. Admin/co-admin deletion remains scoped to active verified group admins.\n- The Storage bucket remains private with a 50 MiB file limit and three Storage policies. The current group schema has no active course rows, so users can create general groups.
+- Live staging counts remain 0 study groups, 0 group members, 0 group invites, and 0 active courses. No group test records were retained in Supabase.
+- The repository now defines 35 Playwright scenarios, including five group workspace tests for chat/pin, material upload, poll creation/voting, private invite by NIM, and invite acceptance. They use mocked Supabase/Storage responses; CI for the latest PR commit is still pending. Mocked browser tests do not replace live two-account acceptance.
+- Outstanding real-account checks: two verified synthetic accounts to verify cross-account chat, signed file access, poll Realtime updates, invite notification delivery, member approval and private-invite acceptance. Netlify production deployment is still unconfirmed.
 
 ## Matching & Connections state (checked 2026-10-31)
 

@@ -48,6 +48,24 @@ import {
   createStudyGroup,
   joinStudyGroup,
   respondGroupJoinRequest,
+  listGroupMessages,
+  sendGroupMessage,
+  setGroupMessagePinned,
+  subscribeToGroupMessages,
+  unsubscribeFromGroupMessages,
+  listGroupMaterials,
+  uploadGroupMaterial,
+  deleteGroupMaterial,
+  listGroupAgendaItems,
+  createGroupAgendaItem,
+  updateGroupAgendaItem,
+  deleteGroupAgendaItem,
+  getGroupPollResults,
+  castGroupPollVote,
+  listMyGroupInvitations,
+  listGroupInvites,
+  inviteGroupMemberByNim,
+  cancelGroupInvite,
 } from "../services/groups.js";
 import {
   listMyNotifications,
@@ -55,6 +73,10 @@ import {
   markAllMyNotificationsRead,
   subscribeToMyNotifications,
 } from "../services/notifications.js";
+import {
+  openGroupWorkspace,
+  closeGroupWorkspace,
+} from "./group-workspace.js";
 import {
   getMyLocation,
   saveMyLocation,
@@ -66,7 +88,7 @@ export function initDashboard({ isAdmin = false, isVerified = false, verificatio
   window.L = L;
   const lucide = window.lucide;
 const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root.querySelectorAll(s)];
-  const state={page:'home',radius:3000,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,myMarker:null,center:null,myLocation:null,nearbyStudents:[],homeMapRequestId:0,connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumCourses:[],groups:[],groupCourses:[],groupMemberships:new Map(),groupMembers:[],matchingCourses:[],matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredCourseIds:[],matchRadius:3000};
+  const state={page:'home',radius:3000,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,myMarker:null,center:null,myLocation:null,nearbyStudents:[],homeMapRequestId:0,connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumCourses:[],groups:[],groupCourses:[],groupMemberships:new Map(),groupMembers:[],groupInvitations:[],activeGroupChannel:null,activeGroupId:null,groupWorkspace:{messages:[],materials:[],agenda:[],invites:[],pollResults:{}},matchingCourses:[],matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredCourseIds:[],matchRadius:3000};
   const NOTIFICATION_META = {
     connection_request: { icon: "user-plus", page: "matching" },
     connection_accepted: { icon: "user-check", page: "matching" },
@@ -76,6 +98,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     group_join_request: { icon: "users-round", page: "groups" },
     group_join_approved: { icon: "check-circle-2", page: "groups" },
     group_join_rejected: { icon: "users-round", page: "groups" },
+    group_invite: { icon: "mail-plus", page: "groups" },
   };
 
   function notificationDate(value) {
@@ -1120,7 +1143,11 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       return matchesMode && matchesSearch;
     });
 
-    $("#group-list").innerHTML = filtered.map(group => {
+    const invitationHtml = state.groupInvitations.map(invite =>
+      '<article class="surface group-invitation-row"><div><strong>' + escapeText(invite.group_name) + '</strong><p>' + escapeText(invite.group_description || "Undangan kelompok belajar privat.") + '</p><small>Dikirim ' + escapeText(groupDate(invite.invited_at)) + '</small></div>' +
+      '<div class="group-request-actions"><button class="btn btn-primary btn-sm" data-group-invite-accept="' + escapeText(invite.group_id) + '">Terima</button><button class="btn btn-secondary btn-sm" data-group-invite-decline="' + escapeText(invite.invite_id) + '">Tolak</button></div></article>'
+    ).join("");
+    $("#group-list").innerHTML = invitationHtml + (filtered.map(group => {
       const courseName = group.course?.course_name || "Kelompok umum";
       const membership = state.groupMemberships.get(group.id);
       const isActiveMember = membership?.status === "active";
@@ -1167,8 +1194,10 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
           <div class="group-sub">${capacityText}</div>
           <div class="group-foot"><span class="tiny group-pending-count">${pendingCount ? `${pendingCount} permohonan masuk` : ""}</span>${action}</div>
         </article>`;
-    }).join("") || '<div class="empty-state" style="grid-column:1/-1"><h3>Belum ada kelompok belajar</h3><p>Buat kelompok baru atau coba kata kunci dan filter lain.</p></div>';
+    }).join("") || '<div class="empty-state" style="grid-column:1/-1"><h3>Belum ada kelompok belajar</h3><p>Buat kelompok baru atau coba kata kunci dan filter lain.</p></div>');
 
+    $$("[data-group-invite-accept]").forEach(button => button.addEventListener("click", () => acceptGroupInvitation(button.dataset.groupInviteAccept)));
+    $$("[data-group-invite-decline]").forEach(button => button.addEventListener("click", () => declineGroupInvitation(button.dataset.groupInviteDecline)));
     $$("[data-group-join]").forEach(button => button.addEventListener("click", () => requestGroupJoin(button.dataset.groupJoin, button)));
     $$("[data-group-open]").forEach(button => button.addEventListener("click", () => openGroupDetails(button.dataset.groupOpen)));
     icons();
@@ -1181,22 +1210,26 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       state.groupCourses = [];
       state.groupMemberships = new Map();
       state.groupMembers = [];
+      state.groupInvitations = [];
       $("#group-list").innerHTML = "";
       return;
     }
 
     if (showLoading) $("#group-list").innerHTML = '<div class="verification-loading">Memuat grup belajar...</div>';
     try {
-      const [groups, courses, memberships] = await Promise.all([
+      const [groups, courses, memberships, invitations] = await Promise.all([
         listStudyGroups(),
         listActiveStudyCourses(),
         listMyGroupMemberships(currentUserId),
+        listMyGroupInvitations(),
       ]);
       state.groups = groups;
       state.groupCourses = courses;
       state.groupMemberships = new Map(memberships.map(item => [item.group_id, item]));
       state.groupMembers = await listVisibleGroupMembers(groups.map(group => group.id));
+      state.groupInvitations = invitations;
       renderGroups();
+      return state.groupMembers;
     } catch (error) {
       console.error("Study group load failed:", error);
       $("#group-list").innerHTML = `<div class="empty-state"><div class="empty-icon"><i data-lucide="alert-circle"></i></div><h3>Grup belajar belum dapat dimuat</h3><p>${escapeText(error?.message || "Periksa koneksi lalu coba kembali.")}</p><button class="btn btn-secondary btn-sm" id="group-retry">Coba lagi</button></div>`;
@@ -1220,6 +1253,29 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     }
   }
 
+  async function acceptGroupInvitation(groupId) {
+    if (!isVerified) { toast("Verifikasi mahasiswa diperlukan untuk menerima undangan."); return; }
+    try {
+      const status = await joinStudyGroup(groupId);
+      if (status !== "active") throw new Error("Undangan belum dapat diterima. Periksa kembali status grup.");
+      await loadGroups({ showLoading: false });
+      toast("Undangan diterima. Kamu sekarang menjadi anggota kelompok.");
+      openGroupDetails(groupId);
+    } catch (error) {
+      toast(error?.message || "Undangan belum berhasil diterima.");
+    }
+  }
+
+  async function declineGroupInvitation(inviteId) {
+    try {
+      await cancelGroupInvite(inviteId);
+      await loadGroups({ showLoading: false });
+      toast("Undangan kelompok ditolak.");
+    } catch (error) {
+      toast(error?.message || "Undangan belum berhasil ditolak.");
+    }
+  }
+
   function groupDate(value) {
     if (!value) return "-";
     const date = new Date(value);
@@ -1233,31 +1289,19 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     if (!group) return;
     const membership = state.groupMemberships.get(group.id);
     if (membership?.status !== "active") return;
-    const isManager = ["admin", "co_admin"].includes(membership.role);
-    const members = state.groupMembers.filter(item => item.group_id === group.id);
-    const activeMembers = members.filter(item => item.status === "active");
-    const pendingMembers = isManager ? members.filter(item => item.status === "pending") : [];
-    const courseName = group.course?.course_name || "Kelompok umum";
-    const location = group.mode === "online"
-      ? (group.online_url ? `<a href="${escapeText(group.online_url)}" target="_blank" rel="noopener noreferrer">Buka tautan pertemuan</a>` : "Tautan belum ditambahkan")
-      : escapeText(group.offline_area_label || "Lokasi belum ditentukan");
-    const pendingHtml = pendingMembers.length
-      ? pendingMembers.map((member, index) => `
-          <div class="group-request-row">
-            <div><strong>Permohonan #${index + 1}</strong><small>Dikirim ${escapeText(groupDate(member.created_at))} · Mahasiswa terverifikasi</small></div>
-            <div class="group-request-actions"><button type="button" class="btn btn-primary btn-sm" data-group-review="approve" data-group-user="${escapeText(member.user_id)}">Setujui</button><button type="button" class="btn btn-secondary btn-sm" data-group-review="reject" data-group-user="${escapeText(member.user_id)}">Tolak</button></div>
-          </div>`).join("")
-      : '<p class="section-note">Belum ada permohonan yang menunggu persetujuan.</p>';
-    const content = `
-      <div class="group-modal-details">
-        <div class="group-modal-meta"><span class="mode ${escapeText(group.mode)}">${group.mode === "online" ? "Online" : "Offline"}</span><span class="group-access-label">${escapeText(group.access_type === "approval" ? "Perlu persetujuan" : group.access_type === "private" ? "Undangan pribadi" : "Terbuka")}</span></div>
-        <p class="section-note">${escapeText(group.description || "Belum ada deskripsi kelompok.")}</p>
-        <div class="group-modal-facts"><div><span>Mata kuliah</span><strong>${escapeText(courseName)}</strong></div><div><span>Jadwal</span><strong>${escapeText(group.schedule_text || "Belum ditentukan")}</strong></div><div><span>Pertemuan</span><strong>${location}</strong></div><div><span>Anggota aktif</span><strong>${activeMembers.length} / ${group.capacity}</strong></div><div><span>Peran kamu</span><strong>${isManager ? "Admin grup" : "Anggota"}</strong></div></div>
-        ${isManager ? `<section class="group-requests"><h3>Permohonan bergabung (${pendingMembers.length})</h3>${pendingHtml}<p class="group-privacy-note">Nama anggota lain tidak ditampilkan karena pengaturan privasi profil.</p></section>` : ""}
-      </div>`;
-    openModal("Ruang kelompok belajar", content, "Tutup");
-    $$("[data-group-review]").forEach(button => button.addEventListener("click", () => confirmGroupJoinReview(group.id, button.dataset.groupUser, button.dataset.groupReview === "approve")));
-    icons();
+    openGroupWorkspace({
+      group,
+      membership,
+      members: state.groupMembers.filter(member => member.group_id === group.id),
+      currentUserId,
+      toast,
+      escape: escapeText,
+      openModal,
+      refresh: () => loadGroups({ showLoading: false }),
+    }).catch(error => {
+      console.error("Group workspace failed to open:", error);
+      toast(error?.message || "Ruang kelompok belum dapat dibuka.");
+    });
   }
 
   function confirmGroupJoinReview(groupId, userId, accept) {
@@ -1784,6 +1828,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   function escapeText(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   let modalAction=null,modalSuccessMessage='Perubahan diterapkan pada sesi demo.';function openModal(title,content,confirm='Mengerti',action=null,successMessage='Perubahan diterapkan pada sesi demo.'){ modalAction=action;modalSuccessMessage=successMessage;$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal-confirm').textContent=confirm;$('#modal-confirm').style.display='';$('#modal-confirm').disabled=false;$('#modal-cancel').textContent='Tutup';$('#modal-backdrop').classList.add('open'); }
   function closeModal(){
+    closeGroupWorkspace().catch(error => console.warn("Group workspace cleanup failed:", error));
     if(state.activeChatChannel){
       const channel=state.activeChatChannel;
       state.activeChatChannel=null;

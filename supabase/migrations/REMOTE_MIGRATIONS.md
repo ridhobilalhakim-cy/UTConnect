@@ -18,6 +18,13 @@ These migrations have been applied on Supabase project `hqyusbyndtlfypdbmatw` (S
 | 20261031111603 | secure_notifications_workflow |
 | 20261031121632 | home_map_location_workflow |
 | 20261031121933 | home_map_hidden_viewer_search |
+| 20261031124333 | group_workspace_workflows |
+| 20261031124407 | group_invite_inbox_limit |
+| 20261031133930 | group_workspace_realtime_and_invite_notifications |
+| 20261031134014 | group_members_realtime |
+| 20261031134443 | group_poll_realtime_touch |
+| 20261031135852 | group_membership_verification_guard |
+| 20261031140523 | group_materials_verified_delete_guard |
 
 The matching RPC SQL source is retained as `20261030232434_student_registration_profile_location_rpc_v1.sql`, but the file name timestamp is a local artifact name and not the remote migration version. Treat the remote migration history above as authoritative for the existing staging project.
 
@@ -39,3 +46,19 @@ The Notifications migration is retained as `20261031111603_secure_notifications_
 
 
 The Home Map migration 20261031121632 is retained as `20261031121632_home_map_location_workflow.sql`. It adds owner-scoped location management RPCs and a private per-user nearby-search rate-limit table. The follow-up 20261031121933 migration is retained as `20261031121933_home_map_hidden_viewer_search.sql`; it allows a student who has hidden their own radar pin to browse opted-in nearby students without making that student discoverable as a candidate. Location and nearby-search RPC execution is restricted to service_role and is mediated by the JWT-verified manage-my-location and nearby-students Edge Functions.
+
+
+The Group workspace migration set is retained in these source files:
+- `20261031124333_group_workspace_workflows.sql`: private one-vote-per-member poll storage/RPCs, server-validated private invitations, owner/admin cancellation, and actor-bound group-message pinning.
+- `20261031124407_group_invite_inbox_limit.sql`: private per-admin invitation lookup throttling and an invitee-only inbox RPC.
+- `20261031133930_group_workspace_realtime_and_invite_notifications.sql`: group invite notification trigger and Realtime publication for agenda, materials, and invitations.
+- `20261031134014_group_members_realtime.sql`: RLS-filtered membership update publication.
+- `20261031134443_group_poll_realtime_touch.sql`: updates the agenda row after poll votes so other group members receive refreshed aggregate poll results.
+
+The `manage-group-invites` Edge Function is deployed as version 1 with JWT verification. It HMACs NIM on the server, resolves only verified profiles, creates/cancels invitations through actor-checked RPCs, and returns no invitee UUID to the browser. The private `group-materials` Storage bucket remains non-public; active group membership and the existing object policies govern upload/read/delete, and the client uses short-lived signed download URLs.
+
+
+The final Group membership verification guard is retained as `20261031135852_group_membership_verification_guard.sql`. It makes active-member and admin helper checks require the current account to remain a verified student, and hardens the membership decision, poll, invitation inbox, pin, and invitation-cancellation RPCs so previously active membership does not preserve access after verification is revoked.
+
+
+The `20261031140523_group_materials_verified_delete_guard.sql` migration further tightens material deletion: both the metadata row and Storage object deletion now require current verified active group membership, even when the caller uploaded the file. Active group admins/co-admins may still delete any material in their group.
