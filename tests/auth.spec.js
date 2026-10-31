@@ -906,6 +906,34 @@ test('verified student sees real nearby map results from the secure endpoint', a
   expect(await page.locator('#nearby-list').innerText()).not.toContain('049');
 });
 
+test('pending student cannot search the nearby radar', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'pending' },
+    homeMapLocation: {
+      latitude: -6.9175,
+      longitude: 107.6191,
+      show_in_radar: true,
+      consented_at: '2026-10-31T10:00:00.000Z',
+    },
+    nearbyResults: [{
+      student_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      initials: 'DP',
+      program: 'Sistem Informasi',
+      approx_distance_m: 500,
+      marker_lat: -6.9168,
+      marker_lng: 107.6201,
+    }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await expect(page.locator('#map-result')).toContainText('tersedia setelah verifikasi');
+  expect(state.nearbyCalls).toHaveLength(0);
+  await expect(page.locator('#nearby-list')).not.toContainText('Mahasiswa DP');
+});
+
 test('verified student NIM search is sent only in the authenticated request body', async ({ page }) => {
   const state = await mockSupabase(page, {
     profile: { ...PROFILE, verification_status: 'verified' },
