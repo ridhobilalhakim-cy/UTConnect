@@ -833,7 +833,7 @@ test('group admin can approve a pending membership request', async ({ page }) =>
   await page.locator('[data-group-review="approve"]').click();
   await page.locator('#modal-confirm').click();
 
-  expect(state.groupReviewCalls).toHaveLength(1);
+  await expect.poll(() => state.groupReviewCalls.length).toBe(1);
   expect(state.groupReviewCalls[0].p_actor_id).toBe(USER.id);
   expect(state.groupReviewCalls[0].p_user_id).toBe('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
   expect(state.groupReviewCalls[0].p_accept).toBe(true);
@@ -950,8 +950,8 @@ test('verified student can accept an incoming connection request', async ({ page
   await page.locator('[data-connection-accept="connection-incoming-001"]').click();
   await page.locator('#modal-confirm').click();
 
-  await expect(page.locator('#connection-list')).toContainText('Terhubung');
-  expect(state.connectionResponseCalls).toHaveLength(1);
+  await expect(page.locator('[data-chat-open="connection-incoming-001"]')).toBeVisible();
+  await expect.poll(() => state.connectionResponseCalls.length).toBe(1);
   expect(state.connectionResponseCalls[0]).toEqual({
     p_connection_id: 'connection-incoming-001',
     p_accept: true,
@@ -991,7 +991,7 @@ test('verified student can open an accepted connection chat, read messages and s
   const state = await mockSupabase(page, {
     profile: { ...PROFILE, verification_status: 'verified' },
     connectionSummaries: [{
-      connection_id: 'connection-chat-001',
+      connection_id: '11111111-1111-4111-8111-111111111111',
       other_student_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       initials: 'RA',
       program: 'Manajemen',
@@ -1001,7 +1001,7 @@ test('verified student can open an accepted connection chat, read messages and s
     }],
     directMessages: [{
       id: 'direct-message-incoming-001',
-      connection_id: 'connection-chat-001',
+      connection_id: '11111111-1111-4111-8111-111111111111',
       sender_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       body: '<script>window.__chatInjected = true</script>Halo! Kita belajar bareng?',
       created_at: '2026-10-30T11:00:00.000Z',
@@ -1014,7 +1014,7 @@ test('verified student can open an accepted connection chat, read messages and s
   await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
 
   await page.locator('[data-page="matching"]').first().click();
-  await page.locator('[data-chat-open="connection-chat-001"]').click();
+  await page.locator('[data-chat-open="11111111-1111-4111-8111-111111111111"]').click();
 
   await expect(page.locator('#modal-backdrop')).toHaveClass(/open/);
   await expect(page.locator('#modal-title')).toContainText('Mahasiswa UT · RA');
@@ -1063,7 +1063,7 @@ test('verified student can open a direct-message notification and mark it read',
   const state = await mockSupabase(page, {
     profile: { ...PROFILE, verification_status: 'verified' },
     connectionSummaries: [{
-      connection_id: 'connection-notification-001',
+      connection_id: '22222222-2222-4222-8222-222222222222',
       other_student_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       initials: 'RA',
       program: 'Manajemen',
@@ -1085,7 +1085,7 @@ test('verified student can open a direct-message notification and mark it read',
       notification_type: 'direct_message',
       title: 'Pesan baru',
       body: 'Kamu menerima pesan baru dari koneksimu.',
-      reference_id: 'connection-notification-001',
+      reference_id: '22222222-2222-4222-8222-222222222222',
       read_at: null,
       created_at: '2026-10-30T11:00:00.000Z',
     }],
