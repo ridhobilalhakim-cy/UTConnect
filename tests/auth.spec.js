@@ -26,8 +26,8 @@ function jsonResponse(body, status = 200) {
   return { status, contentType: 'application/json', body: JSON.stringify(body) };
 }
 
-async function mockSupabase(page, { isAdmin = false, informationPosts = [] } = {}) {
-  const state = { loginCalls: 0, recoveryCalls: 0, passwordUpdates: 0, logoutCalls: 0, informationPosts: [...informationPosts], informationCreateCalls: 0 };
+async function mockSupabase(page, { isAdmin = false, informationPosts = [], verificationStatus = { profile_status: 'pending', latest_request: null }, verificationQueue = [] } = {}) {
+  const state = { loginCalls: 0, recoveryCalls: 0, passwordUpdates: 0, logoutCalls: 0, informationPosts: [...informationPosts], informationCreateCalls: 0, verificationStatus: structuredClone(verificationStatus), verificationQueue: [...verificationQueue], verificationUploadCalls: 0, verificationSubmitCalls: 0, verificationReviewCalls: [] };
   for (const pattern of [
     /^https:\/\/fonts\.googleapis\.com\//,
     /^https:\/\/fonts\.gstatic\.com\//,
@@ -71,6 +71,31 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [] } = {
     if (path.endsWith('/rest/v1/rpc/is_current_user_admin') && method === 'POST') {
       return route.fulfill(jsonResponse(isAdmin));
     }
+    if (path.endsWith('/rest/v1/rpc/get_my_student_verification_status') && method === 'POST') {
+      return route.fulfill(jsonResponse(state.verificationStatus));
+    }
+    if (path.endsWith('/rest/v1/rpc/admin_list_student_verification_queue') && method === 'POST') {
+      return route.fulfill(jsonResponse(state.verificationQueue));
+    }
+    if (path.endsWith('/rest/v1/rpc/submit_student_verification') && method === 'POST') {
+      const input = request.postDataJSON();
+      state.verificationSubmitCalls += 1;
+      state.verificationStatus = {
+        profile_status: 'pending',
+        latest_request: { id: 'verification-e2e-001', status: 'submitted', original_filename: input.p_original_filename, submitted_at: new Date().toISOString() },
+      };
+      return route.fulfill(jsonResponse({ success: true, request_id: 'verification-e2e-001', status: 'submitted' }));
+    }
+    if (path.endsWith('/rest/v1/rpc/admin_review_student_verification') && method === 'POST') {
+      const input = request.postDataJSON();
+      state.verificationReviewCalls.push(input);
+      state.verificationQueue = state.verificationQueue.filter(item => item.request_id !== input.p_request_id);
+      return route.fulfill(jsonResponse({ success: true, decision: input.p_decision }));
+    }
+    if (path.includes('/storage/v1/object/student-verification-evidence/') && method === 'POST') {
+      state.verificationUploadCalls += 1;
+      return route.fulfill(jsonResponse({ Key: 'student-verification-evidence/e2e-student-001/evidence.pdf' }));
+    }
     if (path.endsWith('/rest/v1/information_posts')) {
       if (method === 'GET') return route.fulfill(jsonResponse(state.informationPosts));
       if (method === 'POST') {
@@ -92,6 +117,9 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [] } = {
         state.informationPosts = state.informationPosts.filter(item => item.id !== id);
         return route.fulfill(jsonResponse({ id }, 200));
       }
+    }
+    if (path.includes('/storage/v1/object/student-verification-evidence/') && method === 'DELETE') {
+      return route.fulfill(jsonResponse({}));
     }
     if (path.endsWith('/rest/v1/profiles') && method === 'GET') {
       return route.fulfill(jsonResponse([PROFILE]));
@@ -259,4 +287,59 @@ test('ordinary student can read public Information UT without admin controls', a
   await expect(page.locator('.info-card h3')).toHaveText('Kalender Akademik');
   await expect(page.locator('#share-info')).toBeHidden();
   expect(state.informationPosts).toHaveLength(1);
+});
+
+
+test('student can submit private verification evidence and sees a pending review state', async ({ page }) => {
+  const state = await mockSupabase(page);
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="verification"]').first().click();
+  await expect(page.locator('#verification-status-panel')).toContainText('Belum terverifikasi');
+  await page.locator('#verification-file').setInputFiles({
+    name: 'KRS-semester-berjalan.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-1.4 sample'),
+  });
+  await page.locator('#verification-consent').check();
+  await page.getByRole('button', { name: 'Kirim untuk diverifikasi' }).click();
+
+  await expect(page.locator('#verification-submit-panel')).toContainText('Bukti sedang diperiksa');
+  expect(state.verificationUploadCalls).toBe(1);
+  expect(state.verificationSubmitCalls).toBe(1);
+});
+
+test('administrator can review a submitted student verification request', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    isAdmin: true,
+    verificationQueue: [{
+      request_id: 'verification-request-001',
+      user_id: 'another-student',
+      full_name: 'Mahasiswa Antrean',
+      faculty: 'Fakultas Sains dan Teknologi',
+      program: 'Sistem Informasi',
+      semester: 2,
+      original_filename: 'Bukti-Registrasi.pdf',
+      storage_path: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.pdf',
+      submitted_at: '2026-10-30T10:00:00.000Z',
+    }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="verification"]').first().click();
+  await expect(page.locator('#verification-admin-panel')).toBeVisible();
+  await expect(page.locator('#verification-queue')).toContainText('Mahasiswa Antrean');
+  await page.locator('[data-verification-approve="verification-request-001"]').click();
+  await page.locator('#modal-confirm').click();
+
+  await expect(page.locator('#verification-queue')).toContainText('Belum ada permohonan masuk');
+  expect(state.verificationReviewCalls).toHaveLength(1);
+  expect(state.verificationReviewCalls[0].p_decision).toBe('approved');
+  expect(state.verificationReviewCalls[0].p_request_id).toBe('verification-request-001');
 });
