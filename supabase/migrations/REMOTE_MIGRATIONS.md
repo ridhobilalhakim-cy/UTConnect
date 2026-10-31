@@ -16,6 +16,8 @@ These migrations have been applied on Supabase project `hqyusbyndtlfypdbmatw` (S
 | 20261031102733 | secure_matching_and_connection_workflows |
 | 20261031104922 | secure_direct_message_read_receipts |
 | 20261031111603 | secure_notifications_workflow |
+| 20261031121632 | home_map_location_workflow |
+| 20261031121933 | home_map_hidden_viewer_search |
 
 The matching RPC SQL source is retained as `20261030232434_student_registration_profile_location_rpc_v1.sql`, but the file name timestamp is a local artifact name and not the remote migration version. Treat the remote migration history above as authoritative for the existing staging project.
 
@@ -34,3 +36,6 @@ The Matching & Connections migration adds private search-event logging and guard
 The Direct Messaging security migration is retained as `20261031104922_secure_direct_message_read_receipts.sql`. It restricts direct-message SELECT/INSERT to participants of an accepted connection who both remain verified and are not mutually blocked. Authenticated users receive only column-level UPDATE permission on `read_at`; message body and sender identity are not updateable by the browser role.
 
 The Notifications migration is retained as `20261031111603_secure_notifications_workflow.sql`. It installs private trigger functions that create per-user notifications for connection requests/decisions, direct messages, forum comments on a user's own post, and group join requests/decisions. Authenticated users may read their own notifications and update only `read_at`; direct INSERT/DELETE and edits to notification content/ownership are not granted. The notifications table is added to `supabase_realtime`, with row ownership still enforced by RLS.
+
+
+The Home Map migration 20261031121632 is retained as `20261031121632_home_map_location_workflow.sql`. It adds owner-scoped location management RPCs and a private per-user nearby-search rate-limit table. The follow-up 20261031121933 migration is retained as `20261031121933_home_map_hidden_viewer_search.sql`; it allows a student who has hidden their own radar pin to browse opted-in nearby students without making that student discoverable as a candidate. Location and nearby-search RPC execution is restricted to service_role and is mediated by the JWT-verified manage-my-location and nearby-students Edge Functions.
