@@ -50,6 +50,7 @@
     <nav class="nav-list" aria-label="Navigasi utama">
       <button class="nav-item active" data-page="home"><i data-lucide="map-pinned"></i>Beranda</button>
       <button class="nav-item" data-page="matching"><i data-lucide="users"></i>Matching</button>
+      <button class="nav-item" data-page="messages"><i data-lucide="message-circle"></i>Pesan</button>
       <button class="nav-item" data-page="forum"><i data-lucide="messages-square"></i>Forum</button>
       <button class="nav-item" data-page="groups"><i data-lucide="users-round"></i>Grup Belajar</button>
       <button class="nav-item" data-page="info"><i data-lucide="megaphone"></i>Informasi UT</button>
@@ -133,6 +134,27 @@
         </div>
       </section>
 
+      <!-- PRIVATE DIRECT MESSAGE INBOX -->
+      <section class="page-section" id="page-messages">
+        <div class="page-head"><div><div class="eyebrow">Percakapan pribadi</div><h1 class="page-title">Pesan</h1><p class="page-subtitle">Semua percakapan dengan koneksi yang sudah diterima, tersusun dalam ruang chat tersendiri.</p></div></div>
+        <div class="match-access-notice surface" id="messages-access-notice" hidden></div>
+        <div class="message-inbox surface" id="message-inbox">
+          <aside class="message-room-sidebar">
+            <div class="message-room-sidebar-head"><strong>Chat kamu</strong><button type="button" class="btn btn-quiet btn-sm" id="messages-refresh" aria-label="Muat ulang percakapan"><i data-lucide="refresh-cw"></i></button></div>
+            <div class="message-room-list" id="message-room-list"><div class="verification-loading">Memuat percakapan...</div></div>
+          </aside>
+          <section class="message-room-panel" aria-label="Ruang percakapan">
+            <div class="message-room-placeholder" id="message-room-placeholder"><i data-lucide="messages-square"></i><strong>Pilih percakapan</strong><p>Pilih nama koneksi di sebelah kiri untuk membuka ruang chat pribadi.</p><button class="btn btn-secondary btn-sm" type="button" data-go="matching">Cari koneksi baru</button></div>
+            <div class="message-room-view" id="message-room-view" hidden>
+              <header class="message-room-header"><div class="person-avatar" id="message-room-avatar">UT</div><div><strong id="message-room-name">Koneksi UT</strong><small id="message-room-program"></small></div><span class="message-room-status" id="message-room-status">Memuat pesan...</span><button type="button" class="btn btn-quiet btn-sm" id="message-room-refresh">Muat ulang</button></header>
+              <div class="message-room-messages" id="message-room-messages" role="log" aria-live="polite"><div class="verification-loading">Memuat pesan...</div></div>
+              <form class="message-room-composer" id="message-room-form"><textarea id="message-room-input" rows="2" maxlength="5000" placeholder="Tulis pesan..." aria-label="Tulis pesan"></textarea><button type="submit" class="btn btn-primary" id="message-room-send"><i data-lucide="send"></i>Kirim</button></form>
+              <p class="direct-chat-note">Pesan hanya dapat dibaca oleh dua peserta koneksi yang telah menerima permintaan. Maksimal 5.000 karakter per pesan.</p>
+            </div>
+          </section>
+        </div>
+      </section>
+
       <!-- FORUM -->
       <section class="page-section" id="page-forum">
         <div class="page-head"><div><div class="eyebrow">Peer help</div><h1 class="page-title">Ruang diskusi mahasiswa</h1><p class="page-subtitle">Ajukan pertanyaan, berbagi pemahaman, dan bantu teman menyelesaikan tantangan belajar.</p></div><button class="btn btn-primary" id="new-post"><i data-lucide="plus"></i>Buat diskusi</button></div>
@@ -169,8 +191,8 @@
 
       <!-- PROFILE -->
       <section class="page-section" id="page-profile">
-        <div class="page-head"><div><div class="eyebrow">Ruang personal</div><h1 class="page-title">Profil saya</h1><p class="page-subtitle">Kelola informasi akademik dan preferensi belajar.</p></div><button class="btn btn-secondary" id="edit-profile"><i data-lucide="pencil"></i>Edit profil</button></div>
-        <div class="profile-grid"><div class="surface profile-card"><div class="profile-big" id="profileInitials">UT</div><h3 id="profileFullName">Mahasiswa UT</h3><p>Mahasiswa Universitas Terbuka</p><span class="tag" id="profileStatusTag" style="background:#fff3c2;color:#765400">Status: Pending</span></div><div class="surface profile-main"><h2 class="section-title">Informasi akademik</h2><div class="detail-row"><span>NIM</span><strong id="profileNimLabel">Tidak ditampilkan</strong></div><div class="detail-row"><span>Fakultas</span><strong id="profileFaculty">-</strong></div><div class="detail-row"><span>Program studi</span><strong id="profileProgram">-</strong></div><div class="detail-row"><span>Semester</span><strong id="profileSemester">-</strong></div><div class="detail-row"><span>Preferensi belajar</span><strong>Online · Malam hari</strong></div><div class="detail-row"><span>Visibilitas lokasi</span><strong style="color:#287b59">Tampil dengan jarak perkiraan</strong></div><div style="margin-top:16px;padding:12px;border-radius:11px;background:#f7f9fc;color:#718096;font-size:10px;line-height:1.7"><i data-lucide="shield-check" style="width:14px;height:14px;vertical-align:middle;color:#16845b"></i> Lokasi presisi dan informasi pribadi tidak ditampilkan pada profil publik. Pengaturan keamanan final memerlukan backend.</div></div></div>
+        <div class="page-head"><div><div class="eyebrow">Ruang personal</div><h1 class="page-title">Profil saya</h1><p class="page-subtitle">Kelola identitas akademik dan foto profil akunmu.</p></div><button class="btn btn-secondary" id="edit-profile"><i data-lucide="pencil"></i>Edit profil</button></div>
+        <div class="profile-grid"><div class="surface profile-card"><div class="profile-big" id="profileInitials">UT</div><h3 id="profileFullName">Mahasiswa UT</h3><p id="profileBio">Mahasiswa Universitas Terbuka</p><span class="tag" id="profileStatusTag" style="background:#eaf1f8;color:#003366">Status mahasiswa</span></div><div class="surface profile-main"><h2 class="section-title">Informasi akademik</h2><div class="detail-row"><span>NIM</span><strong id="profileNimLabel">Dilindungi</strong></div><div class="detail-row"><span>Fakultas</span><strong id="profileFaculty">-</strong></div><div class="detail-row"><span>Program studi</span><strong id="profileProgram">-</strong></div><div class="detail-row"><span>Semester</span><strong id="profileSemester">-</strong></div><div class="detail-row"><span>Foto profil</span><strong>Foto atau avatar</strong></div><div style="margin-top:16px;padding:12px;border-radius:11px;background:#f7f9fc;color:#718096;font-size:10px;line-height:1.7"><i data-lucide="shield-check" style="width:14px;height:14px;vertical-align:middle;color:#16845b"></i> NIM, lokasi presisi, dan bukti verifikasi tidak ditampilkan pada profil publik.</div></div></div>
       </section>
       
       <!-- STUDENT VERIFICATION -->
@@ -190,7 +212,7 @@
   </div>
 </div>
 
-<nav class="mobile-nav" aria-label="Navigasi mobile"><button class="active" data-page="home"><i data-lucide="map-pinned"></i><span>Beranda</span></button><button data-page="matching"><i data-lucide="users"></i><span>Matching</span></button><button data-page="forum"><i data-lucide="messages-square"></i><span>Forum</span></button><button data-page="groups"><i data-lucide="users-round"></i><span>Grup</span></button><button data-page="profile"><i data-lucide="user-round"></i><span>Profil</span></button><button data-page="verification"><i data-lucide="shield-check"></i><span>Verifikasi</span></button></nav>
+<nav class="mobile-nav" aria-label="Navigasi mobile"><button class="active" data-page="home"><i data-lucide="map-pinned"></i><span>Beranda</span></button><button data-page="matching"><i data-lucide="users"></i><span>Matching</span></button><button data-page="messages"><i data-lucide="message-circle"></i><span>Pesan</span></button><button data-page="forum"><i data-lucide="messages-square"></i><span>Forum</span></button><button data-page="groups"><i data-lucide="users-round"></i><span>Grup</span></button><button data-page="profile"><i data-lucide="user-round"></i><span>Profil</span></button><button data-page="verification"><i data-lucide="shield-check"></i><span>Verifikasi</span></button></nav>
 <button class="help-fab" data-open-guide><i data-lucide="circle-help"></i><span>Panduan</span></button>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
