@@ -377,6 +377,7 @@ export async function unsubscribeFromGroupMessages(channel) {
 
 export function subscribeToGroupWorkspace(groupId, handlers = {}) {
   if (!groupId) return null;
+  if (typeof window !== "undefined" && window.__UTCONNECT_DISABLE_REALTIME__) return null;
   const channel = supabase.channel(`group-workspace-${groupId}-${crypto.randomUUID()}`);
   const tables = [
     ["group_messages", handlers.onMessages],
