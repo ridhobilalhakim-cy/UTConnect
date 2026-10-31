@@ -24,6 +24,7 @@ These migrations have been applied on Supabase project `hqyusbyndtlfypdbmatw` (S
 | 20261031133930 | group_workspace_realtime_and_invite_notifications |
 | 20261031134014 | group_members_realtime |
 | 20261031134443 | group_poll_realtime_touch |
+| 20261031135852 | group_membership_verification_guard |
 
 The matching RPC SQL source is retained as `20261030232434_student_registration_profile_location_rpc_v1.sql`, but the file name timestamp is a local artifact name and not the remote migration version. Treat the remote migration history above as authoritative for the existing staging project.
 
@@ -58,3 +59,6 @@ The `manage-group-invites` Edge Function is deployed as version 1 with JWT verif
 
 
 The Group membership verification guard is retained as `20261031135852_group_membership_verification_guard.sql`. It updates the central active-member/admin RLS helpers so group access is granted only while the signed-in account is still verified, and hardens the related decision, poll, invite-inbox and message-pin RPCs against stale memberships after verification is revoked.
+
+
+The final Group membership verification guard is retained as `20261031135852_group_membership_verification_guard.sql`. It makes active-member and admin helper checks require the current account to remain a verified student, and hardens the membership decision, poll, invitation inbox, pin, and invitation-cancellation RPCs so previously active membership does not preserve access after verification is revoked.
