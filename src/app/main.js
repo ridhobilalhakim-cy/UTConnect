@@ -66,7 +66,7 @@ async function bootAuthenticatedApp() {
     supabase.auth.onAuthStateChange(event => { if (event === "SIGNED_OUT") window.location.replace("/"); });
 
     const guard = document.getElementById("authGuard"); if (guard) guard.remove();
-    initDashboard({ isAdmin });
+    initDashboard({ isAdmin, isVerified: profile.verification_status === "verified", verificationStatus: profile.verification_status || "pending", currentUserId: session.user.id, currentUserName: fullName });
   } catch (error) {
     guardError(error?.message || "Terjadi kendala saat memulihkan akun.");
   }
