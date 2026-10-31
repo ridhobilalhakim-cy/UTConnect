@@ -37,8 +37,8 @@ The live introspection returned one row in `profiles` and one in `user_locations
 
 - Login and registration page share one Supabase client module and storage key.
 - Dashboard is protected by session and profile lookup.
-- Information UT and Student Verification now call Supabase service modules; Student Verification provides evidence upload/status and an admin review queue.
-- Matching, chat, forum, groups, map markers, and notifications remain demo/simulated rather than live multi-user modules.
+- Information UT, Student Verification, and Forum Diskusi now call Supabase service modules. The forum supports verified-only posts and comments.
+- Matching, chat, groups, map markers, and notifications remain demo/simulated rather than live multi-user modules.
 - Google OAuth provider setup has not been verified end-to-end in this audit.
 - The live database uses NIM digest rather than displaying plaintext NIM. Do not expose real student NIM/location until registration and access-control tests have passed.
 
@@ -53,3 +53,14 @@ The live introspection returned one row in `profiles` and one in `user_locations
 - Authenticated role cannot directly UPDATE profiles.verification_status.
 - Counts at inspection: 3 profiles pending, 0 verified, 0 rejected; 0 submitted verification requests; 0 review events.
 - The UI now integrates these existing services. Actual browser upload/download with real accounts still needs acceptance testing. Evidence acceptance and retention rules remain a project policy decision.
+
+
+## Forum Diskusi state (checked 2026-10-31)
+
+- Forum data uses public.forum_posts and public.forum_comments. Both tables have RLS enabled.
+- SELECT and INSERT are restricted to verified users; inserts require author_id = auth.uid(). UPDATE and DELETE policies are scoped to the original author.
+- Active courses are readable but the catalogue currently contains 0 active courses. The forum therefore permits general discussions without a course link.
+- Latest table counts: 0 forum posts, 0 forum comments, 0 active courses.
+- Latest profile counts: 1 verified, 3 pending, 0 rejected. No forum or comment test data was inserted into Supabase.
+- Profile RLS limits profile reads to the current user, so the forum UI masks other students' names instead of querying private profile data.
+- The frontend forum module is covered by mocked Playwright tests; real-account browser acceptance is still outstanding.
