@@ -765,6 +765,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   }
 
   function renderMatches() {
+    const preferredPrograms = state.preferredPrograms || [];
     const selectedProgram = $("#filter-program").value;
     const topic = $("#filter-topic").value.trim().toLowerCase();
     const time = $("#filter-time").value;
@@ -774,7 +775,8 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       const interests = student.interests || [];
       const times = student.study_times || [];
       const searchable = [program, ...topics, ...interests].join(" ").toLowerCase();
-      return (!selectedProgram || program === selectedProgram)
+      return (!preferredPrograms.length || preferredPrograms.includes(program))
+        && (!selectedProgram || program === selectedProgram)
         && (!topic || searchable.includes(topic))
         && (!time || times.includes(time));
     });
