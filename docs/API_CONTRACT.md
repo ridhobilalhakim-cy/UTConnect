@@ -149,7 +149,7 @@ Invitation insert triggers a notification of type `group_invite` to the invitee.
 
 The `supabase_realtime` publication includes `group_messages`, `group_materials`, `group_agenda_items`, `group_invites`, and `group_members`. Subscriptions are filtered by group ID and remain subject to table RLS. Poll vote changes update the parent agenda row so active subscribers can reload aggregate counts. Notification Realtime remains filtered by the signed-in user's own ID.
 
-The `group-materials` Storage bucket is private. The frontend never constructs public object URLs; it requests short-lived signed URLs after a successful RLS-protected metadata read. Poll votes are stored in `group_agenda_votes`, which has RLS enabled and no direct authenticated table writes; actor-checked RPCs are the only user-facing interface.
+The `group-materials` Storage bucket is private. The frontend never constructs public object URLs; it requests short-lived signed URLs after a successful RLS-protected metadata read. Deleting a metadata row or Storage object requires current verified active group membership; uploaders may delete their own files while they remain active, and active admins/co-admins may delete any file in their group. Poll votes are stored in `group_agenda_votes`, which has RLS enabled and no direct authenticated table writes; actor-checked RPCs are the only user-facing interface.
 
 ## Forum and Informasi UT
 
