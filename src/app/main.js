@@ -1,6 +1,6 @@
 import { supabase } from "../lib/supabase.js";
 import { initDashboard } from "./dashboard.js";
-import { resolveUTFaculty } from "../data/ut-programs.js";
+import { resolveUTFaculty, resolveUTProgram } from "../data/ut-programs.js";
 function guardError(message) {
   const spinner = document.getElementById("authGuardSpinner");
   const title = document.getElementById("authGuardTitle");
@@ -58,7 +58,7 @@ async function bootAuthenticatedApp() {
     const profileStatus = document.getElementById("profileStatusTag"); if (profileStatus) profileStatus.textContent = isAdmin ? "Role: ADMINISTRATOR" : `Status: ${(profile.verification_status || "pending").toUpperCase()}`;
     const profileBio = document.getElementById("profileBio"); if (profileBio) profileBio.textContent = profile.bio || (isAdmin ? "Administrator UT Connect" : "Mahasiswa Universitas Terbuka");
     const profileFaculty = document.getElementById("profileFaculty"); if (profileFaculty) profileFaculty.textContent = resolveUTFaculty(profile.faculty) || profile.faculty || "-";
-    const profileProgram = document.getElementById("profileProgram"); if (profileProgram) profileProgram.textContent = profile.program || "-";
+    const profileProgram = document.getElementById("profileProgram"); if (profileProgram) profileProgram.textContent = resolveUTProgram(profile.faculty, profile.program) || profile.program || "-";
     const profileSemester = document.getElementById("profileSemester"); if (profileSemester) profileSemester.textContent = profile.semester || "-";
     const profileNim = document.getElementById("profileNimLabel"); if (profileNim) profileNim.textContent = "Dilindungi (digest)";
     const welcome = document.querySelector("#page-home .page-title"); if (welcome) welcome.textContent = `Selamat datang, ${fullName} 👋`;
