@@ -84,7 +84,7 @@ import {
   setMyLocationVisibility,
   findNearbyStudents,
 } from "../services/home-map.js";
-import { listMyChatRooms, updateMyStudentProfile, uploadMyProfileAvatar, getProfileAvatarUrl } from "../services/profile.js";
+import { listMyChatRooms, updateMyStudentProfile, uploadMyProfileAvatar, setMyProfileAvatarPreset, getProfileAvatarUrl } from "../services/profile.js";
 import { populateUTFacultyProgramSelects } from "../data/ut-programs.js";
 
 export function initDashboard({ isAdmin = false, isVerified = false, verificationStatus = "pending", currentUserId = null, currentUserName = "Mahasiswa UT", currentProfile = {} } = {}) {
