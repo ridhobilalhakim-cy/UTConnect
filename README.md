@@ -14,7 +14,7 @@ This is the official consolidated source tree for the current UT Connect staging
 
 - `src/auth/main.js`: email/password, Google OAuth entry, password reset, registration profile form, map pin selection, and session restore.
 - `src/app/main.js`: protected route, session and profile check, profile header hydration, logout.
-- `src/app/dashboard.js`: existing V2.2 dashboard UI interactions remain **DEMO/SIMULATED** until each feature is replaced by backend service modules. Do not present them as live multi-user capabilities.
+- `src/app/dashboard.js`: Information UT and Student Verification now use Supabase services. Matching, chat, forum, groups, map markers, notifications, and several other V2.2 interactions remain **DEMO/SIMULATED**.
 - `src/lib/supabase.js`: the single browser client and storage key shared by both pages. Only the Supabase publishable key belongs here.
 - `supabase/functions/complete-student-registration/index.ts`: source mirror of deployed function v4; editing the repository file does not automatically deploy the function to Supabase.
 
@@ -52,23 +52,25 @@ After deployment, set Supabase Auth Site URL and Redirect URLs to the actual HTT
 2. The administrator role is stored in the non-exposed `private.app_user_roles` table. Three team accounts have been assigned the `admin` role; role lookup is performed server-side and normal users cannot edit role assignments.
 3. **Information UT is connected to Supabase.** The feed is loaded from `public.information_posts`; the three administrator accounts can create, edit, publish, unpublish, and delete posts. Students can read published posts according to the database audience rules. Drafts are visible to admins only.
 4. The Information UT page has database-backed categories, audience selection, source links, and draft/published states. The feed currently contains zero posts; no sample content has been seeded into the live database.
-5. Matching, chat, forum, groups, student map markers, and notifications remain prototypes/simulated and must not be described as operational.
-6. Seven remote migrations are recorded for the staging project. The first five SQL bodies still need to be reconstructed and reviewed in source control; the registration and admin migrations are retained in `supabase/migrations/`. See `docs/STAGING_STATE.md` and `supabase/migrations/REMOTE_MIGRATIONS.md`.
-7. The local execution environment cannot resolve external DNS, but the GitHub-hosted CI runner successfully installed dependencies from the committed lockfile and built the production site.
+5. **Student Verification is connected to the existing Supabase workflow.** Students can upload one PDF/JPG/PNG file (maximum 5 MB) to a private Storage bucket, view their own review status, and resubmit after rejection. Only administrators can read the review queue and private evidence, then approve or reject with a reason. Database review functions update profiles.verification_status and record review events.
+6. Evidence guidance in the UI names current-semester registration/KRS documents as examples; administrators must manually inspect the evidence. Google/email login and self-entered profile details are not proof of UT student status. UT Connect has not integrated with an official UT verification API, and an evidence acceptance/retention policy still needs to be agreed before open public launch.
+7. Matching, chat, forum, groups, student map markers, and notifications remain prototypes/simulated and must not be described as operational.
+8. Eight remote migrations are recorded for the staging project. The first five SQL bodies and the remote student_verification_workflow SQL body still need to be reconstructed and reviewed in source control; the registration and admin migrations are retained in supabase/migrations/. See docs/STAGING_STATE.md and supabase/migrations/REMOTE_MIGRATIONS.md.
+9. The local execution environment cannot resolve external DNS, but the GitHub-hosted CI runner successfully installed dependencies from the committed lockfile and built the production site.
 
 ## Verification and next acceptance gate
 
-GitHub Actions run #21 passed on 2026-10-31 (commit `5c45899`): source checks, Vite production build, Chromium installation, and all seven mocked Playwright tests. The browser suite includes admin and student Information UT flows, including create, edit, unpublish, republish, and delete.
+GitHub Actions run #32 passed on 2026-10-31 (commit `3dd13ca`): source checks, Vite production build, Chromium installation, and ten mocked Playwright tests. The suite includes authentication, Information UT admin/student flows, evidence submission, admin approval, and rejection-reason validation. A subsequent filename-sanitization fix is being checked in run #33.
 
 The live Supabase database was separately checked with authenticated SQL role contexts: an assigned administrator resolves as admin and can insert an information post; a non-admin student profile resolves as non-admin and its insert is rejected by RLS. The test insert was rolled back, leaving the Information UT feed empty.
 
-The next acceptance gate is to verify the current GitHub commit has deployed to the Netlify HTTPS site, then test with the team's actual Google accounts. These browser tests mock Supabase and do not prove live Google OAuth, full live CRUD through the browser, email delivery, or the deployed registration Edge Function. The deployment status could not be independently confirmed from this environment.
+The next acceptance gate is to verify the latest GitHub commit has deployed to the Netlify HTTPS site, then test with real student/admin accounts. These browser tests mock Supabase and do not prove live Google OAuth, actual file upload/download/review in a real browser, email delivery, or the deployed registration Edge Function. The deployment status could not be independently confirmed from this environment.
 
-Student verification remains separate from administrator access. At the last database check, the three administrator roles existed, but one of those accounts had not completed its student profile; all three existing student profiles were still `pending`, and none was `verified`. Do not mark a student verified solely because they used Google login.
+Student verification remains separate from administrator access. At the last database check, three profiles existed: all three were pending, none was verified, and there were no submitted evidence requests or review events. Administrators should compare the uploaded document with the student's profile details and check that it demonstrates current UT student status before approving. No profile status has been changed by the new UI.
 
 ## Browser E2E tests
 
-The project includes Playwright tests for the authentication interface and Information UT client flows. They use mocked Supabase HTTP responses and synthetic test records; they do not create accounts or read/write the live Supabase project.
+The project includes Playwright tests for authentication, Information UT, and Student Verification client flows. They use mocked Supabase HTTP responses, mocked Storage, and synthetic test records; they do not create accounts or read/write the live Supabase project.
 
 ```bash
 npm ci
@@ -77,4 +79,4 @@ npm run build
 npm run test:e2e
 ```
 
-The seven tests cover login/register separation, guest access protection, email login/session restoration/logout, forgot-password, password recovery/update, administrator Information UT CRUD/publication flows, and student public-feed visibility with admin controls hidden. Google OAuth, real email delivery, the deployed Edge Function, the Netlify production deployment, and live Supabase RLS are verified separately rather than inferred from mocked tests.
+The ten tests cover login/register separation, guest access protection, email login/session restoration/logout, forgot-password, password recovery/update, administrator Information UT CRUD/publication flows, student public-feed visibility with admin controls hidden, student evidence upload/pending state, administrator approval, and rejection-reason validation. Google OAuth, real email delivery, the deployed Edge Function, the Netlify production deployment, and live Supabase RLS are verified separately rather than inferred from mocked tests.
