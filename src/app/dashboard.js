@@ -187,7 +187,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   }));
   const shareInfoButton=$('#share-info');
   if(shareInfoButton){
-    shareInfoButton.hidden=!isAdmin;
+    shareInfoButton.hidden=!isAdmin;shareInfoButton.style.display=isAdmin?'':'none';
     if(isAdmin){
       shareInfoButton.innerHTML='<i data-lucide="plus"></i>Tambah informasi';
       shareInfoButton.addEventListener('click',()=>openInfoEditor());
