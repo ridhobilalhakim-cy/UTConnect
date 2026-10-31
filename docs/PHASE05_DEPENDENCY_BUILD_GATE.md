@@ -4,15 +4,15 @@ Date: 2026-10-31
 
 ## Outcome
 
-**PASSED in GitHub Actions run #32.**
+**PASSED in GitHub Actions run #33.**
 
 The local execution environment has no reliable external DNS access, but the GitHub-hosted runner installed dependencies successfully from the committed lockfile and completed the full production build and browser test suite.
 
 ## Latest verified CI run
 
 - Workflow: `Verify UT Connect build`
-- Run: https://github.com/ridhobilalhakim-cy/UTConnect/actions/runs/41182194373
-- Commit: `3dd13caeeed09d0d8894f80178e2f90e537c6bdf`
+- Run: https://github.com/ridhobilalhakim-cy/UTConnect/actions/runs/41182270518
+- Commit: `f90411793c213c91a31ad80a212f38316b4319cf`
 - Lockfile-based dependency install — PASS.
 - `npm run check` — PASS.
 - `npm run build` — PASS.
@@ -37,4 +37,4 @@ The ten browser tests include mocked evidence upload and pending state, admin ap
 
 Live database inspection confirmed the private evidence bucket, owner-only upload policy, admin-only read policy, admin-gated review RPC, and the absence of authenticated UPDATE privilege on profiles.verification_status. At the last check all three profiles remained pending, with no submitted requests or review events.
 
-The evidence examples in the UI are manual review guidance. There is no official UT API integration. Before public launch, define the acceptable proof of active UT enrollment and an evidence retention/deletion period. CI run #33 is checking a subsequent filename-sanitization fix.
+The evidence examples in the UI are manual review guidance. There is no official UT API integration. Before public launch, define the acceptable proof of active UT enrollment and an evidence retention/deletion period. CI run #33 passed after the filename-sanitization fix.
