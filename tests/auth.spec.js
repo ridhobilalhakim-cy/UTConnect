@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 const SUPABASE_URL = 'https://hqyusbyndtlfypdbmatw.supabase.co';
 const STORAGE_KEY = 'utconnect-hqyusbyndtlfypdbmatw-auth';
 const USER = {
-  id: 'e2e-student-001',
+  id: 'a1d2c3e4-f5a6-47b8-9c01-234567890abc',
   aud: 'authenticated',
   role: 'authenticated',
   email: 'student.e2e@example.test',
@@ -342,4 +342,38 @@ test('administrator can review a submitted student verification request', async 
   expect(state.verificationReviewCalls).toHaveLength(1);
   expect(state.verificationReviewCalls[0].p_decision).toBe('approved');
   expect(state.verificationReviewCalls[0].p_request_id).toBe('verification-request-001');
+});
+
+
+test('administrator must provide a reason when rejecting student verification', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    isAdmin: true,
+    verificationQueue: [{
+      request_id: 'verification-request-002',
+      user_id: 'b2d3e4f5-a6b7-48c9-8012-34567890abcd',
+      full_name: 'Mahasiswa Perlu Perbaikan',
+      faculty: 'Fakultas Sains dan Teknologi',
+      program: 'Sistem Informasi',
+      semester: 2,
+      original_filename: 'Dokumen.pdf',
+      storage_path: 'b2d3e4f5-a6b7-48c9-8012-34567890abcd/c3e4f5a6-b7c8-4901-8234-567890abcdef.pdf',
+      submitted_at: '2026-10-30T10:00:00.000Z',
+    }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="verification"]').first().click();
+  await page.locator('[data-verification-reject="verification-request-002"]').click();
+  await page.locator('#modal-confirm').click();
+  await expect(page.locator('#toast')).toContainText('Alasan penolakan minimal 5 karakter');
+  expect(state.verificationReviewCalls).toHaveLength(0);
+
+  await page.locator('#verification-reject-note').fill('Bukti registrasi semester berjalan belum terlihat.');
+  await page.locator('#modal-confirm').click();
+  expect(state.verificationReviewCalls).toHaveLength(1);
+  expect(state.verificationReviewCalls[0].p_decision).toBe('rejected');
+  expect(state.verificationReviewCalls[0].p_review_note).toContain('Bukti registrasi');
 });
