@@ -94,20 +94,62 @@ Both functions return Cache-Control: no-store. The Home Map does not render synt
 | Read direct messages | `direct_messages` select | Accepted connection participants | Only accepted connection members can read. |
 | Send direct message | `direct_messages` insert | Accepted connection participants | Sender must equal current user. |
 
-## Study groups
+## Study groups and collaborative workspace
+
+All group discovery and workspace features are for verified students. Group tables enforce RLS. The browser must not bypass RLS with service-role credentials.
 
 | Operation | Method | Access | Expected behavior |
 |---|---|---|---|
-| Create group | `study_groups` insert | Verified student | Capacity 2–100; trigger adds creator as admin. |
-| Discover groups | `study_groups` select | Verified student | Private groups hidden except to members/invitees. |
-| Join open group | RPC `join_study_group(group_id)` | Verified student | Membership becomes active if capacity allows. |
+| Create group | `study_groups` insert | Verified student | Capacity 2–100; trigger adds creator as active admin. |
+| Discover groups | `study_groups` select | Verified student | Private groups are hidden except to active members and invitees. |
+| Join open group | RPC `join_study_group` | Verified student | Membership becomes active if capacity permits. |
 | Request approval | Same RPC | Verified student | Membership becomes pending. |
-| Join private group | Same RPC + invite | Invited verified student | Requires a valid invite. |
-| Approve/reject request | RPC `respond_group_join_request(group_id, user_id, accept)` | Group admin/co-admin | Enforces capacity under a row lock. |
-| Invite to private group | RPC `invite_to_private_group(group_id, user_id)` | Group admin/co-admin | Creates or refreshes invitation. |
-| Group chat | `group_messages` select/insert | Active members | Reply and mention fields are stored; pin mutation endpoint still needs implementation. |
-| Agenda | `group_agenda_items` | Active members | Supports schedule, target, task, poll, note. |
-| Materials | `group_materials` metadata | Active members | Actual Storage bucket and object policies still need setup. |
+| Accept private invitation | Same RPC + pending invite | Invited verified student | Requires valid invite; marks invite accepted and membership active. |
+| Approve/reject request | RPC `respond_group_join_request` | Active group admin/co-admin | Enforces actor and capacity. |
+| Group chat | `group_messages` select/insert | Active member | Message body max 5,000 characters; same-group replies and active-member mentions are checked by trigger. |
+| Pin/unpin message | RPC `set_group_message_pin` | Active group admin/co-admin | Checks `auth.uid() = p_actor_id` and role before updating pin state. |
+| Read materials | `group_materials` select + Storage signed URL | Active member | Bucket is private; signed download URLs expire after 10 minutes. |
+| Upload material | Storage object upload + `group_materials` insert | Active member | Path is `{group_id}/{uploader_id}/{file_id}.{ext}`; max size 50 MiB; only PDF, DOC/DOCX, PPTX, XLSX, JPG, PNG. |
+| Delete material | `group_materials` delete + Storage object delete | Uploader or active admin/co-admin | Table and object policies enforce ownership/admin access. |
+| Agenda | `group_agenda_items` select/insert/update/delete | Active member | Types: schedule, target, task, poll, note. Updates/deletes are limited to creator or admin/co-admin. |
+| Poll results | RPC `get_group_agenda_poll_results` | Active member | Returns option labels and aggregate counts, not voter identities. |
+| Cast poll vote | RPC `cast_group_agenda_vote` | Active member | One vote per member per poll; repeat vote changes that member's choice. |
+| Invite to private group | Edge Function `manage-group-invites` action `invite_by_nim` | Active private-group admin/co-admin | Accepts a nine-digit NIM in the authenticated POST body; server HMACs NIM, resolves verified profile and returns no invitee UUID. Five lookup attempts per minute per inviter. |
+| Cancel invitation | Edge Function `manage-group-invites` action `cancel` | Invitee or active private-group admin/co-admin | Removes a pending invite through an actor-checked RPC. |
+| List own invitations | RPC `list_my_group_invites` | Verified signed-in user | Returns invitations addressed to the current user only. |
+
+### Group invitation Edge Function
+
+`POST /functions/v1/manage-group-invites` requires a valid Supabase access token. The user ID is derived from `auth.getUser(access_token)`; no browser-supplied actor ID is accepted.
+
+Invite request:
+
+```json
+{
+  "action": "invite_by_nim",
+  "group_id": "GROUP_UUID",
+  "nim": "049123456"
+}
+```
+
+The function validates the group UUID and nine-digit NIM, applies the authenticated invite-search limit, HMACs the NIM using the server-side `NIM_HMAC_SECRET`, resolves only a verified profile, then calls `create_group_invite` through the authenticated user context. The Edge Function never returns the invitee UUID or NIM digest.
+
+Cancel request:
+
+```json
+{
+  "action": "cancel",
+  "invite_id": "INVITE_UUID"
+}
+```
+
+Invitation insert triggers a notification of type `group_invite` to the invitee. The notification reference is the group ID; the recipient sees the invitation in the Groups inbox.
+
+### Realtime and privacy
+
+The `supabase_realtime` publication includes `group_messages`, `group_materials`, `group_agenda_items`, `group_invites`, and `group_members`. Subscriptions are filtered by group ID and remain subject to table RLS. Poll vote changes update the parent agenda row so active subscribers can reload aggregate counts. Notification Realtime remains filtered by the signed-in user's own ID.
+
+The `group-materials` Storage bucket is private. The frontend never constructs public object URLs; it requests short-lived signed URLs after a successful RLS-protected metadata read. Poll votes are stored in `group_agenda_votes`, which has RLS enabled and no direct authenticated table writes; actor-checked RPCs are the only user-facing interface.
 
 ## Forum and Informasi UT
 
