@@ -61,6 +61,9 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
       state.recoveryCalls += 1;
       return route.fulfill(jsonResponse({}));
     }
+    if (path.endsWith('/auth/v1/user') && method === 'GET') {
+      return route.fulfill(jsonResponse(USER));
+    }
     if (path.endsWith('/auth/v1/user') && method === 'PUT') {
       state.passwordUpdates += 1;
       return route.fulfill(jsonResponse({ ...USER, updated_at: new Date().toISOString() }));
