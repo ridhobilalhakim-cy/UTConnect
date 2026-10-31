@@ -1,4 +1,4 @@
-# Build and verification status — Information UT / Student Verification / Forum Diskusi / Grup Belajar
+# Build and verification status — Information UT / Student Verification / Forum Diskusi / Grup Belajar / Matching & Connections
 
 Date: 2026-10-31
 
@@ -14,7 +14,7 @@ Workflow: `Verify UT Connect build`
 - Playwright Chromium installation — PASS.
 - Browser E2E — **13 passed** on that commit.
 - Forum create/comment flows and verified-only access checks included.
-- The current repository now defines 17 Playwright tests; four new Grup Belajar scenarios were added after run #50 and their CI outcome is not yet confirmed.
+- The current repository now defines 22 Playwright tests: four new Grup Belajar and five new Matching/Connections scenarios were added after run #50. Their CI outcome is not yet confirmed.
 
 Workflow run: https://github.com/ridhobilalhakim-cy/UTConnect/actions/runs/41191070350
 
@@ -64,11 +64,11 @@ This environment could not independently resolve the public Netlify domain. The 
 2. Test Google sign-in and profile completion using each team's actual account.
 3. Test Information UT create/edit/publish/unpublish/delete from a real admin browser session and confirm student read visibility.
 4. Define and publish the evidence acceptance and retention policy before opening Student Verification to the public.
-5. Run and review CI for the new Grup Belajar integration, then perform real-account group creation/join/admin-approval acceptance tests. Matching/Connections, Chat, notifications, and map access remain future integration milestones.
+5. Run and review CI for the new Grup Belajar and Matching/Connections integrations, then perform real-account group, preference, connection-request, and accept/reject acceptance tests. Chat, notifications, and map access remain future integration milestones.
 
 ## Source-control caveats
 
-- The remote staging project has nine recorded migrations. The first five original SQL bodies and the student_verification_workflow SQL body still need reconstruction/review in repository source. Do not re-run them blindly against the live staging database.
+- The remote staging project has ten recorded migrations. The first five original SQL bodies and the student_verification_workflow SQL body still need reconstruction/review in repository source. Do not re-run them blindly against the live staging database.
 - The registration Edge Function mirror in GitHub does not automatically deploy source edits to Supabase.
 - Never put the Supabase service-role key, secret keys, or NIM HMAC secret in browser code or public GitHub files.
 
@@ -152,3 +152,30 @@ Database security update:
 Latest live staging counts after the migration and code changes: 0 study_groups, 0 group_members, 0 group_invites, and 0 active courses. No group test data has been inserted into Supabase. There is one verified profile and three pending profiles; verified-only group UI and database policies therefore currently restrict access to the single verified profile.
 
 The four new group Playwright tests use mocked Supabase responses. They cover the verification gate, group creation, approval-based join request, and admin approval. They have not been counted as passing until an Actions run for the latest code confirms them. Real-user group creation and join workflows remain an acceptance test.
+
+
+## Matching & Connections milestone — implementation added 2026-10-31
+
+The Matching page now uses src/services/matching.js and the existing matching_preferences, profile_courses, user_locations, and connections schema.
+
+Student experience:
+- Verified students can save their own learning topics, interests, preferred study times, and selected active courses.
+- Matching search supports radii of 1 km, 3 km, and 5 km, with at most ten results.
+- Candidate cards display initials, study program, approximate distance, active course names, topics, interests, and study times.
+- Students can send connection requests. Recipients can accept or reject incoming requests; request status is reflected in the connection panel.
+- Matching remains unavailable to unverified profiles. The page does not reveal full names, NIM digests, or exact coordinates.
+
+Database and privacy boundary:
+- Existing find_nearby_students logic filters candidates to verified profiles with radar visibility enabled and excludes mutually blocked users. Its jittered marker coordinates are not returned by the new Matching RPC.
+- find_matching_students requires auth.uid(), verified status, a radius of 1/3/5 km, and limits requests to 30 per user per 10 minutes using the private match_search_events table.
+- get_my_connection_summaries returns connection rows involving only the signed-in user and exposes only the other party's initials/program.
+- Authenticated can INSERT but not UPDATE public.connections. The INSERT RLS policy enforces verified sender/recipient, pending status, distinct users, and no block.
+- The respond_connection_request SECURITY DEFINER RPC permits only the recipient of a pending request to accept/reject it; it re-checks verification and block status.
+- The active course catalogue currently has zero courses. Topic, interest, and study-time preferences still work; course selection will become available after the catalogue is populated.
+- Direct messages remain demo/simulated and are not unlocked by accepting a connection in this milestone.
+
+Live staging counts after migration: 0 matching preferences, 0 profile-course links, 0 connections, 0 direct messages, and 0 matching search events. Four profiles exist, with one verified and three pending; all four current location records have radar visibility enabled, but only verified profiles are eligible for matching.
+
+The repository now defines 22 Playwright scenarios in total. Five new mocked tests cover the matching gate, preference save, privacy-limited search and connection request, incoming acceptance, and incoming rejection. Run #50 is the latest previously verified passing CI result and predates these latest changes; the five new tests are not counted as passed until a current Actions result confirms them. Real-account flows and the latest Netlify deployment are still external acceptance checks.
+
+The Supabase security advisor intentionally flags the three new SECURITY DEFINER functions because authenticated users can execute them. Their function bodies validate the authenticated caller and constrain results/actions to that caller. The private search-event table has RLS enabled and no public table privileges. The advisor also reports leaked-password protection disabled; this is a separate Auth configuration item.
