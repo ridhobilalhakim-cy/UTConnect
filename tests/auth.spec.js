@@ -659,6 +659,18 @@ test('login and registration are separate views', async ({ page }) => {
   await page.locator('#faculty').selectOption({ label: 'Fakultas Sains dan Teknologi (FST)' });
   await expect(page.locator('#program')).toBeEnabled();
   await expect(page.locator('#program')).toContainText('Sistem Informasi');
+
+  const facultyProgrammeCounts = [
+    { faculty: 'Fakultas Ekonomi dan Bisnis (FEB)', count: 7 },
+    { faculty: 'Fakultas Hukum, Ilmu Sosial, dan Ilmu Politik (FHISIP)', count: 9 },
+    { faculty: 'Fakultas Keguruan dan Ilmu Pendidikan (FKIP)', count: 12 },
+    { faculty: 'Fakultas Sains dan Teknologi (FST)', count: 8 },
+  ];
+  for (const item of facultyProgrammeCounts) {
+    await page.locator('#faculty').selectOption({ label: item.faculty });
+    await expect(page.locator('#program option')).toHaveCount(item.count + 1);
+  }
+  await page.locator('#faculty').selectOption({ label: 'Fakultas Sains dan Teknologi (FST)' });
   await page.locator('#program').selectOption({ label: 'Sistem Informasi' });
 
   await page.getByRole('button', { name: 'Masuk', exact: true }).last().click();
@@ -1693,7 +1705,32 @@ test('administrator dashboard shows the admin role without a student PENDING sta
   await expect(page.locator('#topUserMeta')).toHaveText('Administrator UT Connect');
   await expect(page.locator('#profileStatusTag')).toHaveText('Role: ADMINISTRATOR');
   await expect(page.locator('#sessionNotice')).toBeHidden();
+  await expect(page.locator('.demo-badge')).toHaveCount(0);
   await expect(page.locator('#profileStatusTag')).not.toContainText('PENDING');
+
+  await page.locator('[data-page="verification"]').first().click();
+  await expect(page.locator('#verification-admin-panel')).toBeVisible();
+  await expect(page.locator('#verification-status-panel')).toBeHidden();
+  await expect(page.locator('#verification-submit-panel')).toBeHidden();
+});
+
+test('legacy UT programme names are normalized in the profile editor', async ({ page }) => {
+  await mockSupabase(page, {
+    profile: {
+      ...PROFILE,
+      faculty: 'FHISIP',
+      program: 'Ilmu Administrasi Negara',
+      verification_status: 'pending',
+    },
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+  await page.locator('[data-page="profile"]').first().click();
+  await page.locator('#edit-profile').click();
+  await expect(page.locator('#profile-edit-faculty')).toHaveValue('Fakultas Hukum, Ilmu Sosial, dan Ilmu Politik (FHISIP)');
+  await expect(page.locator('#profile-edit-program')).toHaveValue('Ilmu Administrasi Publik');
 });
 
 test('student can edit profile using the save action instead of a close-only modal', async ({ page }) => {
