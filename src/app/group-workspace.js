@@ -463,6 +463,7 @@ async function loadWorkspaceData() {
 }
 
 export async function openGroupWorkspace(options) {
+  const epoch = ++workspaceEpoch;
   activeGroup = options.group;
   activeMembership = options.membership;
   currentUserId = options.currentUserId;
@@ -475,8 +476,10 @@ export async function openGroupWorkspace(options) {
     await unsubscribeFromGroupMessages(activeChannel).catch(() => {});
     activeChannel = null;
   }
+  if (epoch !== workspaceEpoch || !activeGroup) return;
   openModalHandler("Ruang kelompok belajar", workspaceShell(), "Tutup");
   await loadWorkspaceData();
+  if (epoch !== workspaceEpoch || !activeGroup) return;
   render();
   activeChannel = subscribeToGroupWorkspace(activeGroup.id, {
     onMessages: () => {
@@ -520,6 +523,7 @@ export async function openGroupWorkspace(options) {
 }
 
 export async function closeGroupWorkspace() {
+  workspaceEpoch += 1;
   if (activeChannel) {
     const channel = activeChannel;
     activeChannel = null;
