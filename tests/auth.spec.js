@@ -109,14 +109,14 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
         return route.fulfill(jsonResponse(created, 201));
       }
       if (method === 'DELETE') {
-        const id = url.searchParams.get('id')?.replace(/^eq\\./, '');
+        const id = url.searchParams.get('id')?.replace(/^eq\./, '');
         state.forumPosts = state.forumPosts.filter(item => item.id !== id);
         return route.fulfill({ status: 204, body: '' });
       }
     }
     if (path.endsWith('/rest/v1/forum_comments')) {
       if (method === 'GET') {
-        const postId = url.searchParams.get('post_id')?.replace(/^eq\\./, '');
+        const postId = url.searchParams.get('post_id')?.replace(/^eq\./, '');
         return route.fulfill(jsonResponse(state.forumComments.filter(item => item.post_id === postId)));
       }
       if (method === 'POST') {
@@ -127,7 +127,7 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
         return route.fulfill(jsonResponse(created, 201));
       }
       if (method === 'DELETE') {
-        const id = url.searchParams.get('id')?.replace(/^eq\\./, '');
+        const id = url.searchParams.get('id')?.replace(/^eq\./, '');
         state.forumComments = state.forumComments.filter(item => item.id !== id);
         return route.fulfill({ status: 204, body: '' });
       }
