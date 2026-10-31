@@ -26,8 +26,8 @@ function jsonResponse(body, status = 200) {
   return { status, contentType: 'application/json', body: JSON.stringify(body) };
 }
 
-async function mockSupabase(page, { isAdmin = false, informationPosts = [], verificationStatus = { profile_status: 'pending', latest_request: null }, verificationQueue = [], profile = PROFILE, forumPosts = [], forumComments = [], courses = [], studyGroups = [], groupMembers = [] } = {}) {
-  const state = { loginCalls: 0, recoveryCalls: 0, passwordUpdates: 0, logoutCalls: 0, informationPosts: [...informationPosts], informationCreateCalls: 0, verificationStatus: structuredClone(verificationStatus), verificationQueue: [...verificationQueue], verificationUploadCalls: 0, verificationSubmitCalls: 0, verificationReviewCalls: [], profile, forumPosts: [...forumPosts], forumComments: [...forumComments], courses: [...courses], studyGroups: [...studyGroups], groupMembers: [...groupMembers], groupCreateCalls: 0, groupJoinCalls: [], groupReviewCalls: [], forumPostCreateCalls: 0, forumCommentCreateCalls: 0 };
+async function mockSupabase(page, { isAdmin = false, informationPosts = [], verificationStatus = { profile_status: 'pending', latest_request: null }, verificationQueue = [], profile = PROFILE, forumPosts = [], forumComments = [], courses = [], studyGroups = [], groupMembers = [], matchingPreferences = null, profileCourseIds = [], matchingCandidates = [], connectionSummaries = [] } = {}) {
+  const state = { loginCalls: 0, recoveryCalls: 0, passwordUpdates: 0, logoutCalls: 0, informationPosts: [...informationPosts], informationCreateCalls: 0, verificationStatus: structuredClone(verificationStatus), verificationQueue: [...verificationQueue], verificationUploadCalls: 0, verificationSubmitCalls: 0, verificationReviewCalls: [], profile, forumPosts: [...forumPosts], forumComments: [...forumComments], courses: [...courses], studyGroups: [...studyGroups], groupMembers: [...groupMembers], groupCreateCalls: 0, groupJoinCalls: [], groupReviewCalls: [], matchingPreferences: matchingPreferences ? structuredClone(matchingPreferences) : null, profileCourseIds: [...profileCourseIds], matchingCandidates: [...matchingCandidates], connectionSummaries: [...connectionSummaries], matchingPreferenceSaveCalls: 0, profileCourseInsertCalls: 0, profileCourseDeleteCalls: 0, matchingSearchCalls: [], connectionCreateCalls: [], connectionResponseCalls: [], forumPostCreateCalls: 0, forumCommentCreateCalls: 0 };
   for (const pattern of [
     /^https:\/\/fonts\.googleapis\.com\//,
     /^https:\/\/fonts\.gstatic\.com\//,
@@ -98,6 +98,76 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
     }
     if (path.endsWith('/rest/v1/courses') && method === 'GET') {
       return route.fulfill(jsonResponse(state.courses));
+    }
+    if (path.endsWith('/rest/v1/matching_preferences')) {
+      if (method === 'GET') return route.fulfill(jsonResponse(state.matchingPreferences));
+      if (method === 'POST') {
+        state.matchingPreferenceSaveCalls += 1;
+        state.matchingPreferences = request.postDataJSON();
+        return route.fulfill(jsonResponse(state.matchingPreferences));
+      }
+    }
+    if (path.endsWith('/rest/v1/profile_courses')) {
+      if (method === 'GET') return route.fulfill(jsonResponse(state.profileCourseIds.map(course_id => ({ user_id: USER.id, course_id }))));
+      if (method === 'POST') {
+        const input = request.postDataJSON();
+        const rows = Array.isArray(input) ? input : [input];
+        for (const row of rows) {
+          if (row.user_id !== USER.id) return route.fulfill(jsonResponse({ message: 'course owner mismatch' }, 403));
+          if (!state.profileCourseIds.includes(row.course_id)) state.profileCourseIds.push(row.course_id);
+        }
+        state.profileCourseInsertCalls += rows.length;
+        return route.fulfill(jsonResponse(rows, 201));
+      }
+      if (method === 'DELETE') {
+        const filter = url.searchParams.get('course_id') || '';
+        const removeIds = filter.startsWith('in.(') ? filter.slice(4, -1).split(',') : [];
+        state.profileCourseIds = state.profileCourseIds.filter(id => !removeIds.includes(id));
+        state.profileCourseDeleteCalls += 1;
+        return route.fulfill({ status: 204, body: '' });
+      }
+    }
+    if (path.endsWith('/rest/v1/rpc/find_matching_students') && method === 'POST') {
+      const input = request.postDataJSON();
+      state.matchingSearchCalls.push(input);
+      return route.fulfill(jsonResponse(state.matchingCandidates));
+    }
+    if (path.endsWith('/rest/v1/rpc/get_my_connection_summaries') && method === 'POST') {
+      return route.fulfill(jsonResponse(state.connectionSummaries));
+    }
+    if (path.endsWith('/rest/v1/rpc/respond_connection_request') && method === 'POST') {
+      const input = request.postDataJSON();
+      state.connectionResponseCalls.push(input);
+      const connection = state.connectionSummaries.find(item => item.connection_id === input.p_connection_id);
+      if (!connection || !connection.is_incoming || connection.status !== 'pending') {
+        return route.fulfill(jsonResponse({ message: 'incoming request not found' }, 403));
+      }
+      connection.status = input.p_accept ? 'accepted' : 'rejected';
+      return route.fulfill(jsonResponse(connection.status));
+    }
+    if (path.endsWith('/rest/v1/connections') && method === 'POST') {
+      const input = request.postDataJSON();
+      if (input.initiator_id !== USER.id || input.recipient_id === USER.id || input.status !== 'pending') {
+        return route.fulfill(jsonResponse({ message: 'connection insert policy denied' }, 403));
+      }
+      const created = {
+        id: 'connection-e2e-001',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        ...input,
+      };
+      state.connectionCreateCalls.push(input);
+      const candidate = state.matchingCandidates.find(item => item.student_id === input.recipient_id);
+      state.connectionSummaries.unshift({
+        connection_id: created.id,
+        other_student_id: input.recipient_id,
+        initials: candidate?.initials || 'UT',
+        program: candidate?.program || 'Program studi tidak tersedia',
+        status: 'pending',
+        created_at: created.created_at,
+        is_incoming: false,
+      });
+      return route.fulfill(jsonResponse(created, 201));
     }
     if (path.endsWith('/rest/v1/study_groups')) {
       if (method === 'GET') return route.fulfill(jsonResponse(state.studyGroups.filter(group => !group.is_archived)));
@@ -678,4 +748,151 @@ test('group admin can approve a pending membership request', async ({ page }) =>
   expect(state.groupReviewCalls[0].p_user_id).toBe('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
   expect(state.groupReviewCalls[0].p_accept).toBe(true);
   expect(state.groupMembers.find(member => member.user_id === 'cccccccc-cccc-4ccc-8ccc-cccccccccccc').status).toBe('active');
+});
+
+
+test('unverified student cannot access matching search or connection controls', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'pending' },
+    matchingCandidates: [{ student_id: 'hidden-candidate', initials: 'AB', program: 'Sistem Informasi', approx_distance_m: 500 }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="matching"]').first().click();
+  await expect(page.locator('#match-access-notice')).toContainText('Verifikasi mahasiswa diperlukan');
+  await expect(page.locator('#match-layout')).toBeHidden();
+  await expect(page.locator('#match-results')).toBeEmpty();
+  expect(state.matchingSearchCalls).toHaveLength(0);
+  expect(state.matchingPreferenceSaveCalls).toBe(0);
+  expect(state.connectionCreateCalls).toHaveLength(0);
+});
+
+test('verified student can save personal matching preferences and selected courses', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+    courses: [
+      { id: 'course-001', course_code: 'MSIM4201', course_name: 'Sistem Operasi', is_active: true },
+      { id: 'course-002', course_code: 'MSIM4301', course_name: 'Algoritma Pemrograman', is_active: true },
+    ],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="matching"]').first().click();
+  await page.locator('#preference-topics').fill('struktur data, algoritma');
+  await page.locator('#preference-interests').fill('belajar kelompok, persiapan UAS');
+  await page.locator('#preference-study-times').selectOption(['Malam hari', 'Akhir pekan']);
+  await page.locator('#preferred-courses').selectOption(['course-001']);
+  await page.locator('#save-matching-preferences').click();
+
+  await expect(page.locator('#toast')).toContainText('Preferensi belajar berhasil disimpan');
+  expect(state.matchingPreferenceSaveCalls).toBe(1);
+  expect(state.matchingPreferences.topic_tags).toEqual(['struktur data', 'algoritma']);
+  expect(state.matchingPreferences.interests).toEqual(['belajar kelompok', 'persiapan UAS']);
+  expect(state.matchingPreferences.study_times).toEqual(['Malam hari', 'Akhir pekan']);
+  expect(state.profileCourseIds).toEqual(['course-001']);
+  expect(state.profileCourseInsertCalls).toBe(1);
+  expect(state.matchingSearchCalls.length).toBeGreaterThan(0);
+});
+
+test('verified student can search privacy-limited matches and send a connection request', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+    matchingCandidates: [{
+      student_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      initials: 'RA',
+      program: 'Manajemen',
+      approx_distance_m: 1250,
+      course_names: ['Pengantar Manajemen'],
+      topic_tags: ['manajemen waktu'],
+      interests: ['belajar kelompok'],
+      study_times: ['Malam hari'],
+      full_name: 'Nama Lengkap Rahasia',
+      marker_lat: -6.9,
+      marker_lng: 107.6,
+    }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="matching"]').first().click();
+  await expect(page.locator('.match-card')).toContainText('Mahasiswa UT · RA');
+  await expect(page.locator('.match-card')).toContainText('Manajemen');
+  await expect(page.locator('.match-card')).toContainText('sekitar 1,5 km');
+  await expect(page.locator('.match-card')).not.toContainText('Nama Lengkap Rahasia');
+  await page.locator('[data-connect="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"]').click();
+
+  await expect(page.locator('#connection-panel')).toBeVisible();
+  await expect(page.locator('#connection-list')).toContainText('Menunggu jawaban');
+  expect(state.matchingSearchCalls[0].p_radius_m).toBe(3000);
+  expect(state.connectionCreateCalls).toHaveLength(1);
+  expect(state.connectionCreateCalls[0].initiator_id).toBe(USER.id);
+  expect(state.connectionCreateCalls[0].recipient_id).toBe('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+  expect(state.connectionCreateCalls[0].status).toBe('pending');
+});
+
+test('verified student can accept an incoming connection request', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+    connectionSummaries: [{
+      connection_id: 'connection-incoming-001',
+      other_student_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      initials: 'DP',
+      program: 'Sistem Informasi',
+      status: 'pending',
+      created_at: '2026-10-30T10:00:00.000Z',
+      is_incoming: true,
+    }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="matching"]').first().click();
+  await page.locator('[data-connection-accept="connection-incoming-001"]').click();
+  await page.locator('#modal-confirm').click();
+
+  await expect(page.locator('#connection-list')).toContainText('Terhubung');
+  expect(state.connectionResponseCalls).toHaveLength(1);
+  expect(state.connectionResponseCalls[0]).toEqual({
+    p_connection_id: 'connection-incoming-001',
+    p_accept: true,
+  });
+  expect(state.connectionSummaries[0].status).toBe('accepted');
+});
+
+test('verified student can reject an incoming connection request', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+    connectionSummaries: [{
+      connection_id: 'connection-incoming-002',
+      other_student_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      initials: 'SN',
+      program: 'PGSD',
+      status: 'pending',
+      created_at: '2026-10-30T10:00:00.000Z',
+      is_incoming: true,
+    }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('[data-page="matching"]').first().click();
+  await page.locator('[data-connection-reject="connection-incoming-002"]').click();
+  await page.locator('#modal-confirm').click();
+
+  await expect(page.locator('#connection-list')).toContainText('Permintaan ditolak');
+  expect(state.connectionResponseCalls).toHaveLength(1);
+  expect(state.connectionResponseCalls[0].p_accept).toBe(false);
+  expect(state.connectionSummaries[0].status).toBe('rejected');
 });
