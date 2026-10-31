@@ -85,7 +85,7 @@ import {
   findNearbyStudents,
 } from "../services/home-map.js";
 import { listMyChatRooms, updateMyStudentProfile, uploadMyProfileAvatar, setMyProfileAvatarPreset, getProfileAvatarUrl } from "../services/profile.js";
-import { populateUTFacultyProgramSelects } from "../data/ut-programs.js";
+import { populateUTFacultyProgramSelects, resolveUTFaculty } from "../data/ut-programs.js";
 
 export function initDashboard({ isAdmin = false, isVerified = false, verificationStatus = "pending", currentUserId = null, currentUserName = "Mahasiswa UT", currentProfile = {} } = {}) {
   window.L = L;
@@ -1933,7 +1933,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     ["topUserName", "sideUserName"].forEach(id => { const element = $("#" + id); if (element) element.textContent = name; });
     const status = $("#profileStatusTag");
     if (status) status.textContent = isAdmin ? "Role: ADMINISTRATOR" : "Status: " + String(profile.verification_status || "pending").toUpperCase();
-    const faculty = $("#profileFaculty"); if (faculty) faculty.textContent = profile.faculty || "-";
+    const faculty = $("#profileFaculty"); if (faculty) faculty.textContent = resolveUTFaculty(profile.faculty) || profile.faculty || "-";
     const program = $("#profileProgram"); if (program) program.textContent = profile.program || "-";
     const semester = $("#profileSemester"); if (semester) semester.textContent = profile.semester || "-";
     const bio = $("#profileBio"); if (bio) bio.textContent = profile.bio || (isAdmin ? "Administrator UT Connect" : "Mahasiswa Universitas Terbuka");
