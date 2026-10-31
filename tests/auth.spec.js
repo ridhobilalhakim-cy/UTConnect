@@ -26,8 +26,8 @@ function jsonResponse(body, status = 200) {
   return { status, contentType: 'application/json', body: JSON.stringify(body) };
 }
 
-async function mockSupabase(page, { isAdmin = false, informationPosts = [], verificationStatus = { profile_status: 'pending', latest_request: null }, verificationQueue = [], profile = PROFILE, forumPosts = [], forumComments = [], courses = [], studyGroups = [], groupMembers = [], groupMessages = [], groupMaterials = [], groupAgendaItems = [], groupInvites = [], myGroupInvitations = [], matchingPreferences = null, profileCourseIds = [], matchingCandidates = [], connectionSummaries = [], directMessages = [], notifications = [], homeMapLocation = null, nearbyResults = [] } = {}) {
-  const state = { loginCalls: 0, recoveryCalls: 0, passwordUpdates: 0, logoutCalls: 0, informationPosts: [...informationPosts], informationCreateCalls: 0, verificationStatus: structuredClone(verificationStatus), verificationQueue: [...verificationQueue], verificationUploadCalls: 0, verificationSubmitCalls: 0, verificationReviewCalls: [], profile, forumPosts: [...forumPosts], forumComments: [...forumComments], courses: [...courses], studyGroups: [...studyGroups], groupMembers: [...groupMembers], groupMessages: structuredClone(groupMessages), groupMessageSendCalls: [], groupMessagePinCalls: [], groupMaterials: structuredClone(groupMaterials), groupMaterialUploadCalls: [], groupMaterialDeleteCalls: [], groupAgendaItems: structuredClone(groupAgendaItems), groupAgendaCreateCalls: [], groupAgendaUpdateCalls: [], groupAgendaDeleteCalls: [], groupPollVotes: [], groupInvites: structuredClone(groupInvites), myGroupInvitations: structuredClone(myGroupInvitations), groupInviteCalls: [], groupInviteCancelCalls: [], groupCreateCalls: 0, groupJoinCalls: [], groupReviewCalls: [], matchingPreferences: matchingPreferences ? structuredClone(matchingPreferences) : null, profileCourseIds: [...profileCourseIds], matchingCandidates: [...matchingCandidates], connectionSummaries: [...connectionSummaries], directMessages: structuredClone(directMessages), directMessageSendCalls: [], directMessageReadCalls: [], notifications: structuredClone(notifications), notificationReadCalls: [], notificationBulkReadCalls: 0, homeMapLocation: structuredClone(homeMapLocation), nearbyResults: structuredClone(nearbyResults), nearbyCalls: [], locationSaveCalls: [], locationVisibilityCalls: [], matchingPreferenceSaveCalls: 0, profileCourseInsertCalls: 0, profileCourseDeleteCalls: 0, matchingSearchCalls: [], connectionCreateCalls: [], connectionResponseCalls: [], forumPostCreateCalls: 0, forumCommentCreateCalls: 0 };
+async function mockSupabase(page, { isAdmin = false, informationPosts = [], verificationStatus = { profile_status: 'pending', latest_request: null }, verificationQueue = [], profile = PROFILE, forumPosts = [], forumComments = [], forumAuthorProfiles = [], courses = [], studyGroups = [], groupMembers = [], groupMessages = [], groupMaterials = [], groupAgendaItems = [], groupInvites = [], myGroupInvitations = [], matchingPreferences = null, profileCourseIds = [], matchingCandidates = [], connectionSummaries = [], directMessages = [], chatRooms = [], notifications = [], homeMapLocation = null, nearbyResults = [] } = {}) {
+  const state = { loginCalls: 0, recoveryCalls: 0, passwordUpdates: 0, logoutCalls: 0, informationPosts: [...informationPosts], informationCreateCalls: 0, verificationStatus: structuredClone(verificationStatus), verificationQueue: [...verificationQueue], verificationUploadCalls: 0, verificationSubmitCalls: 0, verificationReviewCalls: [], profile, profileUpdateCalls: [], avatarUpdateCalls: [], forumPosts: [...forumPosts], forumComments: [...forumComments], forumAuthorProfiles: [...forumAuthorProfiles], courses: [...courses], studyGroups: [...studyGroups], groupMembers: [...groupMembers], groupMessages: structuredClone(groupMessages), groupMessageSendCalls: [], groupMessagePinCalls: [], groupMaterials: structuredClone(groupMaterials), groupMaterialUploadCalls: [], groupMaterialDeleteCalls: [], groupAgendaItems: structuredClone(groupAgendaItems), groupAgendaCreateCalls: [], groupAgendaUpdateCalls: [], groupAgendaDeleteCalls: [], groupPollVotes: [], groupInvites: structuredClone(groupInvites), myGroupInvitations: structuredClone(myGroupInvitations), groupInviteCalls: [], groupInviteCancelCalls: [], groupCreateCalls: 0, groupJoinCalls: [], groupReviewCalls: [], matchingPreferences: matchingPreferences ? structuredClone(matchingPreferences) : null, profileCourseIds: [...profileCourseIds], matchingCandidates: [...matchingCandidates], connectionSummaries: [...connectionSummaries], directMessages: structuredClone(directMessages), chatRooms: structuredClone(chatRooms), directMessageSendCalls: [], directMessageReadCalls: [], notifications: structuredClone(notifications), notificationReadCalls: [], notificationBulkReadCalls: 0, homeMapLocation: structuredClone(homeMapLocation), nearbyResults: structuredClone(nearbyResults), nearbyCalls: [], locationSaveCalls: [], locationVisibilityCalls: [], matchingPreferenceSaveCalls: 0, profileCourseInsertCalls: 0, profileCourseDeleteCalls: 0, matchingSearchCalls: [], connectionCreateCalls: [], connectionResponseCalls: [], forumPostCreateCalls: 0, forumCommentCreateCalls: 0 };
   await page.addInitScript(() => { window.__UTCONNECT_DISABLE_REALTIME__ = true; });
   for (const pattern of [
     /^https:\/\/fonts\.googleapis\.com\//,
@@ -74,6 +74,48 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
     }
     if (path.endsWith('/rest/v1/rpc/is_current_user_admin') && method === 'POST') {
       return route.fulfill(jsonResponse(isAdmin));
+    }
+    if (path.endsWith('/rest/v1/rpc/get_forum_author_profiles') && method === 'POST') {
+      const input = request.postDataJSON();
+      const ids = new Set(input.p_user_ids || []);
+      return route.fulfill(jsonResponse(state.forumAuthorProfiles.filter(row => ids.has(row.user_id))));
+    }
+    if (path.endsWith('/rest/v1/rpc/get_my_chat_rooms') && method === 'POST') {
+      return route.fulfill(jsonResponse(state.chatRooms));
+    }
+    if (path.endsWith('/rest/v1/rpc/update_my_student_profile') && method === 'POST') {
+      const input = request.postDataJSON();
+      const updated = {
+        ...state.profile,
+        full_name: input.p_full_name,
+        faculty: input.p_faculty,
+        program: input.p_program,
+        semester: input.p_semester,
+        bio: input.p_bio,
+        verification_status: state.profile.verification_status === 'verified' && (
+          state.profile.full_name !== input.p_full_name ||
+          state.profile.faculty !== input.p_faculty ||
+          state.profile.program !== input.p_program ||
+          Number(state.profile.semester) !== Number(input.p_semester)
+        ) ? 'pending' : state.profile.verification_status,
+      };
+      state.profileUpdateCalls.push(input);
+      state.profile = updated;
+      return route.fulfill(jsonResponse({
+        ...updated,
+        identity_changed: Boolean(
+          state.profile.full_name !== input.p_full_name ||
+          state.profile.faculty !== input.p_faculty ||
+          state.profile.program !== input.p_program ||
+          Number(state.profile.semester) !== Number(input.p_semester)
+        ),
+      }));
+    }
+    if (path.endsWith('/rest/v1/rpc/update_my_profile_avatar') && method === 'POST') {
+      const input = request.postDataJSON();
+      state.avatarUpdateCalls.push(input);
+      state.profile.avatar_path = input.p_avatar_path;
+      return route.fulfill(jsonResponse(input.p_avatar_path));
     }
     if (path.endsWith('/rest/v1/rpc/get_my_student_verification_status') && method === 'POST') {
       return route.fulfill(jsonResponse(state.verificationStatus));
@@ -272,6 +314,11 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
         };
         state.directMessageSendCalls.push(input);
         state.directMessages.push(created);
+        const room = state.chatRooms.find(item => item.connection_id === input.connection_id);
+        if (room) {
+          room.last_message = body;
+          room.last_message_at = created.created_at;
+        }
         return route.fulfill(jsonResponse(created, 201));
       }
       if (method === 'PATCH') {
@@ -568,6 +615,12 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
         state.informationPosts = state.informationPosts.filter(item => item.id !== id);
         return route.fulfill(jsonResponse({ id }, 200));
       }
+    }
+    if (path.includes('/storage/v1/object/profile-avatars/') && method === 'POST') {
+      return route.fulfill(jsonResponse({ Key: 'profile-avatars/' + USER.id + '/avatar-e2e.png' }));
+    }
+    if (path.includes('/storage/v1/object/profile-avatars/') && method === 'DELETE') {
+      return route.fulfill(jsonResponse({}));
     }
     if (path.includes('/storage/v1/object/student-verification-evidence/') && method === 'DELETE') {
       return route.fulfill(jsonResponse({}));
@@ -874,12 +927,13 @@ test('verified student can publish a forum post and add a comment', async ({ pag
   expect(state.forumCommentCreateCalls).toBe(1);
 });
 
-test('verified student can read a live forum post without exposing another profile identity', async ({ page }) => {
+test('verified student can read a live forum post with the original author name', async ({ page }) => {
+  const authorId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
   const state = await mockSupabase(page, {
     profile: { ...PROFILE, verification_status: 'verified' },
     forumPosts: [{
       id: 'forum-post-public-001',
-      author_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      author_id: authorId,
       course_id: null,
       post_type: 'discussion',
       title: 'Belajar mandiri di UT',
@@ -888,6 +942,7 @@ test('verified student can read a live forum post without exposing another profi
       updated_at: '2026-10-30T10:00:00.000Z',
       course: null,
     }],
+    forumAuthorProfiles: [{ user_id: authorId, full_name: 'Rina Aulia', avatar_path: null }],
   });
   await page.goto('/');
   await page.locator('#loginEmail').fill(USER.email);
@@ -896,10 +951,10 @@ test('verified student can read a live forum post without exposing another profi
 
   await page.locator('[data-page="forum"]').first().click();
   await expect(page.locator('.forum-post-title')).toHaveText('Belajar mandiri di UT');
-  await expect(page.locator('.post-author')).toContainText('Mahasiswa UT');
+  await expect(page.locator('.post-author')).toContainText('Rina Aulia');
+  await expect(page.locator('.post-author')).not.toContainText('Andi Bintang');
   expect(state.forumPosts).toHaveLength(1);
 });
-
 
 test('unverified student cannot discover or create study groups', async ({ page }) => {
   const state = await mockSupabase(page, {
@@ -1471,22 +1526,34 @@ test('verified student can reject an incoming connection request', async ({ page
   expect(state.connectionSummaries[0].status).toBe('rejected');
 });
 
-test('verified student can open an accepted connection chat, read messages and send a persisted message', async ({ page }) => {
+test('verified student can open a dedicated chat room, read messages and send a persisted message', async ({ page }) => {
+  const connectionId = '11111111-1111-4111-8111-111111111111';
+  const otherId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
   const state = await mockSupabase(page, {
     profile: { ...PROFILE, verification_status: 'verified' },
     connectionSummaries: [{
-      connection_id: '11111111-1111-4111-8111-111111111111',
-      other_student_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      connection_id: connectionId,
+      other_student_id: otherId,
       initials: 'RA',
       program: 'Manajemen',
       status: 'accepted',
       created_at: '2026-10-30T10:00:00.000Z',
       is_incoming: false,
     }],
+    chatRooms: [{
+      connection_id: connectionId,
+      other_user_id: otherId,
+      other_full_name: 'Rina Aulia',
+      avatar_path: null,
+      program: 'Manajemen',
+      last_message: 'Halo! Kita belajar bareng?',
+      last_message_at: '2026-10-30T11:00:00.000Z',
+      unread_count: 1,
+    }],
     directMessages: [{
       id: 'direct-message-incoming-001',
-      connection_id: '11111111-1111-4111-8111-111111111111',
-      sender_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      connection_id: connectionId,
+      sender_id: otherId,
       body: '<script>window.__chatInjected = true</script>Halo! Kita belajar bareng?',
       created_at: '2026-10-30T11:00:00.000Z',
       read_at: null,
@@ -1498,20 +1565,21 @@ test('verified student can open an accepted connection chat, read messages and s
   await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
 
   await page.locator('[data-page="matching"]').first().click();
-  await page.locator('[data-chat-open="11111111-1111-4111-8111-111111111111"]').click();
+  await page.locator('[data-chat-open="' + connectionId + '"]').click();
 
-  await expect(page.locator('#modal-backdrop')).toHaveClass(/open/);
-  await expect(page.locator('#modal-title')).toContainText('Mahasiswa UT · RA');
-  await expect(page.locator('#direct-chat-messages')).toContainText('Halo! Kita belajar bareng?');
-  await expect(page.locator('#direct-chat-messages script')).toHaveCount(0);
+  await expect(page.locator('#page-messages')).toHaveClass(/active/);
+  await expect(page.locator('#message-room-name')).toHaveText('Rina Aulia');
+  await expect(page.locator('#message-room-messages')).toContainText('Halo! Kita belajar bareng?');
+  await expect(page.locator('#message-room-messages script')).toHaveCount(0);
   await expect.poll(() => state.directMessages[0].read_at).not.toBeNull();
+  await expect(page.locator('[data-message-room="' + connectionId + '"]')).not.toContainText('1');
 
-  await page.locator('#direct-chat-input').fill('Siap, aku akan bahas materi Sistem Operasi.');
-  await page.locator('#direct-chat-send').click();
-  await expect(page.locator('#direct-chat-messages')).toContainText('Siap, aku akan bahas materi Sistem Operasi.');
+  await page.locator('#message-room-input').fill('Siap, aku akan bahas materi Sistem Operasi.');
+  await page.locator('#message-room-send').click();
+  await expect(page.locator('#message-room-messages')).toContainText('Siap, aku akan bahas materi Sistem Operasi.');
   expect(state.directMessageSendCalls).toHaveLength(1);
   expect(state.directMessageSendCalls[0]).toEqual({
-    connection_id: '11111111-1111-4111-8111-111111111111',
+    connection_id: connectionId,
     sender_id: USER.id,
     body: 'Siap, aku akan bahas materi Sistem Operasi.',
   });
@@ -1543,22 +1611,25 @@ test('chat action is unavailable while a connection request is still pending', a
   expect(state.directMessageReadCalls).toHaveLength(0);
 });
 
-test('verified student can open a direct-message notification and mark it read', async ({ page }) => {
+test('verified student can open a chat inbox notification and mark it read', async ({ page }) => {
+  const connectionId = '22222222-2222-4222-8222-222222222222';
+  const otherId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
   const state = await mockSupabase(page, {
     profile: { ...PROFILE, verification_status: 'verified' },
-    connectionSummaries: [{
-      connection_id: '22222222-2222-4222-8222-222222222222',
-      other_student_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-      initials: 'RA',
+    chatRooms: [{
+      connection_id: connectionId,
+      other_user_id: otherId,
+      other_full_name: 'Rina Aulia',
+      avatar_path: null,
       program: 'Manajemen',
-      status: 'accepted',
-      created_at: '2026-10-30T10:00:00.000Z',
-      is_incoming: false,
+      last_message: 'Ada waktu untuk diskusi?',
+      last_message_at: '2026-10-30T11:00:00.000Z',
+      unread_count: 1,
     }],
     directMessages: [{
       id: 'direct-message-notification-001',
-      connection_id: '22222222-2222-4222-8222-222222222222',
-      sender_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      connection_id: connectionId,
+      sender_id: otherId,
       body: 'Ada waktu untuk diskusi?',
       created_at: '2026-10-30T11:00:00.000Z',
       read_at: null,
@@ -1569,7 +1640,7 @@ test('verified student can open a direct-message notification and mark it read',
       notification_type: 'direct_message',
       title: 'Pesan baru',
       body: 'Kamu menerima pesan baru dari koneksimu.',
-      reference_id: '22222222-2222-4222-8222-222222222222',
+      reference_id: connectionId,
       read_at: null,
       created_at: '2026-10-30T11:00:00.000Z',
     }],
@@ -1585,10 +1656,63 @@ test('verified student can open a direct-message notification and mark it read',
   await expect(page.locator('[data-notification-id="notification-chat-001"]')).toContainText('Pesan baru');
   await page.locator('[data-notification-id="notification-chat-001"]').click();
 
-  await expect(page.locator('#modal-title')).toContainText('Mahasiswa UT · RA');
-  await expect(page.locator('#direct-chat-messages')).toContainText('Ada waktu untuk diskusi?');
+  await expect(page.locator('#page-messages')).toHaveClass(/active/);
+  await expect(page.locator('#message-room-name')).toHaveText('Rina Aulia');
+  await expect(page.locator('#message-room-messages')).toContainText('Ada waktu untuk diskusi?');
   expect(state.notificationReadCalls).toEqual(['notification-chat-001']);
   expect(state.notifications[0].read_at).not.toBeNull();
+});
+
+
+test('pending student cannot open private chat inbox', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'pending' },
+    chatRooms: [{
+      connection_id: '33333333-3333-4333-8333-333333333333',
+      other_user_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      other_full_name: 'Rina Aulia',
+      program: 'Manajemen',
+      unread_count: 0,
+    }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+  await page.locator('[data-page="messages"]').first().click();
+  await expect(page.locator('#messages-access-notice')).toContainText('Verifikasi mahasiswa diperlukan');
+  await expect(page.locator('#message-inbox')).toBeHidden();
+  expect(state.chatRooms).toHaveLength(1);
+});
+
+test('administrator dashboard shows the admin role without a student PENDING status', async ({ page }) => {
+  await mockSupabase(page, { isAdmin: true, profile: { ...PROFILE, verification_status: 'pending' } });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+  await expect(page.locator('#topUserMeta')).toHaveText('Administrator UT Connect');
+  await expect(page.locator('#profileStatusTag')).toHaveText('Role: ADMINISTRATOR');
+  await expect(page.locator('#sessionNotice')).toBeHidden();
+  await expect(page.locator('#profileStatusTag')).not.toContainText('PENDING');
+});
+
+test('student can edit profile using the save action instead of a close-only modal', async ({ page }) => {
+  const state = await mockSupabase(page, { profile: { ...PROFILE, verification_status: 'pending' } });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+  await page.locator('[data-page="profile"]').first().click();
+  await page.locator('#edit-profile').click();
+  await expect(page.locator('#modal-confirm')).toHaveText('Simpan perubahan');
+  await expect(page.locator('#modal-cancel')).toHaveText('Tutup');
+  await page.locator('#profile-edit-name').fill('Mahasiswa Uji Diperbarui');
+  await page.locator('#profile-edit-bio').fill('Suka belajar algoritma dan basis data.');
+  await page.locator('#modal-confirm').click();
+  await expect(page.locator('#profileFullName')).toHaveText('Mahasiswa Uji Diperbarui');
+  expect(state.profileUpdateCalls).toHaveLength(1);
+  expect(state.profileUpdateCalls[0].p_full_name).toBe('Mahasiswa Uji Diperbarui');
 });
 
 test('student can mark all notifications as read and clear the unread counter', async ({ page }) => {
