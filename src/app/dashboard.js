@@ -1228,6 +1228,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       state.groupMembers = await listVisibleGroupMembers(groups.map(group => group.id));
       state.groupInvitations = invitations;
       renderGroups();
+      return state.groupMembers;
     } catch (error) {
       console.error("Study group load failed:", error);
       $("#group-list").innerHTML = `<div class="empty-state"><div class="empty-icon"><i data-lucide="alert-circle"></i></div><h3>Grup belajar belum dapat dimuat</h3><p>${escapeText(error?.message || "Periksa koneksi lalu coba kembali.")}</p><button class="btn btn-secondary btn-sm" id="group-retry">Coba lagi</button></div>`;
@@ -1290,6 +1291,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     openGroupWorkspace({
       group,
       membership,
+      members: state.groupMembers.filter(member => member.group_id === group.id),
       currentUserId,
       toast,
       escape: escapeText,
