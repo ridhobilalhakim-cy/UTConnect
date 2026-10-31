@@ -71,3 +71,5 @@ The `20261031140523_group_materials_verified_delete_guard.sql` migration further
 - Replaces `update_my_student_profile` with the official UT S1 faculty/programme validation, preserving its explicit acknowledgement requirement before verified identity changes reset verification to pending.
 - Adds group activity notifications for newly inserted group messages, materials, and agenda items. The new notification types route back to the group workspace.
 - `complete-student-registration` Edge Function is deployed as version 5 with JWT verification enabled and the same UT S1 faculty/programme validation.
+
+- `20261031163243_profile_avatar_presets.sql`: permits only the four bundled preset avatar identifiers in the owner-scoped avatar RPC; uploaded photos still require a caller-owned Storage object.
