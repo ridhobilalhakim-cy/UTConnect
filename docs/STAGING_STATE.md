@@ -8,7 +8,7 @@ Project status at inspection: ACTIVE_HEALTHY
 
 ## Remote migration history
 
-The connected staging project reported these twenty-seven applied migration entries (latest checked 2026-11-01):
+The connected staging project reported these twenty-eight applied migration entries (latest checked 2026-11-01):
 
 | Version | Name |
 |---|---|
@@ -37,6 +37,7 @@ The connected staging project reported these twenty-seven applied migration entr
 | 20261031163243 | profile_avatar_presets |
 | 20261031164151 | legacy_faculty_code_profile_compatibility |
 | 20261031173449 | normalize_legacy_ut_programme_aliases |
+| 20261031174525 | notifications_for_information_and_verification |
 
 Live introspection found the public application tables with RLS enabled, plus private NIM search and student-verification tables. PostGIS is enabled. The deployed `complete-student-registration` Edge Function is ACTIVE version 5 with JWT verification enabled.
 
@@ -171,3 +172,13 @@ Latest data counts: 0 matching preference rows, 0 profile-course links, 0 connec
 - Remote migration `20261031173449_normalize_legacy_ut_programme_aliases` is applied. Direct SQL checks confirmed both the legacy `Ilmu Administrasi Negara` label and canonical `Ilmu Administrasi Publik` label validate for FHISIP.
 - Profile identity comparisons use canonical faculty/programme names. A legacy label being normalized does not by itself reset a verified user's student-verification status.
 - No profile rows were mass-updated by this migration.
+
+
+## Notification coverage update — checked 2026-11-01
+
+- Applied remote migration `20261031174525_notifications_for_information_and_verification`.
+- A profile status transition to `verified` or `rejected` now creates an owner-scoped `student_verification` notification.
+- A newly inserted published Information UT post, or a draft transitioning to published, creates an `information_post` notification for eligible profiles. Public posts notify all profiles except the author; verified-student posts notify verified profiles except the author.
+- Editing a post that is already published does not emit another notification.
+- Dashboard notification routing now opens the Student Verification or Information UT page for these two notification types.
+- Rollback-only staging SQL checks confirmed both trigger paths and confirmed that editing an already-published Information UT post does not create a duplicate. All temporary rows and status changes were rolled back.
