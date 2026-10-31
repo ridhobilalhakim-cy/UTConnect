@@ -6,6 +6,13 @@ import {
   updateInformationPost,
   deleteInformationPost,
 } from "../services/information.js";
+import {
+  getMyStudentVerificationStatus,
+  submitStudentVerificationEvidence,
+  listStudentVerificationQueue,
+  downloadStudentVerificationEvidence,
+  reviewStudentVerificationRequest,
+} from "../services/verification.js";
 
 export function initDashboard({ isAdmin = false } = {}) {
   window.L = L;
@@ -37,7 +44,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   ];
   function toast(message){const el=$('#toast');el.textContent=message;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),2500)}
   function icons(){if(window.lucide)lucide.createIcons()}
-  function navigate(page){state.page=page;$$('.page-section').forEach(s=>s.classList.toggle('active',s.id==='page-'+page));$$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));const labels={home:'Beranda',matching:'Matching',forum:'Forum',groups:'Grup Belajar',info:'Informasi UT',profile:'Profil Saya'};$('#crumb-current').textContent=labels[page]||'Beranda';window.scrollTo({top:0,behavior:'smooth'});if(page==='home'&&state.map)setTimeout(()=>state.map.invalidateSize(),80);icons()}
+  function navigate(page){state.page=page;$$('.page-section').forEach(s=>s.classList.toggle('active',s.id==='page-'+page));$$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));const labels={home:'Beranda',matching:'Matching',forum:'Forum',groups:'Grup Belajar',info:'Informasi UT',profile:'Profil Saya',verification:'Verifikasi Mahasiswa'};$('#crumb-current').textContent=labels[page]||'Beranda';window.scrollTo({top:0,behavior:'smooth'});if(page==='home'&&state.map)setTimeout(()=>state.map.invalidateSize(),80);if(page==='verification')loadVerification();icons()}
   $$('[data-page]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));$$('[data-go]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.go)));
   function visibleStudents(){return students.filter(s=>s.distance<=state.radius&&(!state.search||s.nim.includes(state.search)))}
   function renderNearby(){const list=$('#nearby-list');const items=visibleStudents().slice(0,5);list.innerHTML=items.length?items.map(s=>`<div class="person-row"><div class="person-avatar">${s.initial}</div><div class="person-meta"><strong>${state.connected.has(s.id)?escapeText(s.name):`Mahasiswa ${s.initial}`}</strong><span>${s.prodi}</span></div><span class="distance">~${Math.round(s.distance*10)/10} km</span></div>`).join(''):`<div class="empty-state"><div class="empty-icon"><i data-lucide="user-search"></i></div><h3>Belum ada hasil</h3><p>Tidak ditemukan mahasiswa dalam radius atau pencarian yang dipilih.</p></div>`;icons()}
@@ -193,11 +200,157 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       shareInfoButton.addEventListener('click',()=>openInfoEditor());
     }
   }
+
+  // Student verification: evidence is stored in a private bucket and decisions are enforced by Supabase RPCs.
+  let activeVerificationPreviewUrl = null;
+  function verificationDate(value) {
+    if (!value) return "-";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+  }
+  function renderVerificationSubmission(status) {
+    const panel = $("#verification-submit-panel");
+    const latest = status?.latest_request;
+    if (status?.profile_status === "verified") {
+      panel.innerHTML = '<div class="verification-result success"><span class="verification-symbol">✓</span><div><strong>Verifikasi disetujui</strong><p>Status mahasiswa akun ini telah diverifikasi oleh administrator.</p></div></div>';
+      return;
+    }
+    if (latest?.status === "submitted") {
+      panel.innerHTML = `<div class="verification-result pending"><span class="verification-symbol">…</span><div><strong>Bukti sedang diperiksa</strong><p>Dokumen ${escapeText(latest.original_filename || "yang diunggah")} diterima pada ${escapeText(verificationDate(latest.submitted_at))}. Tunggu hasil pemeriksaan administrator.</p></div></div>`;
+      return;
+    }
+    const rejection = status?.profile_status === "rejected"
+      ? `<div class="verification-result rejected"><span class="verification-symbol">!</span><div><strong>Verifikasi belum disetujui</strong><p>${escapeText(latest?.review_note || "Silakan periksa kembali dokumen dan kirim bukti yang sesuai.")}</p></div></div>`
+      : "";
+    panel.innerHTML = `
+      ${rejection}
+      <div class="verification-panel-head"><div><h2>Unggah bukti status mahasiswa</h2><p>Gunakan dokumen yang menunjukkan status mahasiswa UT aktif, misalnya bukti registrasi atau KRS semester berjalan. KTM dapat menjadi dokumen pendukung.</p></div></div>
+      <form id="verification-form" class="verification-form">
+        <label class="verification-upload" for="verification-file"><span class="upload-symbol">↑</span><strong>Pilih dokumen bukti</strong><small>PDF, JPG, atau PNG · Maksimal 5 MB</small><input id="verification-file" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required></label>
+        <label class="verification-consent"><input id="verification-consent" type="checkbox" required><span>Saya memastikan dokumen yang dikirim benar dan mengizinkan UT Connect menggunakannya hanya untuk pemeriksaan status mahasiswa.</span></label>
+        <button class="btn btn-primary" id="verification-submit" type="submit">Kirim untuk diverifikasi</button>
+      </form>
+      <p class="verification-privacy">Berkas disimpan pada penyimpanan privat. Hanya administrator yang berwenang dapat mengaksesnya untuk pemeriksaan. Jangan unggah KTP atau dokumen yang memuat data pribadi yang tidak diperlukan.</p>
+    `;
+    $("#verification-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const file = $("#verification-file").files?.[0];
+      const consent = $("#verification-consent").checked;
+      if (!file || !consent) { toast("Pilih dokumen dan setujui pernyataan terlebih dahulu."); return; }
+      const button = $("#verification-submit");
+      button.disabled = true;
+      button.textContent = "Mengunggah bukti...";
+      try {
+        await submitStudentVerificationEvidence(file);
+        toast("Bukti berhasil dikirim. Status menunggu pemeriksaan.");
+        await loadVerification();
+      } catch (error) {
+        console.error("Student verification submission failed:", error);
+        toast(error?.message || "Bukti belum berhasil dikirim.");
+        button.disabled = false;
+        button.textContent = "Kirim untuk diverifikasi";
+      }
+    });
+  }
+  function renderVerificationQueue(items) {
+    const container = $("#verification-queue");
+    if (!items.length) {
+      container.innerHTML = '<div class="empty-state verification-empty"><div class="empty-icon"><i data-lucide="inbox"></i></div><h3>Belum ada permohonan masuk</h3><p>Permohonan verifikasi baru akan muncul di sini setelah mahasiswa mengunggah bukti.</p></div>';
+      icons();
+      return;
+    }
+    container.innerHTML = items.map(item => `
+      <article class="verification-queue-card">
+        <div class="verification-queue-head"><div><strong>${escapeText(item.full_name)}</strong><span>${escapeText(item.program)} · ${escapeText(item.faculty)}</span></div><span class="verification-status-pill">Menunggu</span></div>
+        <div class="verification-meta"><span>Semester ${escapeText(item.semester)}</span><span>Dikirim ${escapeText(verificationDate(item.submitted_at))}</span></div>
+        <div class="verification-file-row"><span class="verification-file-name">▣ ${escapeText(item.original_filename)}</span><button class="btn btn-secondary btn-sm" type="button" data-verification-preview="${escapeText(item.storage_path)}" data-verification-filename="${escapeText(item.original_filename)}">Lihat bukti</button></div>
+        <div class="verification-review-actions"><button class="btn btn-primary btn-sm" type="button" data-verification-approve="${escapeText(item.request_id)}">Setujui</button><button class="btn btn-secondary btn-sm verification-reject-button" type="button" data-verification-reject="${escapeText(item.request_id)}">Tolak dengan alasan</button></div>
+      </article>
+    `).join("");
+    container.querySelectorAll("[data-verification-preview]").forEach(button => button.addEventListener("click", () => previewVerificationEvidence(button.dataset.verificationPreview, button.dataset.verificationFilename)));
+    container.querySelectorAll("[data-verification-approve]").forEach(button => button.addEventListener("click", () => confirmVerificationReview(button.dataset.verificationApprove, "approved")));
+    container.querySelectorAll("[data-verification-reject]").forEach(button => button.addEventListener("click", () => confirmVerificationReview(button.dataset.verificationReject, "rejected")));
+    icons();
+  }
+  async function previewVerificationEvidence(storagePath, filename) {
+    try {
+      const blob = await downloadStudentVerificationEvidence(storagePath);
+      if (activeVerificationPreviewUrl) URL.revokeObjectURL(activeVerificationPreviewUrl);
+      activeVerificationPreviewUrl = URL.createObjectURL(blob);
+      const safeFilename = escapeText(filename || "Bukti verifikasi");
+      const content = blob.type.startsWith("image/")
+        ? `<div class="verification-preview"><img src="${activeVerificationPreviewUrl}" alt="${safeFilename}"><p>${safeFilename}</p></div>`
+        : `<div class="verification-preview"><div class="empty-icon"><i data-lucide="file-pdf"></i></div><strong>${safeFilename}</strong><p>Dokumen PDF berhasil diambil dari penyimpanan privat.</p><a class="btn btn-primary" href="${activeVerificationPreviewUrl}" target="_blank" rel="noopener noreferrer" download="${safeFilename}">Buka / unduh PDF</a></div>`;
+      openModal("Bukti verifikasi mahasiswa", content, "Selesai");
+      icons();
+    } catch (error) {
+      console.error("Unable to load verification evidence:", error);
+      toast(error?.message || "Bukti tidak dapat dibuka.");
+    }
+  }
+  function confirmVerificationReview(requestId, decision) {
+    const approving = decision === "approved";
+    const content = approving
+      ? '<p class="section-note">Pastikan dokumen menunjukkan status mahasiswa UT aktif dan data akademik sesuai dengan profil yang diajukan.</p>'
+      : '<p class="section-note">Tuliskan alasan singkat agar mahasiswa mengetahui hal yang perlu diperbaiki sebelum mengirim ulang.</p><label class="field"><span>Alasan penolakan</span><textarea id="verification-reject-note" class="text-input" rows="4" maxlength="500" placeholder="Contoh: Bukti registrasi semester berjalan belum terlihat."></textarea></label>';
+    openModal(
+      approving ? "Setujui verifikasi mahasiswa?" : "Tolak permohonan verifikasi?",
+      content,
+      approving ? "Setujui bukti" : "Kirim penolakan",
+      async () => {
+        const note = approving ? null : $("#verification-reject-note")?.value.trim();
+        if (!approving && (!note || note.length < 5)) {
+          toast("Alasan penolakan minimal 5 karakter.");
+          return false;
+        }
+        await reviewStudentVerificationRequest(requestId, decision, note);
+        await loadVerification();
+        return true;
+      },
+      approving ? "Status mahasiswa berhasil diverifikasi." : "Permohonan ditolak. Mahasiswa dapat mengirim bukti ulang."
+    );
+  }
+  async function loadVerification() {
+    const statusPanel = $("#verification-status-panel");
+    const queuePanel = $("#verification-admin-panel");
+    if (!statusPanel) return;
+    statusPanel.innerHTML = '<div class="verification-loading">Memuat status verifikasi...</div>';
+    try {
+      const status = await getMyStudentVerificationStatus();
+      const profileStatus = status?.profile_status || "pending";
+      const labels = { pending: "Belum terverifikasi", verified: "Terverifikasi", rejected: "Perlu perbaikan" };
+      const styles = { pending: "pending", verified: "success", rejected: "rejected" };
+      statusPanel.innerHTML = `
+        <div class="verification-status-head"><div><div class="eyebrow">Status akun mahasiswa</div><h2>${labels[profileStatus] || "Belum terverifikasi"}</h2><p>Login Google atau email tidak otomatis membuktikan status mahasiswa UT.</p></div><span class="verification-status-pill ${styles[profileStatus] || "pending"}">${escapeText(profileStatus.toUpperCase())}</span></div>
+        <div class="verification-steps"><span class="verification-step done">1. Lengkapi profil</span><span class="verification-step ${status?.latest_request ? "done" : ""}">2. Kirim bukti</span><span class="verification-step ${profileStatus === "verified" ? "done" : ""}">3. Pemeriksaan admin</span></div>
+      `;
+      renderVerificationSubmission(status);
+      if (isAdmin && queuePanel) {
+        queuePanel.hidden = false;
+        $("#verification-queue").innerHTML = '<div class="verification-loading">Memuat antrean...</div>';
+        const items = await listStudentVerificationQueue();
+        renderVerificationQueue(items);
+        $("#verification-queue-count").textContent = String(items.length);
+      } else if (queuePanel) {
+        queuePanel.hidden = true;
+      }
+    } catch (error) {
+      console.error("Student verification load failed:", error);
+      statusPanel.innerHTML = `<div class="verification-result rejected"><span class="verification-symbol">!</span><div><strong>Status belum dapat dimuat</strong><p>${escapeText(error?.message || "Periksa koneksi lalu coba lagi.")}</p><button class="btn btn-secondary btn-sm" id="verification-retry">Coba lagi</button></div></div>`;
+      $("#verification-retry")?.addEventListener("click", loadVerification);
+      if (isAdmin && queuePanel) {
+        queuePanel.hidden = false;
+        $("#verification-queue").innerHTML = '<p class="section-note">Antrean belum dapat dimuat.</p>';
+      }
+    }
+  }
+  $("#verification-refresh")?.addEventListener("click", loadVerification);
+
   function openChat(id){const s=students.find(x=>x.id===id);if(!s)return;const msgs=state.messages[id]||[];openModal(`Chat dengan ${s.name}`,`<div class="tiny muted" style="margin-bottom:10px">Percakapan pribadi · mode demo, belum real-time</div><div id="chat-history" style="min-height:150px;max-height:280px;overflow:auto;background:#f7f9fc;border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;align-content:start;gap:8px">${msgs.length?msgs.map(m=>`<div style="justify-self:end;max-width:85%;background:#eaf1fa;color:#23415f;padding:9px 11px;border-radius:12px 12px 3px 12px;font-size:11px;line-height:1.6">${escapeText(m)}</div>`).join(''):'<div class="empty-state" style="border:0;background:transparent;padding:28px 8px"><h3>Mulai percakapan</h3><p>Belum ada pesan. Kirim pesan pertama untuk memulai diskusi belajar.</p></div>'}</div><div style="display:flex;gap:7px;margin-top:10px"><input id="chat-input" class="text-input" placeholder="Tulis pesan..." style="flex:1"><button id="chat-send" class="btn btn-primary"><i data-lucide="send"></i>Kirim</button></div><p class="tiny muted" style="margin:9px 0 0">Pesan hanya tersimpan sementara di sesi browser ini. Tidak dikirim ke mahasiswa lain.</p>`);$('#modal-confirm').style.display='none';$('#modal-cancel').textContent='Tutup';const send=()=>{const input=$('#chat-input');const value=input.value.trim();if(!value)return;(state.messages[id]??=[]).push(value);const history=$('#chat-history');history.innerHTML=state.messages[id].map(m=>`<div style="justify-self:end;max-width:85%;background:#eaf1fa;color:#23415f;padding:9px 11px;border-radius:12px 12px 3px 12px;font-size:11px;line-height:1.6">${escapeText(m)}</div>`).join('');input.value='';history.scrollTop=history.scrollHeight};$('#chat-send').addEventListener('click',send);$('#chat-input').addEventListener('keydown',e=>{if(e.key==='Enter')send()});icons()}
   function escapeText(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   let modalAction=null,modalSuccessMessage='Perubahan diterapkan pada sesi demo.';function openModal(title,content,confirm='Mengerti',action=null,successMessage='Perubahan diterapkan pada sesi demo.'){ modalAction=action;modalSuccessMessage=successMessage;$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal-confirm').textContent=confirm;$('#modal-confirm').style.display='';$('#modal-confirm').disabled=false;$('#modal-cancel').textContent='Tutup';$('#modal-backdrop').classList.add('open'); }
-  function closeModal(){$('#modal-backdrop').classList.remove('open')}
+  function closeModal(){$('#modal-backdrop').classList.remove('open');if(activeVerificationPreviewUrl){URL.revokeObjectURL(activeVerificationPreviewUrl);activeVerificationPreviewUrl=null}}
   const guide=`<div style="display:grid;gap:14px"><div><b style="font-size:11px">01 · Lengkapi profil</b><p class="section-note">Daftar dengan data akademik yang diperlukan. Verifikasi identitas harus dilakukan melalui layanan yang sah pada versi produksi.</p></div><div><b style="font-size:11px">02 · Atur lokasi secara sadar</b><p class="section-note">Pilih lokasi perkiraan dan tentukan apakah ingin tampil di radar. Jangan tampilkan alamat rumah atau koordinat presisi kepada pengguna lain.</p></div><div><b style="font-size:11px">03 · Temukan teman belajar</b><p class="section-note">Gunakan radius dan preferensi mata kuliah untuk melihat rekomendasi yang relevan.</p></div><div><b style="font-size:11px">04 · Bangun koneksi</b><p class="section-note">Kirim permintaan connect. Chat hanya tersedia setelah kedua pihak menyetujui koneksi.</p></div><div><b style="font-size:11px">05 · Belajar bersama</b><p class="section-note">Gunakan forum untuk peer help atau bergabung dan membuat kelompok belajar.</p></div><p class="tiny muted" style="padding:10px;background:#f7f9fc;border-radius:9px">Catatan: halaman ini adalah prototype UI/UX dengan data simulasi. Integrasi akun, lokasi aman, koneksi, dan chat multi-user belum tersedia.</p></div>`;
   $$('[data-open-guide]').forEach(b=>b.addEventListener('click',()=>openModal('Panduan UT Connect',guide)));$('#modal-close').addEventListener('click',closeModal);$('#modal-cancel').addEventListener('click',closeModal);$('#modal-confirm').addEventListener('click',async()=>{if(modalAction){const confirmButton=$('#modal-confirm');confirmButton.disabled=true;try{const result=await modalAction();if(result===false)return;modalAction=null;closeModal();toast(modalSuccessMessage)}catch(error){console.error('Modal action failed:',error);toast(error.message||'Tindakan gagal. Silakan coba lagi.')}finally{confirmButton.disabled=false}return}closeModal();toast('Panduan ditutup.')});$('#modal-backdrop').addEventListener('click',e=>{if(e.target.id==='modal-backdrop')closeModal()});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});$('#notif-btn').addEventListener('click',()=>toast('Belum ada notifikasi baru.'));$('#edit-profile').addEventListener('click',()=>openModal('Edit profil',`<p class="section-note">Form edit profil ditampilkan sebagai rancangan UI. Penyimpanan dan verifikasi perubahan belum terhubung ke backend.</p><div class="field"><label>Nama tampilan</label><input class="text-input" value="Andi Bintang"></div><div class="field"><label>Program studi</label><input class="text-input" value="Sistem Informasi" disabled></div><div class="field"><label>Preferensi belajar</label><select class="select"><option>Online · Malam hari</option><option>Online · Akhir pekan</option><option>Offline</option></select></div>`,`Tutup`));
-  renderNearby();renderMatches();renderPosts();renderGroups();loadInformation();initMap();icons();
+  renderNearby();renderMatches();renderPosts();renderGroups();loadInformation();loadVerification();initMap();icons();
 }
