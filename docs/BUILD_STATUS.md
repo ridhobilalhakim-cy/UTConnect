@@ -102,11 +102,11 @@ Important limitations:
 - Playwright tests mock Supabase RPC and Storage. Actual end-to-end upload, secure download, and review with real accounts are not yet browser-verified.
 - No real student request or status has been changed during implementation.
 
-At the last live database check:
-- 3 profiles are pending.
-- 1 profile is verified.
-- 0 verification requests are awaiting review.
-- 0 review events have been recorded.
+At the latest live database check:
+- 4 profiles exist: 1 verified and 3 pending.
+- 1 verification request has status approved.
+- 1 approved review event is recorded.
+- 0 requests are awaiting review.
 
 
 ## Forum Diskusi milestone
@@ -126,6 +126,6 @@ Security boundary:
 - The UI receives the signed-in user's own name from the profile already loaded for the session. Other students' profile names are masked because profiles RLS does not permit reading another user's profile record.
 - Existing RLS remains authoritative; the UI gate is supplementary and cannot grant access by itself.
 
-Live database counts at the latest check: 0 forum posts, 0 forum comments, and 0 active courses. One of four profiles is verified; three are pending. No live test records were inserted.
+Live database counts at the latest check: 0 forum posts, 0 forum comments, and 0 active courses. One of four profiles is verified; three are pending. The private verification tables contain one approved request and one approved review event. No live forum test records were inserted.
 
 The 13 Playwright tests use mocked Supabase HTTP routes and synthetic data. They prove client-side flows but do not prove live posting/commenting across real accounts. Real-browser acceptance against Supabase and confirmation of the Netlify deployment are still required.
