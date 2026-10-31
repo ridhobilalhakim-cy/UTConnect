@@ -145,3 +145,16 @@ Latest data counts: 0 matching preference rows, 0 profile-course links, 0 connec
 - Both Edge Functions set Cache-Control: no-store. The Home Map UI includes explicit location consent, GPS refresh, confirmed manual map-point selection, radar visibility, and radius selection. The old fabricated student/NIM list and fixed Bandung center have been removed.
 - Latest mocked browser verification: GitHub Actions run #119, all 30 Playwright tests passed. This does not replace live acceptance with two verified synthetic accounts. The current staging database still has only one verified profile and no nearby test cohort; no live location rows or real student records were inserted or altered during this feature work.
 - Before public release, configure explicit CORS origin allowlists for the actual app domain and complete two-account location privacy tests. Netlify deployment status and production URL are still unconfirmed.
+
+
+## Reported UI integration fixes (checked 2026-10-31)
+
+- Registration now uses linked Faculty and Programme selectors for the 36 official UT undergraduate S1 programmes across FEB, FHISIP, FKIP and FST. The Edge Function rejects programme/faculty combinations outside that catalogue. Source catalogue: UT official Program Studi page.
+- Administrators are identified by the admin role in the dashboard/profile rather than displaying the student verification state as their role. Verified students no longer see the obsolete "modules still in backend integration" notice.
+- Forum author names now load through `get_forum_author_profiles`, which only returns verified users who authored a forum post/comment and exposes name/avatar fields required by the forum. Forum replies continue to use the existing RLS-protected `forum_comments` workflow.
+- Direct messages now have a dedicated inbox and per-connection rooms. `get_my_chat_rooms` only returns accepted connections where both participants are verified and not mutually blocked. It returns the other participant's name/avatar, programme, latest message and unread count.
+- Profile editing now calls the existing owner-scoped `update_my_student_profile` RPC, validates official faculty/programme combinations, supports a short bio, and allows an owner-scoped avatar upload. Changing academic identity for a verified student still requires acknowledgement and returns the student to pending verification.
+- Group notifications additionally cover new group chat messages, shared materials and agenda entries, in addition to existing join/decision/invite notifications.
+- New remote migration version: `20261031162034_bugfix_forum_chat_profile_avatars_group_notifications`. Registration Edge Function: version 5, JWT verification ON.
+- Live staging remains intentionally free of sample forum/group/chat/notification rows. Multi-account group/chat/realtime delivery still requires a verified second test account; the group workspace UI remains covered by mocked Playwright tests.
+- The active UT course catalogue `public.courses` still contains zero rows. General forum discussions and general study groups work without it; course-specific lists must be populated from an official UT course catalogue rather than synthesised from programme names.
