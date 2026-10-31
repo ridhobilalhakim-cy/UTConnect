@@ -140,7 +140,6 @@ Deno.serve(async (req: Request) => {
     }
 
     const results = (Array.isArray(data) ? data : []).map((row: Record<string, unknown>) => ({
-      student_id: row.student_id,
       initials: row.initials,
       program: row.program,
       approx_distance_m: row.approx_distance_m,
