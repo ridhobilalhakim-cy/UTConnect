@@ -1,4 +1,4 @@
-# Build and verification status — Information UT / Student Verification / Forum Diskusi / Grup Belajar / Matching & Connections / Direct Messaging
+# Build and verification status — Information UT / Student Verification / Forum Diskusi / Grup Belajar / Matching & Connections / Direct Messaging / Notifications
 
 Date: 2026-10-31
 
@@ -14,7 +14,7 @@ Workflow: `Verify UT Connect build`
 - Playwright Chromium installation — PASS.
 - Browser E2E — **13 passed** on that commit.
 - Forum create/comment flows and verified-only access checks included.
-- The current repository now defines 24 Playwright tests: four Grup Belajar, five Matching/Connections, and two Direct Messaging scenarios were added after run #50. The 11 added tests have not yet been confirmed by a successful CI run.
+- The current repository now defines 26 Playwright tests: four Grup Belajar, five Matching/Connections, two Direct Messaging, and two Notifications scenarios were added after run #50. The 13 added tests have not yet been confirmed by a successful CI run.
 
 Workflow run: https://github.com/ridhobilalhakim-cy/UTConnect/actions/runs/41191070350
 
@@ -64,7 +64,7 @@ This environment could not independently resolve the public Netlify domain. The 
 2. Test Google sign-in and profile completion using each team's actual account.
 3. Test Information UT create/edit/publish/unpublish/delete from a real admin browser session and confirm student read visibility.
 4. Define and publish the evidence acceptance and retention policy before opening Student Verification to the public.
-5. Run and review CI for the new Grup Belajar, Matching/Connections, and Direct Messaging integrations, then perform real-account group, preference, connection-request, and two-party chat acceptance tests. Notifications and home-map access remain future integration milestones.
+5. Run and review CI for the new Grup Belajar, Matching/Connections, Direct Messaging, and Notifications integrations, then perform real-account group, preference, connection-request, two-party chat, and notification-trigger acceptance tests. Home-map access remains a future integration milestone.
 
 ## Source-control caveats
 
@@ -196,3 +196,23 @@ Database security update:
 - A temporary SQL transaction verified that an accepted recipient context can read a message and update its read receipt, while a pending connection exposes zero messages. The test transaction was rolled back.
 
 The two new Playwright scenarios mock Supabase responses and Realtime. They are not counted as passing until a current GitHub Actions run confirms the full 24-test suite. Live staging currently has zero connection records and zero direct messages, and only one verified student profile; real two-account conversation and Realtime acceptance therefore remains outstanding.
+
+
+## Notifications milestone — implementation added 2026-10-31
+
+The dashboard notification bell now reads from `public.notifications` through `src/services/notifications.js`.
+
+- The header displays the unread count and opens a recent-notifications panel. Users can mark one notification or all notifications as read.
+- Notification selection routes the user to Matching/Connections, the relevant direct-message conversation, a forum thread, or group details/request management as appropriate.
+- The client subscribes to Realtime changes filtered by the signed-in user's ID. The database RLS policy independently restricts reads to the owner.
+
+Database update:
+- Migration `20261031111603_secure_notifications_workflow` is applied and recorded in `supabase/migrations/REMOTE_MIGRATIONS.md`.
+- Six private trigger functions create notifications for connection requests, connection decisions, direct messages, comments on the current user's post, group join requests sent to active admins/co-admins, and group join decisions.
+- Authenticated users cannot insert/delete notification rows or modify their content/owner. They have column-level UPDATE on `read_at` only, and the RLS policy permits updating only their own unread notifications.
+- `public.notifications` is added to `supabase_realtime`; change events are scoped by a per-user subscription filter and RLS.
+
+Verification:
+- Temporary database transactions verified that all six event types create notifications and that authenticated users see only their own rows. A read receipt update succeeded; direct insert and title update privileges were absent. All synthetic database changes were rolled back.
+- Two mocked Playwright tests cover opening a direct-message notification and marking all notifications read. The current suite defines 26 tests; the two new scenarios are not counted as passing until a current CI run confirms them.
+- Live staging has zero stored notification records, zero connection/message/forum/group test data, one verified student and three pending students. Real cross-account notification and Realtime behavior remains an acceptance test after a second verified test account is available.
