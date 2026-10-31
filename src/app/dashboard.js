@@ -301,11 +301,17 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     }).addTo(map);
     map.on("click", event => {
       const consent = $("#map-location-consent");
-      if (state.myLocation?.consented_at || consent?.checked) {
-        saveSelectedMapPoint(event.latlng.lat, event.latlng.lng);
-      } else {
+      if (!state.myLocation?.consented_at && !consent?.checked) {
         toast("Setujui penggunaan lokasi sebelum memilih titik pada peta.");
+        return;
       }
+      openModal(
+        "Simpan titik lokasi belajar?",
+        "<p class='section-note'>Titik yang dipilih akan disimpan sebagai lokasi presisi milik akunmu. Mahasiswa lain hanya dapat melihat pin perkiraan jika kamu mengaktifkan radar.</p>",
+        "Simpan titik",
+        async () => saveSelectedMapPoint(event.latlng.lat, event.latlng.lng),
+        "Titik lokasi berhasil disimpan.",
+      );
     });
   }
 
@@ -472,7 +478,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     } catch (error) {
       console.error("Home Map point save failed:", error);
       setMapStatus(error?.message || "Titik lokasi belum berhasil disimpan.", "error");
-      toast(error?.message || "Lokasi belum berhasil disimpan.");
+      throw error;
     }
   }
 
