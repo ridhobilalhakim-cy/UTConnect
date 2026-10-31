@@ -21,7 +21,7 @@ async function bootAuthenticatedApp() {
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("id,full_name,faculty,program,semester,verification_status")
+      .select("id,full_name,faculty,program,semester,verification_status,bio,avatar_path")
       .eq("id", session.user.id)
       .maybeSingle();
     if (profileError) throw profileError;
@@ -35,12 +35,27 @@ async function bootAuthenticatedApp() {
     const initialsText = initials(fullName);
     const programMeta = `${profile.program || "Mahasiswa UT"} · Semester ${profile.semester || "-"}`;
     ["topUserName", "sideUserName"].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = fullName; });
-    ["topAvatar", "sideAvatar", "profileInitials"].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = initialsText; });
+    ["topAvatar", "sideAvatar", "profileInitials"].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = initialsText;
+      if (profile.avatar_path) {
+        const { data } = supabase.storage.from("profile-avatars").getPublicUrl(profile.avatar_path);
+        if (data?.publicUrl) {
+          const image = document.createElement("img");
+          image.src = data.publicUrl;
+          image.alt = "";
+          image.loading = "lazy";
+          el.replaceChildren(image);
+        }
+      }
+    });
     const topMeta = document.getElementById("topUserMeta");
     if (topMeta) topMeta.textContent = isAdmin ? "Administrator UT Connect" : (profile.verification_status === "verified" ? "Mahasiswa terverifikasi" : "Status menunggu verifikasi");
-    const sideMeta = document.getElementById("sideUserMeta"); if (sideMeta) sideMeta.textContent = isAdmin ? `${programMeta} · Administrator` : programMeta;
+    const sideMeta = document.getElementById("sideUserMeta"); if (sideMeta) sideMeta.textContent = isAdmin ? "Administrator UT Connect" : programMeta;
     const profileName = document.getElementById("profileFullName"); if (profileName) profileName.textContent = fullName;
-    const profileStatus = document.getElementById("profileStatusTag"); if (profileStatus) profileStatus.textContent = `Status: ${(profile.verification_status || "pending").toUpperCase()}`;
+    const profileStatus = document.getElementById("profileStatusTag"); if (profileStatus) profileStatus.textContent = isAdmin ? "Role: ADMINISTRATOR" : `Status: ${(profile.verification_status || "pending").toUpperCase()}`;
+    const profileBio = document.getElementById("profileBio"); if (profileBio) profileBio.textContent = profile.bio || "Mahasiswa Universitas Terbuka";
     const profileFaculty = document.getElementById("profileFaculty"); if (profileFaculty) profileFaculty.textContent = profile.faculty || "-";
     const profileProgram = document.getElementById("profileProgram"); if (profileProgram) profileProgram.textContent = profile.program || "-";
     const profileSemester = document.getElementById("profileSemester"); if (profileSemester) profileSemester.textContent = profile.semester || "-";
@@ -49,11 +64,8 @@ async function bootAuthenticatedApp() {
     const greeting = document.querySelector(".welcome-copy .hello"); if (greeting) greeting.textContent = `Halo, ${fullName.split(/\s+/)[0]}! Siap belajar hari ini?`;
     const notice = document.getElementById("sessionNotice");
     if (notice) {
-      notice.textContent = isAdmin
-        ? `Administrator UT Connect aktif. Status mahasiswa: ${(profile.verification_status || "pending").toUpperCase()}. Role admin tidak mengubah status verifikasi mahasiswa.`
-        : (profile.verification_status === "verified"
-          ? "Akun mahasiswa terverifikasi. Beberapa modul dashboard masih dalam tahap integrasi backend."
-          : "Akun berhasil masuk. Status mahasiswa masih menunggu verifikasi. Beberapa modul dashboard masih dalam tahap integrasi backend.");
+      notice.hidden = isAdmin || profile.verification_status === "verified";
+      notice.textContent = "Akun berhasil masuk. Status mahasiswa masih menunggu verifikasi. Selesaikan pemeriksaan pada menu Verifikasi Mahasiswa.";
     }
 
     const signout = document.getElementById("authSignout");
@@ -66,7 +78,7 @@ async function bootAuthenticatedApp() {
     supabase.auth.onAuthStateChange(event => { if (event === "SIGNED_OUT") window.location.replace("/"); });
 
     const guard = document.getElementById("authGuard"); if (guard) guard.remove();
-    initDashboard({ isAdmin, isVerified: profile.verification_status === "verified", verificationStatus: profile.verification_status || "pending", currentUserId: session.user.id, currentUserName: fullName });
+    initDashboard({ isAdmin, isVerified: profile.verification_status === "verified", verificationStatus: profile.verification_status || "pending", currentUserId: session.user.id, currentUserName: fullName, currentProfile: profile });
   } catch (error) {
     guardError(error?.message || "Terjadi kendala saat memulihkan akun.");
   }
