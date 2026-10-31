@@ -1017,9 +1017,9 @@ test('group admin can approve a pending membership request', async ({ page }) =>
 
   await page.locator('[data-page="groups"]').first().click();
   await page.locator('[data-group-open="group-admin-001"]').click();
-  await expect(page.locator('#modal-content')).toContainText('Permohonan bergabung (1)');
-  await page.locator('[data-group-review="approve"]').click();
-  await page.locator('#modal-confirm').click();
+  await page.locator('[data-group-tab="members"]').click();
+  await expect(page.locator('#modal-content')).toContainText('Permohonan masuk #1');
+  await page.locator('[data-group-member-decision="approve"]').click();
 
   await expect.poll(() => state.groupReviewCalls.length).toBe(1);
   expect(state.groupReviewCalls[0].p_actor_id).toBe(USER.id);
