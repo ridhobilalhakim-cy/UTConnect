@@ -85,10 +85,26 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
     }
     if (path.endsWith('/rest/v1/rpc/update_my_student_profile') && method === 'POST') {
       const input = request.postDataJSON();
+      const facultyAliases = {
+        FEB: 'Fakultas Ekonomi dan Bisnis (FEB)',
+        FHISIP: 'Fakultas Hukum, Ilmu Sosial, dan Ilmu Politik (FHISIP)',
+        FKIP: 'Fakultas Keguruan dan Ilmu Pendidikan (FKIP)',
+        FST: 'Fakultas Sains dan Teknologi (FST)',
+      };
+      const programAliases = {
+        'Ilmu Administrasi Negara': 'Ilmu Administrasi Publik',
+        'Ilmu Administrasi Bisnis': 'Administrasi Bisnis',
+        'Ilmu Hukum': 'Hukum',
+        'Ilmu Perpustakaan': 'Perpustakaan dan Sains Informasi',
+        'Ilmu dan Teknologi Pangan': 'Teknologi Pangan',
+        'Pendidikan Agama Islam': 'Pendidikan Agama Islam (PAI)',
+      };
+      const currentFaculty = facultyAliases[state.profile.faculty] || state.profile.faculty;
+      const currentProgram = programAliases[state.profile.program] || state.profile.program;
       const identityChanged =
         state.profile.full_name !== input.p_full_name ||
-        state.profile.faculty !== input.p_faculty ||
-        state.profile.program !== input.p_program ||
+        currentFaculty !== input.p_faculty ||
+        currentProgram !== input.p_program ||
         Number(state.profile.semester) !== Number(input.p_semester);
       const updated = {
         ...state.profile,
@@ -1714,13 +1730,13 @@ test('administrator dashboard shows the admin role without a student PENDING sta
   await expect(page.locator('#verification-submit-panel')).toBeHidden();
 });
 
-test('legacy UT programme names are normalized in the profile editor', async ({ page }) => {
-  await mockSupabase(page, {
+test('legacy UT programme labels preserve a verified student during profile edits', async ({ page }) => {
+  const state = await mockSupabase(page, {
     profile: {
       ...PROFILE,
-      faculty: 'FHISIP',
+      faculty: 'Fakultas Hukum, Ilmu Sosial, dan Ilmu Politik (FHISIP)',
       program: 'Ilmu Administrasi Negara',
-      verification_status: 'pending',
+      verification_status: 'verified',
     },
   });
   await page.goto('/');
@@ -1731,6 +1747,11 @@ test('legacy UT programme names are normalized in the profile editor', async ({ 
   await page.locator('#edit-profile').click();
   await expect(page.locator('#profile-edit-faculty')).toHaveValue('Fakultas Hukum, Ilmu Sosial, dan Ilmu Politik (FHISIP)');
   await expect(page.locator('#profile-edit-program')).toHaveValue('Ilmu Administrasi Publik');
+  await page.locator('#profile-edit-bio').fill('Bio mahasiswa yang diperbarui.');
+  await page.locator('#modal-confirm').click();
+  await expect(page.locator('#profileStatusTag')).toHaveText('Status: VERIFIED');
+  expect(state.profileUpdateCalls).toHaveLength(1);
+  expect(state.profileUpdateCalls[0].p_program).toBe('Ilmu Administrasi Publik');
 });
 
 test('student can edit profile using the save action instead of a close-only modal', async ({ page }) => {
