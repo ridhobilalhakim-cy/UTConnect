@@ -34,6 +34,13 @@ import {
   respondConnectionRequest,
 } from "../services/matching.js";
 import {
+  listDirectMessages,
+  sendDirectMessage,
+  markDirectMessagesRead,
+  subscribeToDirectMessages,
+  unsubscribeFromDirectMessages,
+} from "../services/chat.js";
+import {
   listActiveStudyCourses,
   listStudyGroups,
   listMyGroupMemberships,
@@ -47,7 +54,7 @@ export function initDashboard({ isAdmin = false, isVerified = false, verificatio
   window.L = L;
   const lucide = window.lucide;
 const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root.querySelectorAll(s)];
-  const state={page:'home',radius:3,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,center:[-6.9175,107.6191],connected:new Set(),messages:{},infoItems:[],forumPosts:[],forumCourses:[],groups:[],groupCourses:[],groupMemberships:new Map(),groupMembers:[],matchingCourses:[],matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredCourseIds:[],matchRadius:3000};
+  const state={page:'home',radius:3,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,center:[-6.9175,107.6191],connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,infoItems:[],forumPosts:[],forumCourses:[],groups:[],groupCourses:[],groupMemberships:new Map(),groupMembers:[],matchingCourses:[],matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredCourseIds:[],matchRadius:3000};
   const students=[
     {id:1,nim:'049100101',initial:'RA',name:'Rina Amelia',prodi:'Manajemen',distance:.55,courses:['Pengantar Manajemen','Statistika'],topics:['Manajemen waktu'],times:['Malam hari'],mode:'Online'},
     {id:2,nim:'049100102',initial:'DP',name:'Dimas Prakoso',prodi:'Sistem Informasi',distance:1.2,courses:['Algoritma & Pemrograman','Sistem Operasi'],topics:['Struktur data','Perulangan'],times:['Akhir pekan','Malam hari'],mode:'Online'},
@@ -168,7 +175,9 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       };
       const actions = incoming
         ? `<div class="connection-actions"><button type="button" class="btn btn-primary btn-sm" data-connection-accept="${escapeText(connection.connection_id)}">Terima</button><button type="button" class="btn btn-secondary btn-sm" data-connection-reject="${escapeText(connection.connection_id)}">Tolak</button></div>`
-        : `<span class="connection-state">${escapeText(labels[connection.status] || "Status koneksi")}</span>`;
+        : connection.status === "accepted"
+          ? `<div class="connection-actions"><button type="button" class="btn btn-primary btn-sm" data-chat-open="${escapeText(connection.connection_id)}"><i data-lucide="message-circle"></i>Chat</button></div>`
+          : `<span class="connection-state">${escapeText(labels[connection.status] || "Status koneksi")}</span>`;
       return `
         <article class="connection-row">
           <div class="person-avatar">${escapeText(connection.initials || "UT")}</div>
@@ -176,8 +185,9 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
           ${actions}
         </article>`;
     }).join("");
-    $$("[data-connection-accept]").forEach(button => button.addEventListener("click", () => confirmConnectionResponse(button.dataset.connectionAccept, true)));
-    $$("[data-connection-reject]").forEach(button => button.addEventListener("click", () => confirmConnectionResponse(button.dataset.connectionReject, false)));
+    $("[data-connection-accept]").forEach(button => button.addEventListener("click", () => confirmConnectionResponse(button.dataset.connectionAccept, true)));
+    $("[data-connection-reject]").forEach(button => button.addEventListener("click", () => confirmConnectionResponse(button.dataset.connectionReject, false)));
+    $("[data-chat-open]").forEach(button => button.addEventListener("click", () => openDirectChat(button.dataset.chatOpen)));
   }
 
   function renderMatches() {
@@ -206,7 +216,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       let action = `<button type="button" class="btn btn-primary btn-sm" data-connect="${escapeText(student.student_id)}">Connect</button>`;
       let label = "Belum terhubung";
       if (connection?.status === "accepted") {
-        action = '<span class="connection-state">Terhubung</span>';
+        action = `<button type="button" class="btn btn-secondary btn-sm" data-chat-open="${escapeText(connection.connection_id)}"><i data-lucide="message-circle"></i>Chat</button>`;
         label = "Koneksi aktif";
       } else if (connection?.status === "pending") {
         action = '<span class="connection-state">Menunggu jawaban</span>';
@@ -1085,11 +1095,176 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   }
   $("#verification-refresh")?.addEventListener("click", loadVerification);
 
-  function openChat(id){const s=students.find(x=>x.id===id);if(!s)return;const msgs=state.messages[id]||[];openModal(`Chat dengan ${s.name}`,`<div class="tiny muted" style="margin-bottom:10px">Percakapan pribadi · mode demo, belum real-time</div><div id="chat-history" style="min-height:150px;max-height:280px;overflow:auto;background:#f7f9fc;border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;align-content:start;gap:8px">${msgs.length?msgs.map(m=>`<div style="justify-self:end;max-width:85%;background:#eaf1fa;color:#23415f;padding:9px 11px;border-radius:12px 12px 3px 12px;font-size:11px;line-height:1.6">${escapeText(m)}</div>`).join(''):'<div class="empty-state" style="border:0;background:transparent;padding:28px 8px"><h3>Mulai percakapan</h3><p>Belum ada pesan. Kirim pesan pertama untuk memulai diskusi belajar.</p></div>'}</div><div style="display:flex;gap:7px;margin-top:10px"><input id="chat-input" class="text-input" placeholder="Tulis pesan..." style="flex:1"><button id="chat-send" class="btn btn-primary"><i data-lucide="send"></i>Kirim</button></div><p class="tiny muted" style="margin:9px 0 0">Pesan hanya tersimpan sementara di sesi browser ini. Tidak dikirim ke mahasiswa lain.</p>`);$('#modal-confirm').style.display='none';$('#modal-cancel').textContent='Tutup';const send=()=>{const input=$('#chat-input');const value=input.value.trim();if(!value)return;(state.messages[id]??=[]).push(value);const history=$('#chat-history');history.innerHTML=state.messages[id].map(m=>`<div style="justify-self:end;max-width:85%;background:#eaf1fa;color:#23415f;padding:9px 11px;border-radius:12px 12px 3px 12px;font-size:11px;line-height:1.6">${escapeText(m)}</div>`).join('');input.value='';history.scrollTop=history.scrollHeight};$('#chat-send').addEventListener('click',send);$('#chat-input').addEventListener('keydown',e=>{if(e.key==='Enter')send()});icons()}
+  function chatTimestamp(value) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "Waktu tidak tersedia" : date.toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+  }
+
+  function upsertDirectChatMessage(message) {
+    if (!message?.id) return;
+    const index = state.chatMessages.findIndex(item => item.id === message.id);
+    if (index >= 0) state.chatMessages[index] = { ...state.chatMessages[index], ...message };
+    else state.chatMessages.push(message);
+    state.chatMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    renderDirectChatMessages();
+  }
+
+  function renderDirectChatMessages() {
+    const container = $("#direct-chat-messages");
+    if (!container) return;
+    const messages = state.chatMessages || [];
+    container.innerHTML = messages.length ? messages.map(message => {
+      const own = message.sender_id === currentUserId;
+      const receipt = own ? (message.read_at ? "Dibaca" : "Terkirim") : "";
+      return `
+        <article class="direct-chat-message ${own ? "own" : "other"}">
+          <div class="direct-chat-bubble">${escapeText(message.body)}</div>
+          <div class="direct-chat-meta">${escapeText(chatTimestamp(message.created_at))}${receipt ? ` · ${receipt}` : ""}</div>
+        </article>`;
+    }).join("") : '<div class="direct-chat-empty">Belum ada pesan. Mulai percakapan belajar dengan menyapa koneksimu.</div>';
+    container.scrollTop = container.scrollHeight;
+  }
+
+  async function refreshDirectChat({ markRead = true } = {}) {
+    const connectionId = state.activeChatConnectionId;
+    if (!connectionId) return;
+    const messages = await listDirectMessages(connectionId, { limit: 60 });
+    if (state.activeChatConnectionId !== connectionId) return;
+    state.chatMessages = messages;
+    renderDirectChatMessages();
+    if (markRead) await markDirectMessagesRead(connectionId);
+  }
+
+  async function submitDirectChatMessage() {
+    const connectionId = state.activeChatConnectionId;
+    const input = $("#direct-chat-input");
+    const button = $("#direct-chat-send");
+    if (!connectionId || !input || !button) return;
+    const body = input.value.trim();
+    if (!body) return;
+    button.disabled = true;
+    try {
+      const message = await sendDirectMessage(connectionId, body);
+      upsertDirectChatMessage(message);
+      input.value = "";
+      input.focus();
+    } catch (error) {
+      console.error("Direct message send failed:", error);
+      toast(error?.message || "Pesan belum berhasil dikirim.");
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function openDirectChat(connectionId) {
+    if (!isVerified) {
+      toast("Verifikasi mahasiswa diperlukan untuk menggunakan chat.");
+      return;
+    }
+    const connection = state.connectionSummaries.find(item => item.connection_id === connectionId);
+    if (!connection || connection.status !== "accepted") {
+      toast("Chat hanya tersedia setelah koneksi diterima kedua pihak.");
+      return;
+    }
+    if (state.activeChatChannel) {
+      const previousChannel = state.activeChatChannel;
+      state.activeChatChannel = null;
+      unsubscribeFromDirectMessages(previousChannel).catch(error => console.warn("Chat channel cleanup failed:", error));
+    }
+
+    state.activeChatConnectionId = connectionId;
+    state.chatMessages = [];
+    const identity = `Mahasiswa UT · ${connection.initials || "UT"}`;
+    openModal(
+      `Chat · ${identity}`,
+      `
+        <div class="direct-chat-shell">
+          <div class="direct-chat-toolbar">
+            <span id="direct-chat-status">Memuat percakapan...</span>
+            <button type="button" class="btn btn-secondary btn-sm" id="direct-chat-refresh"><i data-lucide="refresh-cw"></i>Muat ulang</button>
+          </div>
+          <div class="direct-chat-messages" id="direct-chat-messages" role="log" aria-live="polite">
+            <div class="verification-loading">Memuat pesan...</div>
+          </div>
+          <form class="direct-chat-composer" id="direct-chat-form">
+            <textarea id="direct-chat-input" class="textarea" rows="2" maxlength="5000" placeholder="Tulis pesan untuk koneksimu..." aria-label="Tulis pesan"></textarea>
+            <button type="submit" class="btn btn-primary" id="direct-chat-send"><i data-lucide="send"></i>Kirim</button>
+          </form>
+          <p class="direct-chat-note">Pesan hanya dapat dibaca oleh dua peserta koneksi ini. Maksimal 5.000 karakter per pesan.</p>
+        </div>
+      `
+    );
+    $("#modal-confirm").style.display = "none";
+    $("#modal-cancel").textContent = "Tutup";
+    $("#direct-chat-form").addEventListener("submit", event => {
+      event.preventDefault();
+      submitDirectChatMessage();
+    });
+    $("#direct-chat-refresh").addEventListener("click", async () => {
+      const status = $("#direct-chat-status");
+      status.textContent = "Memuat ulang...";
+      try {
+        await refreshDirectChat();
+        status.textContent = "Percakapan diperbarui.";
+      } catch (error) {
+        status.textContent = "Belum dapat memuat percakapan.";
+        toast(error?.message || "Gagal memuat pesan.");
+      }
+    });
+
+    try {
+      await refreshDirectChat();
+      if (state.activeChatConnectionId !== connectionId) return;
+      state.activeChatChannel = subscribeToDirectMessages(
+        connectionId,
+        payload => {
+          if (state.activeChatConnectionId !== connectionId) return;
+          const message = payload?.new;
+          if (!message?.id) return;
+          upsertDirectChatMessage(message);
+          if (payload.eventType === "INSERT" && message.sender_id !== currentUserId) {
+            markDirectMessagesRead(connectionId).catch(error => console.warn("Read receipt update failed:", error));
+          }
+        },
+        (status, error) => {
+          const statusLabel = $("#direct-chat-status");
+          if (!statusLabel || state.activeChatConnectionId !== connectionId) return;
+          if (status === "SUBSCRIBED") {
+            statusLabel.textContent = "Terhubung · pesan diperbarui langsung";
+            refreshDirectChat().catch(loadError => console.warn("Realtime chat refresh failed:", loadError));
+          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            statusLabel.textContent = "Pembaruan langsung terputus. Gunakan Muat ulang.";
+            if (error) console.warn("Realtime chat status:", status, error);
+          }
+        }
+      );
+      if (!state.activeChatChannel) {
+        const statusLabel = $("#direct-chat-status");
+        if (statusLabel) statusLabel.textContent = "Pembaruan langsung tidak aktif. Gunakan Muat ulang.";
+      }
+    } catch (error) {
+      console.error("Direct chat load failed:", error);
+      const statusLabel = $("#direct-chat-status");
+      if (statusLabel) statusLabel.textContent = "Percakapan belum dapat dimuat.";
+      toast(error?.message || "Gagal membuka percakapan.");
+    }
+    icons();
+  }
+
   function escapeText(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   let modalAction=null,modalSuccessMessage='Perubahan diterapkan pada sesi demo.';function openModal(title,content,confirm='Mengerti',action=null,successMessage='Perubahan diterapkan pada sesi demo.'){ modalAction=action;modalSuccessMessage=successMessage;$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal-confirm').textContent=confirm;$('#modal-confirm').style.display='';$('#modal-confirm').disabled=false;$('#modal-cancel').textContent='Tutup';$('#modal-backdrop').classList.add('open'); }
-  function closeModal(){$('#modal-backdrop').classList.remove('open');if(activeVerificationPreviewUrl){URL.revokeObjectURL(activeVerificationPreviewUrl);activeVerificationPreviewUrl=null}}
-  const guide=`<div style="display:grid;gap:14px"><div><b style="font-size:11px">01 · Lengkapi profil</b><p class="section-note">Daftar dengan data akademik yang diperlukan. Verifikasi identitas harus dilakukan melalui layanan yang sah pada versi produksi.</p></div><div><b style="font-size:11px">02 · Atur lokasi secara sadar</b><p class="section-note">Pilih lokasi perkiraan dan tentukan apakah ingin tampil di radar. Jangan tampilkan alamat rumah atau koordinat presisi kepada pengguna lain.</p></div><div><b style="font-size:11px">03 · Temukan teman belajar</b><p class="section-note">Gunakan radius dan preferensi mata kuliah untuk melihat rekomendasi yang relevan.</p></div><div><b style="font-size:11px">04 · Bangun koneksi</b><p class="section-note">Kirim permintaan connect. Chat hanya tersedia setelah kedua pihak menyetujui koneksi.</p></div><div><b style="font-size:11px">05 · Belajar bersama</b><p class="section-note">Gunakan forum untuk peer help atau bergabung dan membuat kelompok belajar.</p></div><p class="tiny muted" style="padding:10px;background:#f7f9fc;border-radius:9px">Catatan: halaman ini adalah prototype UI/UX dengan data simulasi. Integrasi akun, lokasi aman, koneksi, dan chat multi-user belum tersedia.</p></div>`;
+  function closeModal(){
+    if(state.activeChatChannel){
+      const channel=state.activeChatChannel;
+      state.activeChatChannel=null;
+      unsubscribeFromDirectMessages(channel).catch(error=>console.warn("Chat channel cleanup failed:",error));
+    }
+    state.activeChatConnectionId=null;
+    state.chatMessages=[];
+    $('#modal-backdrop').classList.remove('open');
+    if(activeVerificationPreviewUrl){URL.revokeObjectURL(activeVerificationPreviewUrl);activeVerificationPreviewUrl=null}
+  }
+  const guide=`<div style="display:grid;gap:14px"><div><b style="font-size:11px">01 · Lengkapi profil</b><p class="section-note">Daftar dengan data akademik yang diperlukan. Verifikasi identitas harus dilakukan melalui layanan yang sah pada versi produksi.</p></div><div><b style="font-size:11px">02 · Atur lokasi secara sadar</b><p class="section-note">Pilih lokasi perkiraan dan tentukan apakah ingin tampil di radar. Jangan tampilkan alamat rumah atau koordinat presisi kepada pengguna lain.</p></div><div><b style="font-size:11px">03 · Temukan teman belajar</b><p class="section-note">Gunakan radius dan preferensi mata kuliah untuk melihat rekomendasi yang relevan.</p></div><div><b style="font-size:11px">04 · Bangun koneksi</b><p class="section-note">Kirim permintaan connect. Chat hanya tersedia setelah kedua pihak menyetujui koneksi.</p></div><div><b style="font-size:11px">05 · Belajar bersama</b><p class="section-note">Gunakan forum untuk peer help atau bergabung dan membuat kelompok belajar.</p></div><p class="tiny muted" style="padding:10px;background:#f7f9fc;border-radius:9px">Catatan: Matching, koneksi, dan chat langsung tersedia untuk mahasiswa terverifikasi. Peta lokasi pada beranda masih menggunakan data simulasi.</p></div>`;
   $$('[data-open-guide]').forEach(b=>b.addEventListener('click',()=>openModal('Panduan UT Connect',guide)));$('#modal-close').addEventListener('click',closeModal);$('#modal-cancel').addEventListener('click',closeModal);$('#modal-confirm').addEventListener('click',async()=>{if(modalAction){const confirmButton=$('#modal-confirm');confirmButton.disabled=true;try{const result=await modalAction();if(result===false)return;modalAction=null;closeModal();toast(modalSuccessMessage)}catch(error){console.error('Modal action failed:',error);toast(error.message||'Tindakan gagal. Silakan coba lagi.')}finally{confirmButton.disabled=false}return}closeModal();toast('Panduan ditutup.')});$('#modal-backdrop').addEventListener('click',e=>{if(e.target.id==='modal-backdrop')closeModal()});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});$('#notif-btn').addEventListener('click',()=>toast('Belum ada notifikasi baru.'));$('#edit-profile').addEventListener('click',()=>openModal('Edit profil',`<p class="section-note">Form edit profil ditampilkan sebagai rancangan UI. Penyimpanan dan verifikasi perubahan belum terhubung ke backend.</p><div class="field"><label>Nama tampilan</label><input class="text-input" value="Andi Bintang"></div><div class="field"><label>Program studi</label><input class="text-input" value="Sistem Informasi" disabled></div><div class="field"><label>Preferensi belajar</label><select class="select"><option>Online · Malam hari</option><option>Online · Akhir pekan</option><option>Offline</option></select></div>`,`Tutup`));
   renderNearby();loadForum();loadGroups();loadInformation();loadVerification();initMap();icons();
 }
