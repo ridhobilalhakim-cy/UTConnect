@@ -55,7 +55,7 @@ async function bootAuthenticatedApp() {
     const sideMeta = document.getElementById("sideUserMeta"); if (sideMeta) sideMeta.textContent = isAdmin ? "Administrator UT Connect" : programMeta;
     const profileName = document.getElementById("profileFullName"); if (profileName) profileName.textContent = fullName;
     const profileStatus = document.getElementById("profileStatusTag"); if (profileStatus) profileStatus.textContent = isAdmin ? "Role: ADMINISTRATOR" : `Status: ${(profile.verification_status || "pending").toUpperCase()}`;
-    const profileBio = document.getElementById("profileBio"); if (profileBio) profileBio.textContent = profile.bio || "Mahasiswa Universitas Terbuka";
+    const profileBio = document.getElementById("profileBio"); if (profileBio) profileBio.textContent = profile.bio || (isAdmin ? "Administrator UT Connect" : "Mahasiswa Universitas Terbuka");
     const profileFaculty = document.getElementById("profileFaculty"); if (profileFaculty) profileFaculty.textContent = profile.faculty || "-";
     const profileProgram = document.getElementById("profileProgram"); if (profileProgram) profileProgram.textContent = profile.program || "-";
     const profileSemester = document.getElementById("profileSemester"); if (profileSemester) profileSemester.textContent = profile.semester || "-";
