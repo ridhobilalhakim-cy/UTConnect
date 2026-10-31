@@ -52,6 +52,7 @@ import {
   sendGroupMessage,
   setGroupMessagePinned,
   subscribeToGroupMessages,
+  unsubscribeFromGroupMessages,
   listGroupMaterials,
   uploadGroupMaterial,
   deleteGroupMaterial,
@@ -1198,21 +1199,24 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       state.groupCourses = [];
       state.groupMemberships = new Map();
       state.groupMembers = [];
+      state.groupInvitations = [];
       $("#group-list").innerHTML = "";
       return;
     }
 
     if (showLoading) $("#group-list").innerHTML = '<div class="verification-loading">Memuat grup belajar...</div>';
     try {
-      const [groups, courses, memberships] = await Promise.all([
+      const [groups, courses, memberships, invitations] = await Promise.all([
         listStudyGroups(),
         listActiveStudyCourses(),
         listMyGroupMemberships(currentUserId),
+        listMyGroupInvitations(),
       ]);
       state.groups = groups;
       state.groupCourses = courses;
       state.groupMemberships = new Map(memberships.map(item => [item.group_id, item]));
       state.groupMembers = await listVisibleGroupMembers(groups.map(group => group.id));
+      state.groupInvitations = invitations;
       renderGroups();
     } catch (error) {
       console.error("Study group load failed:", error);
