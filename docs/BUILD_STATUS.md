@@ -1,4 +1,4 @@
-# Build and verification status — Information UT / Student Verification / Forum Diskusi / Grup Belajar / Matching & Connections
+# Build and verification status — Information UT / Student Verification / Forum Diskusi / Grup Belajar / Matching & Connections / Direct Messaging
 
 Date: 2026-10-31
 
@@ -14,7 +14,7 @@ Workflow: `Verify UT Connect build`
 - Playwright Chromium installation — PASS.
 - Browser E2E — **13 passed** on that commit.
 - Forum create/comment flows and verified-only access checks included.
-- The current repository now defines 22 Playwright tests: four new Grup Belajar and five new Matching/Connections scenarios were added after run #50. Their CI outcome is not yet confirmed.
+- The current repository now defines 24 Playwright tests: four Grup Belajar, five Matching/Connections, and two Direct Messaging scenarios were added after run #50. The 11 added tests have not yet been confirmed by a successful CI run.
 
 Workflow run: https://github.com/ridhobilalhakim-cy/UTConnect/actions/runs/41191070350
 
@@ -64,7 +64,7 @@ This environment could not independently resolve the public Netlify domain. The 
 2. Test Google sign-in and profile completion using each team's actual account.
 3. Test Information UT create/edit/publish/unpublish/delete from a real admin browser session and confirm student read visibility.
 4. Define and publish the evidence acceptance and retention policy before opening Student Verification to the public.
-5. Run and review CI for the new Grup Belajar and Matching/Connections integrations, then perform real-account group, preference, connection-request, and accept/reject acceptance tests. Chat, notifications, and map access remain future integration milestones.
+5. Run and review CI for the new Grup Belajar, Matching/Connections, and Direct Messaging integrations, then perform real-account group, preference, connection-request, and two-party chat acceptance tests. Notifications and home-map access remain future integration milestones.
 
 ## Source-control caveats
 
@@ -176,6 +176,23 @@ Database and privacy boundary:
 
 Live staging counts after migration: 0 matching preferences, 0 profile-course links, 0 connections, 0 direct messages, and 0 matching search events. Four profiles exist, with one verified and three pending; all four current location records have radar visibility enabled, but only verified profiles are eligible for matching.
 
-The repository now defines 22 Playwright scenarios in total. Five new mocked tests cover the matching gate, preference save, privacy-limited search and connection request, incoming acceptance, and incoming rejection. Run #50 is the latest previously verified passing CI result and predates these latest changes; the five new tests are not counted as passed until a current Actions result confirms them. Real-account flows and the latest Netlify deployment are still external acceptance checks.
+The repository now defines 24 Playwright scenarios in total. Five new mocked tests cover the matching gate, preference save, privacy-limited search and connection request, incoming acceptance, and incoming rejection. Two further mocked tests cover opening an accepted chat, message history, read receipts, message sending, and pending-connection gating. Run #50 is the latest previously verified passing CI result and predates these latest changes; the 11 new group/matching/chat tests are not counted as passed until a current Actions result confirms them. Real-account flows and the latest Netlify deployment are still external acceptance checks.
 
 The Supabase security advisor intentionally flags the three new SECURITY DEFINER functions because authenticated users can execute them. Their function bodies validate the authenticated caller and constrain results/actions to that caller. The private search-event table has RLS enabled and no public table privileges. The advisor also reports leaked-password protection disabled; this is a separate Auth configuration item.
+
+
+## Direct Messaging milestone — implementation added 2026-10-31
+
+The accepted-connection Chat action now uses `src/services/chat.js` and the existing `public.direct_messages` table.
+
+- Verified students can open a conversation only when the matching connection summary has status `accepted`. Pending, rejected, blocked, and unverified states do not expose the Chat action.
+- The client loads the latest 60 messages, displays only the other student's initials/program, sends messages up to 5,000 characters, and marks incoming unread messages as read. Message content is escaped before insertion into the page.
+- Supabase Realtime is already enabled for `public.direct_messages`; the client subscribes to INSERT/UPDATE events filtered by the active connection and removes the channel when the chat dialog closes. A manual refresh is available as fallback.
+
+Database security update:
+- Migration `20261031104922_secure_direct_message_read_receipts` is applied to staging and recorded in `supabase/migrations/REMOTE_MIGRATIONS.md`.
+- SELECT/INSERT policies require the current user and other participant to remain verified, the connection to be accepted, and no mutual block.
+- Authenticated has column-level UPDATE on `read_at` only. Table-wide UPDATE and UPDATE on `body` / `sender_id` remain unavailable.
+- A temporary SQL transaction verified that an accepted recipient context can read a message and update its read receipt, while a pending connection exposes zero messages. The test transaction was rolled back.
+
+The two new Playwright scenarios mock Supabase responses and Realtime. They are not counted as passing until a current GitHub Actions run confirms the full 24-test suite. Live staging currently has zero connection records and zero direct messages, and only one verified student profile; real two-account conversation and Realtime acceptance therefore remains outstanding.
