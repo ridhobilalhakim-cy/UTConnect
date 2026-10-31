@@ -1936,7 +1936,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     const faculty = $("#profileFaculty"); if (faculty) faculty.textContent = profile.faculty || "-";
     const program = $("#profileProgram"); if (program) program.textContent = profile.program || "-";
     const semester = $("#profileSemester"); if (semester) semester.textContent = profile.semester || "-";
-    const bio = $("#profileBio"); if (bio) bio.textContent = profile.bio || "Mahasiswa Universitas Terbuka";
+    const bio = $("#profileBio"); if (bio) bio.textContent = profile.bio || (isAdmin ? "Administrator UT Connect" : "Mahasiswa Universitas Terbuka");
     $("#profileFullName").textContent = name;
     const avatarUrl = getProfileAvatarUrl(profile.avatar_path);
     ["topAvatar", "sideAvatar", "profileInitials"].forEach(id => {
