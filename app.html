@@ -107,7 +107,19 @@
       <!-- FORUM -->
       <section class="page-section" id="page-forum">
         <div class="page-head"><div><div class="eyebrow">Peer help</div><h1 class="page-title">Ruang diskusi mahasiswa</h1><p class="page-subtitle">Ajukan pertanyaan, berbagi pemahaman, dan bantu teman menyelesaikan tantangan belajar.</p></div><button class="btn btn-primary" id="new-post"><i data-lucide="plus"></i>Buat diskusi</button></div>
-        <div class="forum-layout"><div><div class="surface compose"><textarea class="textarea" id="post-content" placeholder="Apa yang sedang kamu pelajari? Tulis pertanyaan atau tawarkan bantuan..." rows="3"></textarea><div class="compose-foot"><select class="select" id="post-course" style="max-width:220px"><option>Algoritma & Pemrograman</option><option>Pengantar Manajemen</option><option>Statistika</option><option>Sistem Operasi</option></select><button class="btn btn-primary" id="publish-post"><i data-lucide="send"></i>Publikasikan</button></div></div><div class="post-list" id="post-list"></div></div>
+        <div class="forum-access-notice surface" id="forum-access-notice" hidden></div>
+        <div class="forum-layout"><div>
+          <div class="surface compose" id="forum-compose">
+            <div class="field forum-compose-title"><label for="post-title">Judul diskusi</label><input class="text-input" id="post-title" type="text" maxlength="140" placeholder="Contoh: Bagaimana memahami perulangan bersarang?" required></div>
+            <div class="forum-compose-grid">
+              <div class="field"><label for="post-type">Jenis diskusi</label><select class="select" id="post-type"><option value="need_help">Butuh bantuan</option><option value="can_help">Bisa membantu</option><option value="discussion">Diskusi umum</option></select></div>
+              <div class="field"><label for="post-course">Mata kuliah (opsional)</label><select class="select" id="post-course"><option value="">Diskusi umum</option></select></div>
+            </div>
+            <div class="field"><label for="post-content">Isi diskusi</label><textarea class="textarea" id="post-content" placeholder="Jelaskan konteks pertanyaan atau pemahaman yang ingin kamu bagikan..." rows="4" maxlength="5000"></textarea></div>
+            <div class="compose-foot"><p class="tiny muted" id="forum-course-notice">Belum ada katalog mata kuliah aktif. Diskusi tetap dapat dibuat sebagai diskusi umum.</p><button class="btn btn-primary" id="publish-post"><i data-lucide="send"></i>Publikasikan</button></div>
+          </div>
+          <div class="post-list" id="post-list"><div class="verification-loading">Memuat diskusi mahasiswa...</div></div>
+        </div>
           <aside class="surface side-info"><h2 class="section-title">Etika berdiskusi</h2><p class="section-note">Bangun ruang belajar yang saling menghargai.</p><div class="info-line"><strong>Berikan konteks pertanyaan</strong><small>Sebutkan mata kuliah, modul, atau bagian yang sedang dipelajari.</small></div><div class="info-line"><strong>Gunakan bahasa yang santun</strong><small>Hargai perbedaan pendapat dan pengalaman belajar.</small></div><div class="info-line"><strong>Bagikan sumber yang relevan</strong><small>Utamakan referensi yang bisa diperiksa bersama.</small></div></aside>
         </div>
       </section>
