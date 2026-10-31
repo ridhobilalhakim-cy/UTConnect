@@ -26,8 +26,8 @@ function jsonResponse(body, status = 200) {
   return { status, contentType: 'application/json', body: JSON.stringify(body) };
 }
 
-async function mockSupabase(page, { isAdmin = false, informationPosts = [], verificationStatus = { profile_status: 'pending', latest_request: null }, verificationQueue = [], profile = PROFILE, forumPosts = [], forumComments = [], courses = [], studyGroups = [], groupMembers = [], matchingPreferences = null, profileCourseIds = [], matchingCandidates = [], connectionSummaries = [], directMessages = [], notifications = [] } = {}) {
-  const state = { loginCalls: 0, recoveryCalls: 0, passwordUpdates: 0, logoutCalls: 0, informationPosts: [...informationPosts], informationCreateCalls: 0, verificationStatus: structuredClone(verificationStatus), verificationQueue: [...verificationQueue], verificationUploadCalls: 0, verificationSubmitCalls: 0, verificationReviewCalls: [], profile, forumPosts: [...forumPosts], forumComments: [...forumComments], courses: [...courses], studyGroups: [...studyGroups], groupMembers: [...groupMembers], groupCreateCalls: 0, groupJoinCalls: [], groupReviewCalls: [], matchingPreferences: matchingPreferences ? structuredClone(matchingPreferences) : null, profileCourseIds: [...profileCourseIds], matchingCandidates: [...matchingCandidates], connectionSummaries: [...connectionSummaries], directMessages: structuredClone(directMessages), directMessageSendCalls: [], directMessageReadCalls: [], notifications: structuredClone(notifications), notificationReadCalls: [], notificationBulkReadCalls: 0, matchingPreferenceSaveCalls: 0, profileCourseInsertCalls: 0, profileCourseDeleteCalls: 0, matchingSearchCalls: [], connectionCreateCalls: [], connectionResponseCalls: [], forumPostCreateCalls: 0, forumCommentCreateCalls: 0 };
+async function mockSupabase(page, { isAdmin = false, informationPosts = [], verificationStatus = { profile_status: 'pending', latest_request: null }, verificationQueue = [], profile = PROFILE, forumPosts = [], forumComments = [], courses = [], studyGroups = [], groupMembers = [], matchingPreferences = null, profileCourseIds = [], matchingCandidates = [], connectionSummaries = [], directMessages = [], notifications = [], homeMapLocation = null, nearbyResults = [] } = {}) {
+  const state = { loginCalls: 0, recoveryCalls: 0, passwordUpdates: 0, logoutCalls: 0, informationPosts: [...informationPosts], informationCreateCalls: 0, verificationStatus: structuredClone(verificationStatus), verificationQueue: [...verificationQueue], verificationUploadCalls: 0, verificationSubmitCalls: 0, verificationReviewCalls: [], profile, forumPosts: [...forumPosts], forumComments: [...forumComments], courses: [...courses], studyGroups: [...studyGroups], groupMembers: [...groupMembers], groupCreateCalls: 0, groupJoinCalls: [], groupReviewCalls: [], matchingPreferences: matchingPreferences ? structuredClone(matchingPreferences) : null, profileCourseIds: [...profileCourseIds], matchingCandidates: [...matchingCandidates], connectionSummaries: [...connectionSummaries], directMessages: structuredClone(directMessages), directMessageSendCalls: [], directMessageReadCalls: [], notifications: structuredClone(notifications), notificationReadCalls: [], notificationBulkReadCalls: 0, homeMapLocation: structuredClone(homeMapLocation), nearbyResults: structuredClone(nearbyResults), nearbyCalls: [], locationSaveCalls: [], locationVisibilityCalls: [], matchingPreferenceSaveCalls: 0, profileCourseInsertCalls: 0, profileCourseDeleteCalls: 0, matchingSearchCalls: [], connectionCreateCalls: [], connectionResponseCalls: [], forumPostCreateCalls: 0, forumCommentCreateCalls: 0 };
   await page.addInitScript(() => { window.__UTCONNECT_DISABLE_REALTIME__ = true; });
   for (const pattern of [
     /^https:\/\/fonts\.googleapis\.com\//,
@@ -96,6 +96,39 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
     if (path.includes('/storage/v1/object/student-verification-evidence/') && method === 'POST') {
       state.verificationUploadCalls += 1;
       return route.fulfill(jsonResponse({ Key: 'student-verification-evidence/e2e-student-001/evidence.pdf' }));
+    }
+    if (path.endsWith('/functions/v1/manage-my-location') && method === 'POST') {
+      const input = request.postDataJSON();
+      if (input.action === 'get') return route.fulfill(jsonResponse({ location: state.homeMapLocation }));
+      if (input.action === 'save') {
+        if (input.consent !== true || typeof input.show_in_radar !== 'boolean') {
+          return route.fulfill(jsonResponse({ error: 'location consent required' }, 400));
+        }
+        state.locationSaveCalls.push(input);
+        state.homeMapLocation = {
+          latitude: input.lat,
+          longitude: input.lng,
+          show_in_radar: input.show_in_radar,
+          consented_at: new Date().toISOString(),
+        };
+        return route.fulfill(jsonResponse({ success: true }));
+      }
+      if (input.action === 'visibility') {
+        state.locationVisibilityCalls.push(input);
+        if (!state.homeMapLocation) return route.fulfill(jsonResponse({ error: 'location missing' }, 404));
+        state.homeMapLocation.show_in_radar = input.show_in_radar;
+        return route.fulfill(jsonResponse({ success: true, show_in_radar: input.show_in_radar }));
+      }
+      return route.fulfill(jsonResponse({ error: 'unknown location action' }, 400));
+    }
+    if (path.endsWith('/functions/v1/nearby-students') && method === 'POST') {
+      const input = request.postDataJSON();
+      state.nearbyCalls.push(input);
+      return route.fulfill(jsonResponse({
+        radius: input.radius,
+        results: state.nearbyResults,
+        message: state.nearbyResults.length ? null : 'Tidak ditemukan mahasiswa.',
+      }));
     }
     if (path.endsWith('/rest/v1/courses') && method === 'GET') {
       return route.fulfill(jsonResponse(state.courses));
@@ -840,6 +873,98 @@ test('group admin can approve a pending membership request', async ({ page }) =>
   expect(state.groupMembers.find(member => member.user_id === 'cccccccc-cccc-4ccc-8ccc-cccccccccccc').status).toBe('active');
 });
 
+
+test('verified student sees real nearby map results from the secure endpoint', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+    homeMapLocation: {
+      latitude: -6.9175,
+      longitude: 107.6191,
+      show_in_radar: true,
+      consented_at: '2026-10-31T10:00:00.000Z',
+    },
+    nearbyResults: [{
+      student_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      initials: 'DP',
+      program: 'Sistem Informasi',
+      approx_distance_m: 550,
+      marker_lat: -6.9168,
+      marker_lng: 107.6201,
+    }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await expect.poll(() => state.nearbyCalls.length).toBe(1);
+  await expect(page.locator('#nearby-list')).toContainText('Mahasiswa DP');
+  await expect(page.locator('#nearby-list')).toContainText('Sistem Informasi');
+  await expect(page.locator('#nearby-list')).toContainText('0.6 km');
+  await expect(page.locator('#map-result')).toContainText('1 mahasiswa terverifikasi');
+  expect(state.nearbyCalls[0]).toEqual({ radius: 3000 });
+  expect(await page.locator('#nearby-list').innerText()).not.toContain('049');
+});
+
+test('verified student NIM search is sent only in the authenticated request body', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+    homeMapLocation: {
+      latitude: -6.9175,
+      longitude: 107.6191,
+      show_in_radar: false,
+      consented_at: '2026-10-31T10:00:00.000Z',
+    },
+    nearbyResults: [{
+      student_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      initials: 'DP',
+      program: 'Sistem Informasi',
+      approx_distance_m: 1200,
+      marker_lat: -6.9168,
+      marker_lng: 107.6201,
+    }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+  await expect.poll(() => state.nearbyCalls.length).toBe(1);
+
+  await page.locator('#nim-search').fill('049123456');
+  await expect.poll(() => state.nearbyCalls.length).toBe(2);
+  expect(state.nearbyCalls[1]).toEqual({ radius: 3000, nim: '049123456' });
+  expect(await page.locator('#nim-search').inputValue()).toBe('049123456');
+  expect(page.url()).not.toContain('049123456');
+});
+
+test('student can hide their map pin without losing the ability to browse nearby peers', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+    homeMapLocation: {
+      latitude: -6.9175,
+      longitude: 107.6191,
+      show_in_radar: true,
+      consented_at: '2026-10-31T10:00:00.000Z',
+    },
+    nearbyResults: [],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+  await expect.poll(() => state.nearbyCalls.length).toBe(1);
+
+  await page.locator('#map-radar-toggle').uncheck();
+  await expect.poll(() => state.locationVisibilityCalls.length).toBe(1);
+  expect(state.locationVisibilityCalls[0]).toEqual({
+    action: 'visibility',
+    show_in_radar: false,
+    consent: false,
+  });
+  expect(state.homeMapLocation.show_in_radar).toBe(false);
+  await expect(page.locator('#map-result')).toContainText('0 mahasiswa terverifikasi');
+  expect(state.nearbyCalls).toHaveLength(1);
+});
 
 test('unverified student cannot access matching search or connection controls', async ({ page }) => {
   const state = await mockSupabase(page, {
