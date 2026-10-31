@@ -1138,7 +1138,11 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       return matchesMode && matchesSearch;
     });
 
-    $("#group-list").innerHTML = filtered.map(group => {
+    const invitationHtml = state.groupInvitations.map(invite =>
+      '<article class="surface group-invitation-row"><div><strong>' + escapeText(invite.group_name) + '</strong><p>' + escapeText(invite.group_description || "Undangan kelompok belajar privat.") + '</p><small>Dikirim ' + escapeText(groupDate(invite.invited_at)) + '</small></div>' +
+      '<div class="group-request-actions"><button class="btn btn-primary btn-sm" data-group-invite-accept="' + escapeText(invite.group_id) + '">Terima</button><button class="btn btn-secondary btn-sm" data-group-invite-decline="' + escapeText(invite.invite_id) + '">Tolak</button></div></article>'
+    ).join("");
+    $("#group-list").innerHTML = invitationHtml + (filtered.map(group => {
       const courseName = group.course?.course_name || "Kelompok umum";
       const membership = state.groupMemberships.get(group.id);
       const isActiveMember = membership?.status === "active";
