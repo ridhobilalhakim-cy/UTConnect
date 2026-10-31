@@ -258,3 +258,22 @@
 .notification-unread-dot{width:7px;height:7px;flex:0 0 7px;border-radius:50%;background:#c84b45;margin-top:5px}
 .notification-empty{padding:28px 17px;text-align:center;font-size:10px;line-height:1.65;color:var(--muted)}
 @media(max-width:760px){.notification-panel{right:0;width:min(390px,calc(100vw - 26px));top:calc(100% + 8px);max-height:65vh}.notification-panel-head{padding:12px}.notification-item{padding:11px 12px}}
+
+
+/* Home Map live location and privacy controls */
+.map-privacy-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin:0 0 12px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fbfcfe}
+.map-consent-option,.map-radar-option{display:flex;align-items:flex-start;gap:8px;font-size:9px;line-height:1.6;color:#62758a}
+.map-consent-option input,.map-radar-option input{margin:2px 0 0;accent-color:var(--ut-blue);flex:0 0 auto}
+.map-radar-option strong{display:block;font-size:10px;color:var(--ink)}
+.map-radar-option small{display:block;margin-top:2px;font-size:8px;line-height:1.5;color:var(--muted)}
+.map-location-status{grid-column:1/-1;font-size:9px;color:var(--muted);padding-top:7px;border-top:1px solid var(--line)}
+.map-location-status[data-state="error"]{color:#a33b35}
+.map-location-status[data-state="success"]{color:#287b59}
+.map-marker.me{background:#e1ad28;border:3px solid #fff;box-shadow:0 2px 10px rgba(17,46,77,.25)}
+.map-marker{background:#003366;border:2px solid #fff;color:#fff;border-radius:50%;width:31px;height:31px;display:grid;place-items:center;font-size:9px;font-weight:800;box-shadow:0 2px 8px rgba(17,46,77,.22)}
+.map-empty-state{padding:13px;border:1px dashed #d7e2ed;border-radius:10px;background:#fbfdff;font-size:9px;line-height:1.65;color:var(--muted)}
+.map-nearby-row{display:flex;align-items:center;gap:9px;padding:10px;border:1px solid #edf1f6;border-radius:11px}
+.map-nearby-row .person-meta{min-width:0;flex:1}
+.map-nearby-row .distance{white-space:nowrap}
+.map-nearby-empty{font-size:9px;line-height:1.65;color:var(--muted);padding:16px 12px;border:1px dashed #d9e3ee;border-radius:11px;background:#fbfdff}
+@media(max-width:900px){.map-privacy-controls{grid-template-columns:1fr}}
