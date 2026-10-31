@@ -8,7 +8,7 @@ Project status at inspection: ACTIVE_HEALTHY
 
 ## Remote migration history
 
-The connected staging project reported these ten applied migration entries:
+The connected staging project reported these eleven applied migration entries:
 
 | Version | Name |
 |---|---|
@@ -22,6 +22,7 @@ The connected staging project reported these ten applied migration entries:
 | 20261031071140 | student_verification_workflow |
 | 20261031101336 | secure_enable_group_join_workflow_rpcs |
 | 20261031102733 | secure_matching_and_connection_workflows |
+| 20261031104922 | secure_direct_message_read_receipts |
 
 Live introspection found the public application tables with RLS enabled, plus private NIM search and student-verification tables. PostGIS is enabled. The deployed `complete-student-registration` Edge Function was last confirmed as ACTIVE version 4 with JWT verification enabled.
 
@@ -39,8 +40,8 @@ Latest live introspection returned four rows in `profiles` and four rows in `use
 
 - Login and registration page share one Supabase client module and storage key.
 - Dashboard is protected by session and profile lookup.
-- Information UT, Student Verification, Forum Diskusi, Grup Belajar, and Matching/Connections now call Supabase service modules. The forum supports verified-only posts/comments; groups support verified-only discovery/creation/join/admin review; matching supports owner-scoped preferences, radar-consent candidate search, and connection requests/decisions.
-- Direct chat/messages, group messages/materials/agenda, home map markers, and notifications remain demo/simulated rather than live multi-user modules.
+- Information UT, Student Verification, Forum Diskusi, Grup Belajar, Matching/Connections, and Direct Messaging now call Supabase service modules. The forum supports verified-only posts/comments; groups support verified-only discovery/creation/join/admin review; matching supports owner-scoped preferences, radar-consent candidate search, and connection requests/decisions; direct chat is restricted to accepted connections and is backed by direct_messages.
+- Group messages/materials/agenda, home map markers, and notifications remain demo/simulated rather than live multi-user modules.
 - Google OAuth provider setup has not been verified end-to-end in this audit.
 - The live database uses NIM digest rather than displaying plaintext NIM. Do not expose real student NIM/location until registration and access-control tests have passed.
 
@@ -93,6 +94,19 @@ Latest live introspection returned four rows in `profiles` and four rows in `use
 - The existing connections_insert_request policy requires the signed-in verified sender, a different verified recipient, pending status, and no block. The migration grants authenticated INSERT only; direct UPDATE remains unavailable.
 - get_my_connection_summaries exposes only a user's own connection rows and the other participant's initials/program. respond_connection_request verifies the signed-in user is the recipient of a pending request and re-checks both verification states and mutual block status before changing the result.
 - The three new SECURITY DEFINER RPCs are intentionally callable by authenticated users. Supabase security advisors report these as warnings; they use the current session identity and return or modify only caller-authorized data.
-- Direct messaging is still not integrated. An accepted connection is not yet a live chat channel.
+- Accepted connections now expose a Direct Messaging action. The database migration requires both participants to remain verified, requires an accepted connection, excludes mutual blocks, and permits authenticated users to update only the `read_at` column.
+- The existing `public.direct_messages` table is part of `supabase_realtime`. The browser fetches recent messages, sends messages, marks incoming messages as read, and subscribes to changes filtered by the active connection. Manual reload is available as a fallback.
+- Live staging remains at 0 connections and 0 direct messages, with only one verified profile. Real two-party chat and Realtime acceptance therefore remains untested until a second verified account is available.
+
 
 Latest data counts: 0 matching preference rows, 0 profile-course links, 0 connection records, 0 direct messages, and 0 matching search events. There are four profiles (one verified and three pending), four radar-opt-in location rows, and zero active courses. No matching preferences, connections, or search events were created as test data.
+
+## Direct Messaging state (checked 2026-10-31)
+
+- Migration `20261031104922_secure_direct_message_read_receipts` is applied to staging and its SQL source is retained in `supabase/migrations/`.
+- `public.direct_messages` has RLS enabled and uses the existing `connections` relation. SELECT and INSERT require the current user to be verified, the other participant to remain verified, an accepted connection, and no mutual block.
+- Read receipts are restricted to recipient-side updates of previously unread messages. Authenticated has column-level UPDATE on `read_at` only; table-wide UPDATE, `body`, and `sender_id` updates remain unavailable.
+- The table is included in the `supabase_realtime` publication. The browser subscribes to INSERT/UPDATE events for the active connection and removes the channel when the chat dialog closes. A manual refresh path remains available if Realtime disconnects.
+- The chat action appears only on accepted connection rows. The UI loads the latest 60 messages, displays initials/program rather than full identity, escapes message content, supports up to 5,000 characters, and marks unread incoming messages as read.
+- Live verification: one temporary SQL transaction created a synthetic accepted connection/message, switched to an authenticated recipient context, successfully updated `read_at`, then changed the connection to pending and confirmed the messages were no longer visible. The transaction ended with ROLLBACK; no synthetic record or profile status change remains.
+- Latest real counts remain 0 connections and 0 direct messages; there is one verified profile and three pending profiles. Two mocked browser tests were added, but CI has not yet confirmed them. Real two-account chat and Realtime testing is still required.
