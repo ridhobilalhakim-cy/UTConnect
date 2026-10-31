@@ -262,3 +262,13 @@ CI run #230 for PR #4 passed source checks, production build, and all 43 Playwri
 Applied migration `20261031174525_notifications_for_information_and_verification` adds owner-scoped notifications for student-verification approval/rejection and first publication of an Information UT post. Dashboard routing opens the corresponding Verifikasi Mahasiswa or Informasi UT page. An edit to an already-published post does not generate duplicate publication notifications.
 
 Rollback-only live SQL checks verified the verification-decision notification, Information UT publication notification, and no-duplicate-on-edit behavior. The transaction rolled back; the staging notifications table remained empty.
+
+
+## Two-account database acceptance and Cloudflare staging preparation — 2026-11-01
+
+- Supabase rollback-only two-account acceptance passed for connection request/acceptance, dedicated chat rooms, direct-message send/read receipt, group creator admin membership, approval-based join, group chat visibility, pending/non-member denial, and owner-scoped notifications.
+- Synthetic auth/profile rows and all related data were rolled back. Post-test counts remained 5 auth users, 4 profiles, and zero connections, direct messages, groups, group messages and notifications.
+- Reusable acceptance script: `supabase/tests/two_account_acceptance.rollback.sql`. It validates database/RLS/RPC behavior with simulated JWT subjects, not real browser Auth or WebSocket Realtime.
+- Cloudflare Pages build config and staging runbook are prepared in `wrangler.toml`, `public/_headers`, and `docs/CLOUDFLARE_PAGES_STAGING.md`.
+- GitHub Actions run #239 passed source checks, Vite build, and 43/43 Playwright tests for the branch including these files.
+- Cloudflare project creation, GitHub authorization, Pages environment variables, Supabase Auth redirect configuration, DNS, and production migration remain unperformed; they require authenticated Cloudflare/dashboard access.
