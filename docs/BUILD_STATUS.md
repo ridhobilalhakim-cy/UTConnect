@@ -69,7 +69,7 @@ This environment could not independently resolve the public Netlify domain. The 
 
 ## Source-control caveats
 
-- The remote staging project has twenty recorded migrations. The first five original SQL bodies and the student_verification_workflow SQL body still need reconstruction/review in repository source. Do not re-run them blindly against the live staging database.
+- The remote staging project has twenty-one recorded migrations. The first five original SQL bodies and the student_verification_workflow SQL body still need reconstruction/review in repository source. Do not re-run them blindly against the live staging database.
 - Edge Function source edits in GitHub do not automatically deploy to Supabase. The Home Map functions were explicitly deployed to staging; the registration Edge Function remains a separately deployed source mirror.
 - Never put the Supabase service-role key, secret keys, or NIM HMAC secret in browser code or public GitHub files.
 
@@ -152,7 +152,7 @@ Security migrations applied to staging:
 - `20261031124407_group_invite_inbox_limit` adds a private invite inbox and five-per-minute NIM lookup limit.
 - `20261031133930_group_workspace_realtime_and_invite_notifications`, `20261031134014_group_members_realtime`, and `20261031134443_group_poll_realtime_touch` add RLS-filtered Realtime updates and invite notifications.
 - `manage-group-invites` Edge Function v1 is ACTIVE with JWT verification.
-- Migration `20261031135852_group_membership_verification_guard` updates central group-member/admin RLS helpers to require the signed-in account to remain verified. It also hardens admin decisions, poll RPCs, invite inbox access, and message pinning against stale membership after verification is revoked.\n- The `group-materials` bucket remains private with three object policies; `group_agenda_votes` has RLS enabled and is accessible through actor-checked RPCs only.
+- Migration `20261031135852_group_membership_verification_guard` updates central group-member/admin RLS helpers to require the signed-in account to remain verified. It also hardens admin decisions, poll RPCs, invite inbox access, and message pinning against stale membership after verification is revoked.\n- Migration `20261031140027_group_materials_verified_delete_guard` requires current verified active membership to delete a group material file, including for the uploader; admin/co-admin deletion remains active-verified-only.\n- The `group-materials` bucket remains private with three object policies; `group_agenda_votes` has RLS enabled and is accessible through actor-checked RPCs only.
 
 Live staging counts remain 0 study_groups, 0 group_members, 0 group_invites, and 0 active courses. No group test records were retained.
 
