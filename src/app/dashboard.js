@@ -109,7 +109,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       return `
         <article class="surface post-card forum-post-card">
           <div class="forum-post-meta"><span class="tag">${escapeText(typeLabel)}</span><span class="tag">${escapeText(courseLabel)}</span></div>
-          <div class="post-author"><div class="person-avatar">${escapeText(ownPost ? currentUserName.split(/\\s+/).slice(0,2).map(x=>x[0]||"").join("").toUpperCase() : "UT")}</div><div class="person-meta"><strong>${escapeText(author)}</strong><span>${escapeText(forumDate(post.created_at))}</span></div></div>
+          <div class="post-author"><div class="person-avatar">${escapeText(ownPost ? currentUserName.split(/\s+/).slice(0,2).map(x=>x[0]||"").join("").toUpperCase() : "UT")}</div><div class="person-meta"><strong>${escapeText(author)}</strong><span>${escapeText(forumDate(post.created_at))}</span></div></div>
           <h3 class="forum-post-title">${escapeText(post.title)}</h3>
           <p class="forum-post-body">${escapeText(post.body)}</p>
           <div class="post-actions forum-post-actions"><button type="button" data-forum-thread="${escapeText(post.id)}"><i data-lucide="message-circle"></i>Buka diskusi</button>${deleteButton}</div>
