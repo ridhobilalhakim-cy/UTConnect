@@ -214,6 +214,24 @@ test('administrator can publish an Information UT post through Supabase', async 
   await expect(page.locator('.info-card h3')).toHaveText('Jadwal Webinar UT');
   expect(state.informationCreateCalls).toBe(1);
   expect(state.informationPosts[0].is_published).toBe(true);
+
+  await page.locator('[data-info-edit]').click();
+  await page.locator('#info-title-input').fill('Jadwal Webinar UT 2026');
+  await page.locator('#modal-confirm').click();
+  await expect(page.locator('.info-card h3')).toHaveText('Jadwal Webinar UT 2026');
+
+  await page.locator('[data-info-publish]').click();
+  await expect(page.locator('.info-status')).toHaveText('Draft');
+  expect(state.informationPosts[0].is_published).toBe(false);
+
+  await page.locator('[data-info-publish]').click();
+  await expect(page.locator('.info-status')).toHaveText('Dipublikasikan');
+  expect(state.informationPosts[0].is_published).toBe(true);
+
+  await page.locator('[data-info-delete]').click();
+  await page.locator('#modal-confirm').click();
+  await expect(page.locator('.info-empty')).toContainText('Belum ada informasi');
+  expect(state.informationPosts).toHaveLength(0);
 });
 
 test('ordinary student can read public Information UT without admin controls', async ({ page }) => {
