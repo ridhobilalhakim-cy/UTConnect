@@ -2,6 +2,7 @@ import { supabase } from "../lib/supabase.js";
 
 const AVATAR_BUCKET = "profile-avatars";
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+const PROFILE_AVATAR_PRESETS = new Set(["avatar-01", "avatar-02", "avatar-03", "avatar-04"]);
 const AVATAR_TYPES = new Map([
   ["image/jpeg", "jpg"],
   ["image/png", "png"],
@@ -68,7 +69,23 @@ export async function uploadMyProfileAvatar(file) {
     throw error;
   }
 
-  if (previous && previous !== storagePath) {
+  if (previous && previous !== storagePath && !previous.startsWith("preset:")) {
+    const { error: cleanupError } = await supabase.storage.from(AVATAR_BUCKET).remove([previous]);
+    if (cleanupError) console.warn("Previous profile avatar cleanup failed:", cleanupError);
+  }
+  return data;
+}
+
+export async function setMyProfileAvatarPreset(presetId) {
+  const userId = await requireUserId();
+  if (!PROFILE_AVATAR_PRESETS.has(presetId)) throw new Error("Pilihan avatar tidak tersedia.");
+  const previous = await getMyProfileAvatarPath();
+  const nextPath = `preset:${presetId}`;
+  const { data, error } = await supabase.rpc("update_my_profile_avatar", {
+    p_avatar_path: nextPath,
+  });
+  throwIfError(error);
+  if (previous && !previous.startsWith("preset:")) {
     const { error: cleanupError } = await supabase.storage.from(AVATAR_BUCKET).remove([previous]);
     if (cleanupError) console.warn("Previous profile avatar cleanup failed:", cleanupError);
   }
@@ -88,6 +105,10 @@ export async function getMyProfileAvatarPath() {
 
 export function getProfileAvatarUrl(path) {
   if (!path) return null;
+  if (path.startsWith("preset:")) {
+    const presetId = path.slice("preset:".length);
+    return PROFILE_AVATAR_PRESETS.has(presetId) ? `/avatars/${presetId}.svg` : null;
+  }
   const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
   return data?.publicUrl || null;
 }
