@@ -73,6 +73,16 @@ export async function joinStudyGroup(groupId) {
   });
   throwIfError(error);
   await runDemoAutomation("group_join", { group_id: groupId, membership_status: data });
+  if (IS_DEMO_BUILD) {
+    const { data: membership, error: membershipError } = await supabase
+      .from("group_members")
+      .select("status")
+      .eq("group_id", groupId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    throwIfError(membershipError);
+    return membership?.status || data;
+  }
   return data;
 }
 
