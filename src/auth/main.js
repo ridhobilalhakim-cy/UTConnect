@@ -160,12 +160,15 @@ window.L = L;
   const demoStartButton = $("demoStartBtn");
   if (demoStartButton) {
     demoStartButton.hidden = !IS_DEMO_BUILD;
+    const demoEntryPanel = $("demoEntryPanel");
+    if (demoEntryPanel) demoEntryPanel.hidden = !IS_DEMO_BUILD;
     demoStartButton.addEventListener("click", async () => {
       if (!IS_DEMO_BUILD) return;
       busy("demoStartBtn", true, "Menyiapkan sesi demo...");
       try {
-        await startDemoSession();
-        window.location.replace("/app.html");
+        const scenario = $("demoScenario")?.value || "all";
+        const result = await startDemoSession(scenario);
+        window.location.replace("/app.html?demoScenario=" + encodeURIComponent(result?.scenario || scenario));
       } catch (error) {
         alertBox(error?.message || "Sesi demo belum dapat dimulai.", "error");
         busy("demoStartBtn", false);
