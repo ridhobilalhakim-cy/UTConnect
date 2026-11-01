@@ -283,7 +283,21 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     if(page==='messages')pageLoad=loadMessages();
     icons();return pageLoad;
   }
-  $$('[data-page]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));$$('[data-go]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.go)));
+  $('[data-page]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));$('[data-go]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.go)));
+  if (isDemo) {
+    $("#demoShowcase [data-demo-nav]").forEach(button => {
+      button.addEventListener("click", () => navigate(button.dataset.demoNav));
+    });
+    $("#demoShowcase [data-demo-notifications]").forEach(button => {
+      button.addEventListener("click", () => $("#notif-btn")?.click());
+    });
+    const shareInfoButton = $("#share-info");
+    if (shareInfoButton) {
+      shareInfoButton.disabled = true;
+      shareInfoButton.textContent = "Konten simulasi · lihat saja";
+      shareInfoButton.title = "Pengelolaan informasi hanya tersedia bagi administrator.";
+    }
+  }
   function setMapStatus(message, status = "idle") {
     const statusText = $("#map-location-status");
     const statusPill = $("#map-status-pill");
