@@ -114,7 +114,7 @@ function renderChat(container) {
         '" data-pin="' + (pinned ? "0" : "1") + '">' + (pinned ? "Lepas pin" : "Sematkan") + '</button>'
       : "";
     return '<article class="group-message ' + (own ? "own" : "") + (pinned ? " pinned" : "") + '">' +
-      '<div class="group-message-meta"><strong>' + (own ? "Kamu" : "Anggota grup") + '</strong>' +
+      '<div class="group-message-meta"><strong>' + (own ? "Kamu" : "Anggota grup") + (message.is_demo ? ' <span class="demo-user-tag">DEMO</span>' : "") + '</strong>' +
       '<time>' + safe(dateLabel(message.created_at)) + '</time>' + controls + '</div>' +
       (pinned ? '<span class="group-pinned-label">Pesan disematkan</span>' : "") +
       '<p>' + safe(message.body) + '</p></article>';
@@ -176,7 +176,7 @@ function renderMaterials(container) {
   const rows = materials.map(item => {
     const canDelete = isManager() || item.uploaded_by === currentUserId;
     return '<article class="group-material-row"><div class="group-material-icon">PDF</div><div class="group-material-info"><strong>' +
-      safe(item.title) + '</strong><span>' + safe(bytesLabel(item.file_size_bytes)) + ' · ' +
+      safe(item.title) + (item.is_demo ? ' <span class="demo-user-tag">DEMO</span>' : "") + '</strong><span>' + safe(bytesLabel(item.file_size_bytes)) + ' · ' +
       safe(dateLabel(item.created_at)) + '</span></div>' +
       (item.download_url
         ? '<a class="btn btn-secondary btn-sm" href="' + safe(item.download_url) + '" target="_blank" rel="noopener noreferrer">Unduh</a>'
@@ -246,7 +246,7 @@ function renderAgenda(container) {
         ).join("") + '<p class="group-poll-total">' + safe(String(result.total_votes)) + ' suara</p></div>'
       : "";
     return '<article class="group-agenda-card"><div class="group-agenda-head"><span class="group-agenda-type">' +
-      safe(item.item_type) + '</span><time>' + safe(dateLabel(item.due_at || item.created_at)) + '</time></div>' +
+      safe(item.item_type) + (item.is_demo ? ' · DEMO' : "") + '</span><time>' + safe(dateLabel(item.due_at || item.created_at)) + '</time></div>' +
       '<h4>' + safe(item.title) + '</h4>' +
       (item.details ? '<p>' + safe(item.details) + '</p>' : "") + pollHtml +
       (canDelete ? '<div class="group-agenda-actions"><button class="btn btn-secondary btn-sm" data-group-agenda-edit="' +
