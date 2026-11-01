@@ -339,6 +339,47 @@ async function seedSession(ctx: DemoContext, scenario: string) {
     preferred_programs: [],
   }, { onConflict: "user_id" }), "Preferensi pengunjung demo gagal disimpan");
 
+  const forumTitle = "Diskusi DEMO: Strategi belajar Basis Data";
+  const forumBody = "[SIMULASI DEMO] Bagaimana cara paling efektif memahami relasi tabel dan normalisasi basis data? Mari berbagi ringkasan dan contoh latihan.";
+  const { data: existingForumPost, error: forumPostLookupError } = await admin.from("forum_posts")
+    .select("id")
+    .eq("is_demo", true)
+    .eq("demo_session_id", sessionId)
+    .eq("author_id", visitorId)
+    .eq("title", forumTitle)
+    .maybeSingle();
+  if (forumPostLookupError) throw new Error("Pemeriksaan postingan Forum demo gagal: " + forumPostLookupError.message);
+  let forumPostId = existingForumPost?.id;
+  if (!forumPostId) {
+    const { data: forumPost, error: forumPostError } = await admin.from("forum_posts").insert({
+      author_id: visitorId,
+      course_id: null,
+      program: "Sistem Informasi",
+      post_type: "discussion",
+      title: forumTitle,
+      body: forumBody,
+    }).select("id").single();
+    if (forumPostError || !forumPost) throw new Error("Postingan Forum demo gagal dibuat: " + (forumPostError?.message || ""));
+    forumPostId = forumPost.id;
+  }
+  const forumCommentBody = "[SIMULASI DEMO] Mulai dari konsep primary key dan foreign key, lalu lanjutkan ke normalisasi 1NF sampai 3NF dengan contoh tabel sederhana.";
+  const { data: existingForumComment, error: forumCommentLookupError } = await admin.from("forum_comments")
+    .select("id")
+    .eq("is_demo", true)
+    .eq("demo_session_id", sessionId)
+    .eq("post_id", forumPostId)
+    .eq("author_id", bot.a.userId)
+    .eq("body", forumCommentBody)
+    .maybeSingle();
+  if (forumCommentLookupError) throw new Error("Pemeriksaan komentar Forum demo gagal: " + forumCommentLookupError.message);
+  if (!existingForumComment) {
+    unwrap(await admin.from("forum_comments").insert({
+      post_id: forumPostId,
+      author_id: bot.a.userId,
+      body: forumCommentBody,
+    }), "Komentar Forum demo gagal dibuat");
+  }
+
   const accepted = await ensureConnection(admin, visitorId, bot.b.userId, "accepted");
   await addDirectMessage(admin, accepted.id, bot.b.userId, "[SIMULASI DEMO] Halo! Aku Demo B dari Manajemen. Kita bisa diskusi materi bersama.");
   await addDirectMessage(admin, accepted.id, visitorId, "[SIMULASI DEMO] Siap, kita bahas materi bareng.");
@@ -545,9 +586,10 @@ async function cleanupSession(ctx: DemoContext) {
     if (storageError) throw new Error("Pembersihan file demo gagal: " + storageError.message);
   }
   const tables = [
-    "group_agenda_votes", "group_messages", "group_materials", "group_agenda_items",
-    "group_invites", "group_members", "direct_messages", "connections",
-    "notifications", "matching_preferences", "user_locations", "study_groups",
+    "forum_comments", "forum_posts", "group_agenda_votes", "group_messages",
+    "group_materials", "group_agenda_items", "group_invites", "group_members",
+    "direct_messages", "connections", "notifications", "matching_preferences",
+    "user_locations", "study_groups",
   ];
   for (const table of tables) {
     const { error: deleteError } = await a.from(table).delete().eq("is_demo", true).eq("demo_session_id", ctx.sessionId);
@@ -594,7 +636,7 @@ Deno.serve(async (req: Request) => {
         const { error: storageError } = await ctx.admin.storage.from("group-materials").remove(paths);
         if (storageError) throw new Error("File demo gagal dibersihkan: " + storageError.message);
       }
-      const tables = ["group_agenda_votes","group_messages","group_materials","group_agenda_items","group_invites","group_members","direct_messages","connections","notifications","matching_preferences","user_locations","study_groups"];
+      const tables = ["forum_comments","forum_posts","group_agenda_votes","group_messages","group_materials","group_agenda_items","group_invites","group_members","direct_messages","connections","notifications","matching_preferences","user_locations","study_groups"];
       for (const table of tables) {
         const { error: deleteError } = await ctx.admin.from(table).delete().eq("is_demo", true).eq("demo_session_id", ctx.sessionId);
         if (deleteError) throw new Error("Reset tabel " + table + " gagal: " + deleteError.message);
