@@ -133,6 +133,17 @@ for (const [relativePath, selectorName] of [
   }
 }
 
+const nearbyEdgePath = join(root, 'supabase/functions/nearby-students/index.ts');
+if (existsSync(nearbyEdgePath)) {
+  const nearbyEdge = readFileSync(nearbyEdgePath, 'utf8');
+  if (!nearbyEdge.includes('const demoModeEnabled = Deno.env.get("UTCONNECT_DEMO_MODE") === "true"')) {
+    failures.push('Nearby Edge Function: demo-only profile columns must be enabled by an explicit server environment flag');
+  }
+  if (!nearbyEdge.includes('select(demoModeEnabled ? "verification_status,is_demo" : "verification_status")')) {
+    failures.push('Nearby Edge Function: normal deployments must not require the demo-only profile marker');
+  }
+}
+
 if (existsSync(demoEdgePath)) {
   const edge = readFileSync(demoEdgePath, 'utf8');
   for (const [description, condition] of [
