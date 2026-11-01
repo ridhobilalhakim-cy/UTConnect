@@ -1,4 +1,5 @@
-import { supabase } from "../lib/supabase.js";
+import { supabase, IS_DEMO_BUILD } from "../lib/supabase.js";
+import { startDemoSession } from "../services/demo.js";
 import L from "leaflet";
 import { populateUTFacultyProgramSelects } from "../data/ut-programs.js";
 import "leaflet/dist/leaflet.css";
@@ -156,6 +157,21 @@ window.L = L;
   }
 
   // Basic navigation is wired before the network libraries load, so the UI never appears inert.
+  const demoStartButton = $("demoStartBtn");
+  if (demoStartButton) {
+    demoStartButton.hidden = !IS_DEMO_BUILD;
+    demoStartButton.addEventListener("click", async () => {
+      if (!IS_DEMO_BUILD) return;
+      busy("demoStartBtn", true, "Menyiapkan sesi demo...");
+      try {
+        await startDemoSession();
+        window.location.replace("/app.html");
+      } catch (error) {
+        alertBox(error?.message || "Sesi demo belum dapat dimulai.", "error");
+        busy("demoStartBtn", false);
+      }
+    });
+  }
   $("goRegister").addEventListener("click",()=>{
     showView("registerView");
     $("oauthAccountBox").classList.add("hidden");
