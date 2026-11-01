@@ -16,7 +16,9 @@ if (IS_DEMO_BUILD) {
     throw new Error("Demo Mode is blocked from using an existing UTConnect database. Use a newly provisioned demo-only project.");
   }
 }
-export const AUTH_STORAGE_KEY = `utconnect-${SUPABASE_PROJECT_REF}-auth`;
+export const AUTH_STORAGE_KEY = IS_DEMO_BUILD
+  ? `utconnect-${SUPABASE_PROJECT_REF}-demo-auth`
+  : "utconnect-hqyusbyndtlfypdbmatw-auth";
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
