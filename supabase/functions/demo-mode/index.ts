@@ -338,16 +338,16 @@ async function seedSession(ctx: DemoContext, scenario: string) {
   const open = await insertGroup(admin, sessionId, bot.a.userId, "Kelompok Sistem Informasi — Terbuka", "Sistem Informasi",
     "Ruang belajar simulasi dengan beberapa tempat tersedia.", 8, "open",
     [{ userId: bot.a.userId, role: "admin" }, { userId: bot.b.userId }, { userId: bot.f.userId }]);
-  const nearlyFull = await insertGroup(admin, bot.b.userId, "Kelompok Manajemen — Hampir Penuh", "Manajemen",
+  const nearlyFull = await insertGroup(admin, sessionId, bot.b.userId, "Kelompok Manajemen — Hampir Penuh", "Manajemen",
     "Skenario kapasitas 3 dari 4 anggota aktif.", 4, "open",
     [{ userId: bot.b.userId, role: "admin" }, { userId: bot.c.userId }, { userId: bot.d.userId }]);
-  const full = await insertGroup(admin, bot.c.userId, "Kelompok Akuntansi — Penuh", "Akuntansi",
+  const full = await insertGroup(admin, sessionId, bot.c.userId, "Kelompok Akuntansi — Penuh", "Akuntansi",
     "Skenario kapasitas maksimum; backend harus menolak anggota baru.", 3, "open",
     [{ userId: bot.c.userId, role: "admin" }, { userId: bot.d.userId }, { userId: bot.e.userId }]);
-  const approval = await insertGroup(admin, bot.e.userId, "Kelompok Bahasa Inggris — Persetujuan", "Pendidikan Bahasa Inggris",
+  const approval = await insertGroup(admin, sessionId, bot.e.userId, "Kelompok Bahasa Inggris — Persetujuan", "Pendidikan Bahasa Inggris",
     "Permintaan anggota diproses oleh admin bot simulasi.", 5, "approval",
     [{ userId: bot.e.userId, role: "admin" }, { userId: bot.f.userId }]);
-  const privateGroup = await insertGroup(admin, bot.f.userId, "Kelompok Diskusi Privat — Undangan", "Sains Data",
+  const privateGroup = await insertGroup(admin, sessionId, bot.f.userId, "Kelompok Diskusi Privat — Undangan", "Sains Data",
     "Grup privat yang hanya dapat dimasuki melalui undangan.", 5, "private",
     [{ userId: bot.f.userId, role: "admin" }, { userId: bot.a.userId }]);
   const { data: existingInvite, error: inviteLookupError } = await admin.from("group_invites")
