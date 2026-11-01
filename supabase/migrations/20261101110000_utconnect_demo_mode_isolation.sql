@@ -1894,3 +1894,137 @@ begin
   return v_status;
 end
 $function$;
+
+
+-- A demo profile is never eligible to upload or submit real student verification evidence.
+-- Keep this server-side as well as in the demo UI so direct RPC/storage requests cannot bypass it.
+create or replace function private.can_upload_student_verification_evidence()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $function$
+  select
+    (select auth.uid()) is not null
+    and not exists (
+      select 1
+      from auth.users u
+      where u.id = (select auth.uid())
+        and u.raw_app_meta_data ->> 'utconnect_demo_role' in ('visitor', 'bot')
+    )
+    and exists (
+      select 1
+      from public.profiles p
+      where p.id = (select auth.uid())
+        and p.verification_status in (
+          'pending'::public.student_verification_status,
+          'rejected'::public.student_verification_status
+        )
+    )
+    and not exists (
+      select 1
+      from private.student_verification_requests r
+      where r.user_id = (select auth.uid())
+        and r.status = 'submitted'
+    );
+$function$;
+
+create or replace function private.submit_student_verification(
+  p_storage_path text,
+  p_original_filename text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_user_id uuid := (select auth.uid());
+  v_request_id uuid;
+  v_submitted_at timestamptz;
+  v_profile_status public.student_verification_status;
+begin
+  if v_user_id is null then
+    raise exception 'Authentication required' using errcode = '28000';
+  end if;
+
+  if exists (
+    select 1
+    from auth.users u
+    where u.id = v_user_id
+      and u.raw_app_meta_data ->> 'utconnect_demo_role' in ('visitor', 'bot')
+  ) then
+    raise exception 'Demo accounts cannot submit real student verification evidence'
+      using errcode = '42501';
+  end if;
+
+  if p_storage_path is null
+    or p_storage_path !~ ('^' || v_user_id::text || '/[0-9a-f-]{36}[.](pdf|jpg|jpeg|png)$')
+  then
+    raise exception 'Invalid evidence path' using errcode = '22023';
+  end if;
+
+  if p_original_filename is null
+    or char_length(trim(p_original_filename)) not between 1 and 255
+    or position('/' in p_original_filename) > 0
+    or position(chr(92) in p_original_filename) > 0
+  then
+    raise exception 'Invalid evidence filename' using errcode = '22023';
+  end if;
+
+  select p.verification_status
+  into v_profile_status
+  from public.profiles p
+  where p.id = v_user_id
+  for update;
+
+  if not found then
+    raise exception 'Student profile not found' using errcode = 'P0002';
+  end if;
+
+  if v_profile_status not in (
+    'pending'::public.student_verification_status,
+    'rejected'::public.student_verification_status
+  ) then
+    raise exception 'This profile is not eligible for another verification request' using errcode = '42501';
+  end if;
+
+  if exists (
+    select 1
+    from private.student_verification_requests r
+    where r.user_id = v_user_id
+      and r.status = 'submitted'
+  ) then
+    raise exception 'A verification request is already awaiting review' using errcode = '23505';
+  end if;
+
+  if not exists (
+    select 1
+    from storage.objects o
+    where o.bucket_id = 'student-verification-evidence'
+      and o.name = p_storage_path
+  ) then
+    raise exception 'Evidence file was not found in the private bucket' using errcode = 'P0002';
+  end if;
+
+  insert into private.student_verification_requests (
+    user_id, storage_path, original_filename, status
+  )
+  values (
+    v_user_id, p_storage_path, trim(p_original_filename), 'submitted'
+  )
+  returning id, submitted_at into v_request_id, v_submitted_at;
+
+  update public.profiles
+  set verification_status = 'pending'::public.student_verification_status
+  where id = v_user_id;
+
+  return jsonb_build_object(
+    'success', true,
+    'request_id', v_request_id,
+    'status', 'submitted',
+    'submitted_at', v_submitted_at
+  );
+end;
+$function$;
