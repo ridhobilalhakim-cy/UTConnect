@@ -411,3 +411,12 @@
 .profile-avatar-preset img{width:49px;height:49px;border-radius:50%;display:block}
 .profile-avatar-preset span{font-size:8px;color:var(--muted);font-weight:700}
 @media(max-width:420px){.profile-avatar-preset-grid{gap:6px}.profile-avatar-preset{padding:6px 3px}.profile-avatar-preset img{width:41px;height:41px}}
+
+/* Demo Mode uses the existing UTConnect visual system and is hidden outside demo sessions. */
+.demo-mode-banner{margin:12px 38px 0;padding:12px 14px;border:1px solid #edda9b;border-radius:12px;background:#fff9e8;display:flex;align-items:center;justify-content:space-between;gap:12px;color:#765900}
+.demo-mode-banner[hidden],.demo-badge[hidden]{display:none}
+.demo-mode-banner>div{display:grid;gap:3px}.demo-mode-banner strong{font-size:10px;letter-spacing:.7px}.demo-mode-banner span{font-size:10px;line-height:1.5}
+.demo-user-tag{display:inline-flex;align-items:center;border:1px solid #efd987;background:#fff6d9;color:#795c00;border-radius:6px;padding:4px 6px;font-size:8px;font-weight:850;letter-spacing:.35px;white-space:nowrap}
+.map-marker.demo{background:#8a6800;border:2px solid #fff4ce;box-shadow:0 2px 8px #8a680055}
+.legend-dot.demo{background:#8a6800}
+@media(max-width:760px){.demo-mode-banner{margin:10px 13px 0;align-items:flex-start;flex-direction:column}.demo-mode-banner .btn{align-self:flex-end}.demo-badge{display:none}}
