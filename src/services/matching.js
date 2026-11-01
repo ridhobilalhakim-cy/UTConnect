@@ -75,5 +75,9 @@ export async function respondConnectionRequest(connectionId, accept) {
     p_accept: Boolean(accept),
   });
   throwIfError(error);
+  await runDemoAutomation("connection_response", {
+    connection_id: connectionId,
+    accepted: Boolean(accept),
+  });
   return data;
 }
