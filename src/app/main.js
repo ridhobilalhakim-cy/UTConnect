@@ -75,6 +75,8 @@ async function bootAuthenticatedApp() {
     const demoBadge = document.getElementById("demoModeBadge");
     if (demoBanner) demoBanner.hidden = !isDemo;
     if (demoBadge) demoBadge.hidden = !isDemo;
+    const demoShowcase = document.getElementById("demoShowcase");
+    if (demoShowcase) demoShowcase.hidden = !isDemo;
     const demoScenarioText = document.getElementById("demoScenarioText");
     if (demoScenarioText && isDemo) {
       const scenario = session.user.app_metadata?.utconnect_demo_scenario || new URLSearchParams(window.location.search).get("demoScenario") || "all";
