@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabase.js";
-import { runDemoAutomation } from "./demo.js";
+import { runDemoAutomation, listDemoGroups, IS_DEMO_BUILD } from "./demo.js";
 
 const GROUP_SELECT = "id,created_by,name,description,course_id,program,mode,capacity,access_type,schedule_text,online_url,offline_area_label,is_archived,created_at,updated_at,is_demo,course:courses!study_groups_course_id_fkey(id,course_code,course_name)";
 const MEMBERSHIP_SELECT = "group_id,user_id,role,status,created_at,joined_at,is_demo";
@@ -17,6 +17,7 @@ async function requireUserId() {
 }
 
 export async function listStudyGroups(limit = 100) {
+  if (IS_DEMO_BUILD) return listDemoGroups(limit);
   const { data, error } = await supabase
     .from("study_groups")
     .select(GROUP_SELECT)
