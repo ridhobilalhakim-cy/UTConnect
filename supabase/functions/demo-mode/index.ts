@@ -152,23 +152,32 @@ async function createBot(admin: SupabaseClient, sessionId: string, spec: typeof 
   if (existing) {
     id = existing.id;
   } else {
-    const { data: created, error: createError } = await admin.auth.admin.createUser({
-      email: "demo-" + sessionId + "-" + spec.key + "@utconnect.invalid",
-      password: randomPassword(),
-      email_confirm: true,
-      app_metadata: {
-        utconnect_demo_role: "bot",
-        utconnect_demo_session: sessionId,
-        utconnect_demo_bot_key: spec.key,
-      },
-      user_metadata: { full_name: spec.name },
-    });
-    if (createError || !created.user) {
-      throw new Error("Akun bot " + spec.key.toUpperCase() + " gagal dibuat: " + (createError?.message || ""));
+    const email = "demo-" + sessionId + "-" + spec.key + "@utconnect.invalid";
+    const { data: authUsers, error: listError } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    if (listError) throw new Error("Akun Auth demo belum dapat diperiksa: " + listError.message);
+    const existingAuthUser = authUsers.users.find(user => user.email === email);
+    if (existingAuthUser) {
+      id = existingAuthUser.id;
+    } else {
+      const { data: created, error: createError } = await admin.auth.admin.createUser({
+        email,
+        password: randomPassword(),
+        email_confirm: true,
+        app_metadata: {
+          utconnect_demo_role: "bot",
+          utconnect_demo_session: sessionId,
+          utconnect_demo_bot_key: spec.key,
+        },
+        user_metadata: { full_name: spec.name },
+      });
+      if (createError || !created.user) {
+        throw new Error("Akun bot " + spec.key.toUpperCase() + " gagal dibuat: " + (createError?.message || ""));
+      }
+      id = created.user.id;
     }
-    id = created.user.id;
+
     const digest = await sha256("UTCONNECT-DEMO-NOT-A-REAL-NIM:" + sessionId + ":" + spec.key + ":" + crypto.randomUUID());
-    unwrap(await admin.from("profiles").insert({
+    unwrap(await admin.from("profiles").upsert({
       id,
       full_name: spec.name,
       nim_digest: digest,
@@ -177,7 +186,7 @@ async function createBot(admin: SupabaseClient, sessionId: string, spec: typeof 
       semester: spec.semester,
       verification_status: "pending",
       bio: "Akun simulasi UTConnect. " + spec.name + " bukan mahasiswa sungguhan.",
-    }), "Profil bot gagal dibuat");
+    }, { onConflict: "id" }), "Profil bot gagal dibuat");
   }
 
   // Re-apply these idempotently so a retry can recover from an interrupted first seed.
