@@ -83,11 +83,27 @@ Deno.serve(async (req: Request) => {
     if (authError || !user) return json({ error: "Sesi tidak valid. Silakan masuk kembali." }, 401);
 
     const demoModeEnabled = Deno.env.get("UTCONNECT_DEMO_MODE") === "true";
-    const { data: profile, error: profileError } = await admin
-      .from("profiles")
-      .select(demoModeEnabled ? "verification_status,is_demo" : "verification_status")
-      .eq("id", user.id)
-      .maybeSingle();
+    let profile: { verification_status?: string; is_demo?: boolean } | null = null;
+    let profileError: { message: string } | null = null;
+    if (demoModeEnabled) {
+      // The normal project's generated DB types intentionally do not include demo-only columns.
+      // Keep the demo-only select inside an explicit, server-configured branch.
+      const demoProfiles = admin.from("profiles") as any;
+      const result = await demoProfiles
+        .select("verification_status,is_demo")
+        .eq("id", user.id)
+        .maybeSingle();
+      profile = result.data as { verification_status?: string; is_demo?: boolean } | null;
+      profileError = result.error;
+    } else {
+      const result = await admin
+        .from("profiles")
+        .select("verification_status")
+        .eq("id", user.id)
+        .maybeSingle();
+      profile = result.data as { verification_status?: string; is_demo?: boolean } | null;
+      profileError = result.error;
+    }
     if (profileError) return json({ error: "Status verifikasi belum dapat diperiksa." }, 500);
     if (profile?.verification_status !== "verified" && !(demoModeEnabled && profile?.is_demo === true)) {
       return json({ error: "Peta mahasiswa sekitar hanya tersedia untuk mahasiswa terverifikasi." }, 403);
