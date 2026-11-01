@@ -81,7 +81,7 @@ export function subscribeToDirectMessages(connectionId, onChange, onStatus) {
   if (typeof window !== "undefined" && window.__UTCONNECT_DISABLE_REALTIME__) return null;
 
   return supabase
-    .channel(`direct-messages-${connectionId}`)
+    .channel(`direct-messages-${connectionId}-${crypto.randomUUID()}`)
     .on(
       "postgres_changes",
       {

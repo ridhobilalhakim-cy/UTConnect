@@ -284,9 +284,11 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   function toast(message){const el=$('#toast');el.textContent=message;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),2500)}
   function icons(){if(window.lucide)lucide.createIcons()}
   function navigate(page){
-    if(page!=="messages" && state.activeChatChannel){
-      const channel=state.activeChatChannel;state.activeChatChannel=null;
-      unsubscribeFromDirectMessages(channel).catch(error=>console.warn("Chat channel cleanup failed:",error));
+    if(page!=="messages"){
+      if(state.activeChatChannel){
+        const channel=state.activeChatChannel;state.activeChatChannel=null;
+        unsubscribeFromDirectMessages(channel).catch(error=>console.warn("Chat channel cleanup failed:",error));
+      }
       if(state.activeChatPollTimer){clearInterval(state.activeChatPollTimer);state.activeChatPollTimer=null;}
       state.activeChatConnectionId=null;state.activeChatRoom=null;state.chatMessages=[];
     }
@@ -1966,6 +1968,8 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     try {
       await refreshDirectChat();
       if (state.activeChatConnectionId !== connectionId) return;
+      // Start a short polling safety net while the WebSocket joins; it stops on SUBSCRIBED.
+      startDirectChatFallback(connectionId);
       state.activeChatChannel = subscribeToDirectMessages(
         connectionId,
         payload => {
