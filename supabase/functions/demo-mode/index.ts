@@ -391,10 +391,24 @@ async function seedSession(ctx: DemoContext, scenario: string) {
     contentType: "application/pdf", cacheControl: "600", upsert: true,
   });
   if (uploadError) throw new Error("Materi contoh demo gagal diunggah: " + uploadError.message);
-  unwrap(await admin.from("group_materials").upsert({
-    group_id: open.id, uploaded_by: bot.a.userId, title: "Materi Simulasi UTConnect",
-    storage_path: filePath, content_type: "application/pdf", file_size_bytes: pdfBytes().length,
-  }, { onConflict: "storage_path" }), "Metadata materi contoh demo gagal dibuat");
+  const { data: existingMaterial, error: materialLookupError } = await admin.from("group_materials")
+    .select("id")
+    .eq("storage_path", filePath)
+    .maybeSingle();
+  if (materialLookupError) throw new Error("Pemeriksaan metadata materi demo gagal: " + materialLookupError.message);
+  const materialPayload = {
+    group_id: open.id,
+    uploaded_by: bot.a.userId,
+    title: "Materi Simulasi UTConnect",
+    storage_path: filePath,
+    content_type: "application/pdf",
+    file_size_bytes: pdfBytes().length,
+  };
+  if (existingMaterial) {
+    unwrap(await admin.from("group_materials").update(materialPayload).eq("id", existingMaterial.id), "Metadata materi contoh demo gagal diperbarui");
+  } else {
+    unwrap(await admin.from("group_materials").insert(materialPayload), "Metadata materi contoh demo gagal dibuat");
+  }
 
   return { seeded: true, bot_count: bots.length, groups: 5, scenario };
 }
