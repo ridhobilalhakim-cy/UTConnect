@@ -19,7 +19,7 @@ export async function listMyNotifications({ limit = DEFAULT_LIMIT } = {}) {
   const safeLimit = Math.max(1, Math.min(Number(limit) || DEFAULT_LIMIT, 100));
   const { data, error } = await supabase
     .from("notifications")
-    .select("id,user_id,notification_type,title,body,reference_id,read_at,created_at")
+    .select("id,user_id,notification_type,title,body,reference_id,read_at,created_at,is_demo")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(safeLimit);
