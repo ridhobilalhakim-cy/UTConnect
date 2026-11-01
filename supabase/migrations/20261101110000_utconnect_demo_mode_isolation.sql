@@ -721,3 +721,250 @@ revoke all on function public.get_my_chat_rooms() from public, anon;
 grant execute on function public.get_my_chat_rooms() to authenticated, service_role;
 
 -- Realtime payloads remain filtered by RLS and now carry an explicit, immutable demo marker.
+
+
+-- Server-only helpers for the demo-mode Edge Function.
+-- These routines are never callable by anon/authenticated browser requests.
+create or replace function public.demo_create_session(p_visitor_user_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_session_id uuid;
+  v_metadata jsonb;
+begin
+  if p_visitor_user_id is null then
+    raise exception 'Demo visitor is required' using errcode = '22023';
+  end if;
+
+  select u.raw_app_meta_data into v_metadata
+  from auth.users u
+  where u.id = p_visitor_user_id
+    and u.is_anonymous = true
+  for update;
+
+  if not found then
+    raise exception 'Only an anonymous demo visitor session can be bootstrapped'
+      using errcode = '42501';
+  end if;
+
+  select s.id into v_session_id
+  from private.demo_sessions s
+  where s.visitor_user_id = p_visitor_user_id
+    and s.status = 'active'
+    and s.expires_at > now();
+
+  if v_session_id is not null then
+    return v_session_id;
+  end if;
+
+  v_session_id := gen_random_uuid();
+  insert into private.demo_sessions(id, visitor_user_id, status, expires_at)
+  values (v_session_id, p_visitor_user_id, 'active', now() + interval '8 hours')
+  on conflict (visitor_user_id) do update
+    set id = excluded.id,
+        status = 'active',
+        created_at = now(),
+        expires_at = excluded.expires_at,
+        reset_at = now();
+
+  update auth.users
+  set raw_app_meta_data = coalesce(v_metadata, '{}'::jsonb)
+      || jsonb_build_object(
+        'utconnect_demo_role', 'visitor',
+        'utconnect_demo_session', v_session_id::text
+      ),
+      updated_at = now()
+  where id = p_visitor_user_id;
+
+  return v_session_id;
+end
+$function$;
+
+create or replace function public.demo_get_session(p_visitor_user_id uuid)
+returns uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $function$
+  select private.demo_session_for_user(p_visitor_user_id)
+$function$;
+
+create or replace function public.demo_claim_bot_event(
+  p_session_id uuid,
+  p_event_key text
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+begin
+  if p_session_id is null or p_event_key is null
+    or char_length(p_event_key) not between 1 and 180 then
+    raise exception 'Demo event key is invalid' using errcode = '22023';
+  end if;
+
+  if not exists (
+    select 1 from private.demo_sessions s
+    where s.id = p_session_id and s.status = 'active' and s.expires_at > now()
+  ) then
+    raise exception 'Demo session has expired' using errcode = '42501';
+  end if;
+
+  insert into private.demo_bot_events(session_id, event_key)
+  values (p_session_id, p_event_key)
+  on conflict (session_id, event_key) do nothing;
+
+  return found;
+end
+$function$;
+
+create or replace function public.demo_add_bot_member(
+  p_session_id uuid,
+  p_group_id uuid,
+  p_bot_user_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_group public.study_groups%rowtype;
+  v_count integer;
+begin
+  select * into v_group
+  from public.study_groups g
+  where g.id = p_group_id
+    and g.is_demo = true
+    and g.demo_session_id = p_session_id
+    and not g.is_archived
+  for update;
+
+  if not found then raise exception 'Demo group not found'; end if;
+  if private.demo_session_for_user(p_bot_user_id) is distinct from p_session_id then
+    raise exception 'Bot is outside this demo session' using errcode = '42501';
+  end if;
+
+  select count(*) into v_count
+  from public.group_members gm
+  where gm.group_id = p_group_id
+    and gm.status = 'active'::public.group_member_status;
+
+  if v_count >= v_group.capacity then
+    raise exception 'Group is full' using errcode = '23514';
+  end if;
+
+  insert into public.group_members(group_id, user_id, role, status, joined_at)
+  values (
+    p_group_id,
+    p_bot_user_id,
+    'member'::public.group_member_role,
+    'active'::public.group_member_status,
+    now()
+  )
+  on conflict (group_id, user_id) do update
+    set status = 'active'::public.group_member_status,
+        joined_at = now(),
+        updated_at = now();
+
+  return true;
+end
+$function$;
+
+create or replace function public.demo_approve_join_request(
+  p_session_id uuid,
+  p_group_id uuid,
+  p_bot_admin_id uuid,
+  p_user_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_group public.study_groups%rowtype;
+  v_count integer;
+begin
+  select * into v_group
+  from public.study_groups g
+  where g.id = p_group_id
+    and g.is_demo = true
+    and g.demo_session_id = p_session_id
+    and not g.is_archived
+  for update;
+
+  if not found then raise exception 'Demo group not found'; end if;
+  if private.demo_session_for_user(p_bot_admin_id) is distinct from p_session_id
+    or private.demo_session_for_user(p_user_id) is distinct from p_session_id then
+    raise exception 'Demo approval users are outside the group session'
+      using errcode = '42501';
+  end if;
+
+  if not exists (
+    select 1 from public.group_members gm
+    where gm.group_id = p_group_id
+      and gm.user_id = p_bot_admin_id
+      and gm.role in ('admin'::public.group_member_role, 'co_admin'::public.group_member_role)
+      and gm.status = 'active'::public.group_member_status
+  ) then
+    raise exception 'Demo approval actor is not a group administrator'
+      using errcode = '42501';
+  end if;
+
+  select count(*) into v_count
+  from public.group_members gm
+  where gm.group_id = p_group_id
+    and gm.status = 'active'::public.group_member_status;
+
+  if v_count >= v_group.capacity then
+    raise exception 'Group is full' using errcode = '23514';
+  end if;
+
+  update public.group_members gm
+  set status = 'active'::public.group_member_status,
+      joined_at = now(),
+      updated_at = now()
+  where gm.group_id = p_group_id
+    and gm.user_id = p_user_id
+    and gm.status = 'pending'::public.group_member_status;
+
+  if not found then raise exception 'Pending demo join request not found'; end if;
+  return true;
+end
+$function$;
+
+revoke all on function public.demo_create_session(uuid) from public, anon, authenticated;
+revoke all on function public.demo_get_session(uuid) from public, anon, authenticated;
+revoke all on function public.demo_claim_bot_event(uuid, text) from public, anon, authenticated;
+revoke all on function public.demo_add_bot_member(uuid, uuid, uuid) from public, anon, authenticated;
+revoke all on function public.demo_approve_join_request(uuid, uuid, uuid, uuid) from public, anon, authenticated;
+
+grant execute on function public.demo_create_session(uuid) to service_role;
+grant execute on function public.demo_get_session(uuid) to service_role;
+grant execute on function public.demo_claim_bot_event(uuid, text) to service_role;
+grant execute on function public.demo_add_bot_member(uuid, uuid, uuid) to service_role;
+grant execute on function public.demo_approve_join_request(uuid, uuid, uuid, uuid) to service_role;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'group-materials',
+  'group-materials',
+  false,
+  52428800,
+  array[
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'image/jpeg',
+    'image/png'
+  ]::text[]
+)
+on conflict (id) do nothing;
