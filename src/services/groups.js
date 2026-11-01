@@ -1,5 +1,5 @@
-import { supabase } from "../lib/supabase.js";
-import { runDemoAutomation, listDemoGroups, IS_DEMO_BUILD } from "./demo.js";
+import { supabase, IS_DEMO_BUILD } from "../lib/supabase.js";
+import { runDemoAutomation, listDemoGroups } from "./demo.js";
 
 const GROUP_SELECT = IS_DEMO_BUILD
   ? "id,created_by,name,description,course_id,program,mode,capacity,access_type,schedule_text,online_url,offline_area_label,is_archived,created_at,updated_at,is_demo,course:courses!study_groups_course_id_fkey(id,course_code,course_name)"
