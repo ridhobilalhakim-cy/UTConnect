@@ -199,35 +199,101 @@ async function createBot(admin: SupabaseClient, sessionId: string, spec: typeof 
 
   return { key: spec.key, userId: id, name: spec.name, program: spec.program };
 }
-async function insertGroup(admin: SupabaseClient, creator: string, name: string, program: string,
+async function insertGroup(admin: SupabaseClient, sessionId: string, creator: string, name: string, program: string,
   description: string, capacity: number, access: "open" | "approval" | "private",
   members: Array<{ userId: string; role?: "admin" | "co_admin" | "member" }>) {
-  const { data: group, error } = await admin.from("study_groups").insert({
-    created_by: creator, name, program, description, mode: "online", capacity,
-    access_type: access, schedule_text: "Skenario demo · jadwal dapat diubah",
-    is_archived: false,
-  }).select("id,name").single();
-  if (error || !group) throw new Error("Kelompok demo gagal dibuat: " + (error?.message || "respons kosong"));
-  // study_groups has an AFTER INSERT trigger that already creates the creator as admin.
-  // Insert only the remaining members to avoid a duplicate (group_id, user_id) primary key.
+  const { data: existing, error: lookupError } = await admin.from("study_groups")
+    .select("id,name")
+    .eq("is_demo", true)
+    .eq("demo_session_id", sessionId)
+    .eq("name", name)
+    .maybeSingle();
+  if (lookupError) throw new Error("Pemeriksaan kelompok demo gagal: " + lookupError.message);
+
+  let group = existing;
+  if (!group) {
+    const { data, error } = await admin.from("study_groups").insert({
+      created_by: creator, name, program, description, mode: "online", capacity,
+      access_type: access, schedule_text: "Skenario demo · jadwal dapat diubah",
+      is_archived: false,
+    }).select("id,name").single();
+    if (error || !data) throw new Error("Kelompok demo gagal dibuat: " + (error?.message || "respons kosong"));
+    group = data;
+  }
+
+  // The database trigger creates the creator as admin. Upsert only the other seed members.
   const additionalMembers = members.filter(item => item.userId !== creator);
   if (additionalMembers.length) {
-    unwrap(await admin.from("group_members").insert(additionalMembers.map(item => ({
+    unwrap(await admin.from("group_members").upsert(additionalMembers.map(item => ({
       group_id: group.id, user_id: item.userId, role: item.role || "member",
       status: "active", joined_at: new Date().toISOString(),
-    }))), "Anggota kelompok demo gagal dibuat");
+    })), { onConflict: "group_id,user_id" }), "Anggota kelompok demo gagal dibuat");
   }
   return group;
 }
 
 async function addGroupMessage(admin: SupabaseClient, groupId: string, senderId: string, body: string) {
-  unwrap(await admin.from("group_messages").insert({
+  const { data: existing, error: lookupError } = await admin.from("group_messages")
+    .select("id")
+    .eq("group_id", groupId)
+    .eq("sender_id", senderId)
+    .eq("body", body)
+    .limit(1)
+    .maybeSingle();
+  if (lookupError) throw new Error("Pemeriksaan pesan demo gagal: " + lookupError.message);
+  if (existing) return existing.id;
+
+  const { data, error } = await admin.from("group_messages").insert({
     group_id: groupId, sender_id: senderId, body, mentioned_user_ids: [],
-  }), "Pesan awal grup demo gagal dibuat");
+  }).select("id").single();
+  if (error || !data) throw new Error("Pesan awal grup demo gagal dibuat: " + (error?.message || ""));
+  return data.id;
+}
+
+async function addDirectMessage(admin: SupabaseClient, connectionId: string, senderId: string, body: string) {
+  const { data: existing, error: lookupError } = await admin.from("direct_messages")
+    .select("id")
+    .eq("connection_id", connectionId)
+    .eq("sender_id", senderId)
+    .eq("body", body)
+    .limit(1)
+    .maybeSingle();
+  if (lookupError) throw new Error("Pemeriksaan pesan pribadi demo gagal: " + lookupError.message);
+  if (existing) return existing.id;
+
+  const { data, error } = await admin.from("direct_messages").insert({
+    connection_id: connectionId, sender_id: senderId, body,
+  }).select("id").single();
+  if (error || !data) throw new Error("Pesan pribadi demo gagal dibuat: " + (error?.message || ""));
+  return data.id;
+}
+
+async function ensureConnection(admin: SupabaseClient, initiatorId: string, recipientId: string, initialStatus: "pending" | "accepted") {
+  const { data: existing, error: lookupError } = await admin.from("connections")
+    .select("id,status")
+    .eq("initiator_id", initiatorId)
+    .eq("recipient_id", recipientId)
+    .maybeSingle();
+  if (lookupError) throw new Error("Pemeriksaan koneksi demo gagal: " + lookupError.message);
+  if (existing) return existing;
+
+  const { data, error } = await admin.from("connections").insert({
+    initiator_id: initiatorId, recipient_id: recipientId, status: initialStatus,
+  }).select("id,status").single();
+  if (error || !data) throw new Error("Koneksi demo gagal dibuat: " + (error?.message || ""));
+  return data;
 }
 
 async function addAgenda(admin: SupabaseClient, groupId: string, creatorId: string,
   type: string, title: string, details: string, options: string[] | null = null) {
+  const { data: existing, error: lookupError } = await admin.from("group_agenda_items")
+    .select("id")
+    .eq("group_id", groupId)
+    .eq("title", title)
+    .maybeSingle();
+  if (lookupError) throw new Error("Pemeriksaan agenda demo gagal: " + lookupError.message);
+  if (existing) return existing.id as string;
+
   const { data, error } = await admin.from("group_agenda_items").insert({
     group_id: groupId, created_by: creatorId, item_type: type, title, details,
     due_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
@@ -237,6 +303,7 @@ async function addAgenda(admin: SupabaseClient, groupId: string, creatorId: stri
   return data.id as string;
 }
 
+
 function pdfBytes() {
   const pdf = "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 180]/Resources<</Font<</F1 4 0 R>>>>/Contents 5 0 R>>endobj\n4 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\n5 0 obj<</Length 76>>stream\nBT /F1 14 Tf 24 130 Td (UTConnect DEMO - Materi Simulasi) Tj 0 -24 Td (Data fiktif.) Tj ET\nendstream endobj\ntrailer<</Root 1 0 R>>\n%%EOF";
   return new TextEncoder().encode(pdf);
@@ -244,14 +311,6 @@ function pdfBytes() {
 
 async function seedSession(ctx: DemoContext, scenario: string) {
   const { admin, visitorId, sessionId } = ctx;
-  const { data: currentGroups, error: groupError } = await admin.from("study_groups")
-    .select("id").eq("is_demo", true).eq("demo_session_id", sessionId);
-  if (groupError) throw new Error("Skenario grup demo gagal diperiksa: " + groupError.message);
-  if ((currentGroups || []).length >= 5) return { seeded: false, bot_count: PROGRAMS.length, groups: currentGroups.length, scenario };
-  if ((currentGroups || []).length > 0) {
-    throw new Error("Seed demo belum lengkap. Gunakan Reset Demo sebelum mencoba bootstrap lagi.");
-  }
-
   const bots: DemoBot[] = [];
   for (let i = 0; i < PROGRAMS.length; i += 1) bots.push(await createBot(admin, sessionId, PROGRAMS[i], i));
   const bot = Object.fromEntries(bots.map(item => [item.key, item])) as Record<string, DemoBot>;
@@ -271,19 +330,12 @@ async function seedSession(ctx: DemoContext, scenario: string) {
     preferred_programs: [],
   }, { onConflict: "user_id" }), "Preferensi pengunjung demo gagal disimpan");
 
-  const { data: accepted, error: acceptedError } = await admin.from("connections").insert({
-    initiator_id: visitorId, recipient_id: bot.b.userId, status: "accepted",
-  }).select("id").single();
-  if (acceptedError || !accepted) throw new Error("Koneksi demo awal gagal dibuat: " + (acceptedError?.message || ""));
-  unwrap(await admin.from("direct_messages").insert([
-    { connection_id: accepted.id, sender_id: bot.b.userId, body: "[SIMULASI DEMO] Halo! Aku Demo B dari Manajemen. Kita bisa diskusi materi bersama." },
-    { connection_id: accepted.id, sender_id: visitorId, body: "[SIMULASI DEMO] Siap, kita bahas materi bareng." },
-  ]), "Chat demo awal gagal dibuat");
-  unwrap(await admin.from("connections").insert({
-    initiator_id: bot.c.userId, recipient_id: visitorId, status: "pending",
-  }), "Permintaan koneksi masuk demo gagal dibuat");
+  const accepted = await ensureConnection(admin, visitorId, bot.b.userId, "accepted");
+  await addDirectMessage(admin, accepted.id, bot.b.userId, "[SIMULASI DEMO] Halo! Aku Demo B dari Manajemen. Kita bisa diskusi materi bersama.");
+  await addDirectMessage(admin, accepted.id, visitorId, "[SIMULASI DEMO] Siap, kita bahas materi bareng.");
+  await ensureConnection(admin, bot.c.userId, visitorId, "pending");
 
-  const open = await insertGroup(admin, bot.a.userId, "Kelompok Sistem Informasi — Terbuka", "Sistem Informasi",
+  const open = await insertGroup(admin, sessionId, bot.a.userId, "Kelompok Sistem Informasi — Terbuka", "Sistem Informasi",
     "Ruang belajar simulasi dengan beberapa tempat tersedia.", 8, "open",
     [{ userId: bot.a.userId, role: "admin" }, { userId: bot.b.userId }, { userId: bot.f.userId }]);
   const nearlyFull = await insertGroup(admin, bot.b.userId, "Kelompok Manajemen — Hampir Penuh", "Manajemen",
@@ -298,9 +350,9 @@ async function seedSession(ctx: DemoContext, scenario: string) {
   const privateGroup = await insertGroup(admin, bot.f.userId, "Kelompok Diskusi Privat — Undangan", "Sains Data",
     "Grup privat yang hanya dapat dimasuki melalui undangan.", 5, "private",
     [{ userId: bot.f.userId, role: "admin" }, { userId: bot.a.userId }]);
-  unwrap(await admin.from("group_invites").insert({
+  unwrap(await admin.from("group_invites").upsert({
     group_id: privateGroup.id, invited_user_id: visitorId, invited_by: bot.f.userId, accepted_at: null,
-  }), "Undangan grup privat demo gagal dibuat");
+  }, { onConflict: "group_id,invited_user_id" }), "Undangan grup privat demo gagal dibuat");
 
   await addGroupMessage(admin, open.id, bot.a.userId, "[SIMULASI DEMO] Kita mulai diskusi analisis kebutuhan sistem.");
   await addGroupMessage(admin, nearlyFull.id, bot.b.userId, "[SIMULASI DEMO] Sisa satu tempat di kelompok ini.");
@@ -317,15 +369,15 @@ async function seedSession(ctx: DemoContext, scenario: string) {
     { agenda_item_id: pollId, user_id: bot.f.userId, selected_option: "Sabtu pagi" },
   ], { onConflict: "agenda_item_id,user_id" }), "Suara polling demo gagal dibuat");
 
-  const filePath = open.id + "/" + bot.a.userId + "/" + crypto.randomUUID() + ".pdf";
+  const filePath = open.id + "/" + bot.a.userId + "/seed-demo-material.pdf";
   const { error: uploadError } = await admin.storage.from("group-materials").upload(filePath, pdfBytes(), {
-    contentType: "application/pdf", cacheControl: "600", upsert: false,
+    contentType: "application/pdf", cacheControl: "600", upsert: true,
   });
   if (uploadError) throw new Error("Materi contoh demo gagal diunggah: " + uploadError.message);
-  unwrap(await admin.from("group_materials").insert({
+  unwrap(await admin.from("group_materials").upsert({
     group_id: open.id, uploaded_by: bot.a.userId, title: "Materi Simulasi UTConnect",
     storage_path: filePath, content_type: "application/pdf", file_size_bytes: pdfBytes().length,
-  }), "Metadata materi contoh demo gagal dibuat");
+  }, { onConflict: "group_id,storage_path" }), "Metadata materi contoh demo gagal dibuat");
 
   return { seeded: true, bot_count: bots.length, groups: 5, scenario };
 }
