@@ -644,6 +644,29 @@ Deno.serve(async (req: Request) => {
       const result = await seedSession(ctx, "all");
       return json(allowedOrigin, { success: true, reset: true, ...result });
     }
+    if (action === "list_groups") {
+      const limit = Math.max(1, Math.min(Number(payload.limit) || 100, 100));
+      const { data: groups, error } = await ctx.admin.from("study_groups")
+        .select("id,created_by,name,description,course_id,program,mode,capacity,access_type,schedule_text,online_url,offline_area_label,is_archived,created_at,updated_at,is_demo,course:courses!study_groups_course_id_fkey(id,course_code,course_name)")
+        .eq("is_demo", true)
+        .eq("demo_session_id", ctx.sessionId)
+        .eq("is_archived", false)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (error) throw new Error("Kelompok demo belum dapat dimuat: " + error.message);
+      const result = [];
+      for (const group of groups || []) {
+        const { count, error: countError } = await ctx.admin.from("group_members")
+          .select("user_id", { count: "exact", head: true })
+          .eq("group_id", group.id)
+          .eq("status", "active")
+          .eq("is_demo", true)
+          .eq("demo_session_id", ctx.sessionId);
+        if (countError) throw new Error("Kapasitas kelompok demo belum dapat dihitung: " + countError.message);
+        result.push({ ...group, active_member_count: count || 0 });
+      }
+      return json(allowedOrigin, { success: true, groups: result });
+    }
     if (action === "connection_request") {
       const id = String(payload.connection_id || "");
       const { data: connection } = await ctx.admin.from("connections").select("id,initiator_id,recipient_id,status")
