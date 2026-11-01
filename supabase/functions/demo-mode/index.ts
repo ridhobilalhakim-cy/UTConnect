@@ -321,10 +321,10 @@ function pdfBytes() {
     "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
     "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 360 220] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
     "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-    "<< /Length " + encoder.encode(stream).length + " >>\\nstream\\n" + stream + "\\nendstream",
+    "<< /Length " + encoder.encode(stream).length + " >>\nstream\n" + stream + "\nendstream",
   ];
 
-  let pdf = "%PDF-1.4\\n";
+  let pdf = "%PDF-1.4\n";
   const offsets = [0];
   for (let index = 0; index < objects.length; index += 1) {
     offsets.push(encoder.encode(pdf).length);
