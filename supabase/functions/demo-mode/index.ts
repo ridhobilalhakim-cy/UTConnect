@@ -232,6 +232,9 @@ async function seedSession(ctx: DemoContext, scenario: string) {
     .select("id").eq("is_demo", true).eq("demo_session_id", sessionId);
   if (groupError) throw new Error("Skenario grup demo gagal diperiksa: " + groupError.message);
   if ((currentGroups || []).length >= 5) return { seeded: false, bot_count: PROGRAMS.length, groups: currentGroups.length, scenario };
+  if ((currentGroups || []).length > 0) {
+    throw new Error("Seed demo belum lengkap. Gunakan Reset Demo sebelum mencoba bootstrap lagi.");
+  }
 
   const bots: DemoBot[] = [];
   for (let i = 0; i < PROGRAMS.length; i += 1) bots.push(await createBot(admin, sessionId, PROGRAMS[i], i));
@@ -503,6 +506,8 @@ Deno.serve(async (req: Request) => {
         const { error: removeError } = await ctx.admin.auth.admin.deleteUser(bot.id);
         if (removeError) throw new Error("Akun bot gagal dihapus: " + removeError.message);
       }
+      const { error: eventResetError } = await ctx.admin.rpc("demo_reset_bot_events", { p_session_id: ctx.sessionId });
+      if (eventResetError) throw new Error("Riwayat respons bot demo gagal direset: " + eventResetError.message);
       const result = await seedSession(ctx, "all");
       return json(allowedOrigin, { success: true, reset: true, ...result });
     }
