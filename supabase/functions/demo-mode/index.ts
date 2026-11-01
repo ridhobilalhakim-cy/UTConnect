@@ -314,8 +314,32 @@ async function addAgenda(admin: SupabaseClient, groupId: string, creatorId: stri
 
 
 function pdfBytes() {
-  const pdf = "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 180]/Resources<</Font<</F1 4 0 R>>>>/Contents 5 0 R>>endobj\n4 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\n5 0 obj<</Length 76>>stream\nBT /F1 14 Tf 24 130 Td (UTConnect DEMO - Materi Simulasi) Tj 0 -24 Td (Data fiktif.) Tj ET\nendstream endobj\ntrailer<</Root 1 0 R>>\n%%EOF";
-  return new TextEncoder().encode(pdf);
+  const encoder = new TextEncoder();
+  const stream = "BT /F1 14 Tf 24 130 Td (UTConnect DEMO - Materi Simulasi) Tj 0 -24 Td (Data fiktif untuk demonstrasi.) Tj ET";
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 360 220] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    "<< /Length " + encoder.encode(stream).length + " >>\\nstream\\n" + stream + "\\nendstream",
+  ];
+
+  let pdf = "%PDF-1.4\\n";
+  const offsets = [0];
+  for (let index = 0; index < objects.length; index += 1) {
+    offsets.push(encoder.encode(pdf).length);
+    pdf += (index + 1) + " 0 obj\\n" + objects[index] + "\\nendobj\\n";
+  }
+
+  const xrefOffset = encoder.encode(pdf).length;
+  pdf += "xref\\n0 " + (objects.length + 1) + "\\n";
+  pdf += "0000000000 65535 f \\n";
+  for (const offset of offsets.slice(1)) {
+    pdf += String(offset).padStart(10, "0") + " 00000 n \\n";
+  }
+  pdf += "trailer\\n<< /Size " + (objects.length + 1) + " /Root 1 0 R >>\\n";
+  pdf += "startxref\\n" + xrefOffset + "\\n%%EOF\\n";
+  return encoder.encode(pdf);
 }
 
 async function seedSession(ctx: DemoContext, scenario: string) {
