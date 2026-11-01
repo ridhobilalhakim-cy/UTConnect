@@ -1753,6 +1753,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       const receipt = own ? (message.read_at ? "Dibaca" : "Terkirim") : "";
       return `
         <article class="direct-chat-message ${own ? "own" : "other"}">
+          ${message.is_demo ? '<div class="direct-chat-meta"><span class="demo-user-tag">DEMO · SIMULASI</span></div>' : ""}
           <div class="direct-chat-bubble">${escapeText(message.body)}</div>
           <div class="direct-chat-meta">${escapeText(chatTimestamp(message.created_at))}${receipt ? ` · ${receipt}` : ""}</div>
         </article>`;
