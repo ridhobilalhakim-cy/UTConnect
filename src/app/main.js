@@ -55,19 +55,19 @@ async function bootAuthenticatedApp() {
     });
     const topMeta = document.getElementById("topUserMeta");
     if (topMeta) topMeta.textContent = isDemo ? "Akun simulasi · DEMO" : (isAdmin ? "Administrator UT Connect" : (profile.verification_status === "verified" ? "Mahasiswa terverifikasi" : "Status menunggu verifikasi"));
-    const sideMeta = document.getElementById("sideUserMeta"); if (sideMeta) sideMeta.textContent = isAdmin ? "Administrator UT Connect" : programMeta;
+    const sideMeta = document.getElementById("sideUserMeta"); if (sideMeta) sideMeta.textContent = isDemo ? "Akun simulasi · DEMO" : (isAdmin ? "Administrator UT Connect" : programMeta);
     const profileName = document.getElementById("profileFullName"); if (profileName) profileName.textContent = fullName;
-    const profileStatus = document.getElementById("profileStatusTag"); if (profileStatus) profileStatus.textContent = isAdmin ? "Role: ADMINISTRATOR" : `Status: ${(profile.verification_status || "pending").toUpperCase()}`;
-    const profileBio = document.getElementById("profileBio"); if (profileBio) profileBio.textContent = profile.bio || (isAdmin ? "Administrator UT Connect" : "Mahasiswa Universitas Terbuka");
+    const profileStatus = document.getElementById("profileStatusTag"); if (profileStatus) profileStatus.textContent = isDemo ? "DEMO · SIMULASI" : (isAdmin ? "Role: ADMINISTRATOR" : `Status: ${(profile.verification_status || "pending").toUpperCase()}`);
+    const profileBio = document.getElementById("profileBio"); if (profileBio) profileBio.textContent = isDemo ? "Akun simulasi UTConnect. Identitas ini bukan mahasiswa sungguhan." : (profile.bio || (isAdmin ? "Administrator UT Connect" : "Mahasiswa Universitas Terbuka"));
     const profileFaculty = document.getElementById("profileFaculty"); if (profileFaculty) profileFaculty.textContent = resolveUTFaculty(profile.faculty) || profile.faculty || "-";
     const profileProgram = document.getElementById("profileProgram"); if (profileProgram) profileProgram.textContent = resolveUTProgram(profile.faculty, profile.program) || profile.program || "-";
     const profileSemester = document.getElementById("profileSemester"); if (profileSemester) profileSemester.textContent = profile.semester || "-";
-    const profileNim = document.getElementById("profileNimLabel"); if (profileNim) profileNim.textContent = "Dilindungi (digest)";
+    const profileNim = document.getElementById("profileNimLabel"); if (profileNim) profileNim.textContent = isDemo ? "Tidak berlaku · DEMO" : "Dilindungi (digest)";
     const welcome = document.querySelector("#page-home .page-title"); if (welcome) welcome.textContent = `Selamat datang, ${fullName} 👋`;
     const greeting = document.querySelector(".welcome-copy .hello"); if (greeting) greeting.textContent = `Halo, ${fullName.split(/\s+/)[0]}! Siap belajar hari ini?`;
     const notice = document.getElementById("sessionNotice");
     if (notice) {
-      notice.hidden = isAdmin || profile.verification_status === "verified";
+      notice.hidden = isAdmin || isDemo || profile.verification_status === "verified";
       notice.textContent = "Akun berhasil masuk. Status mahasiswa masih menunggu verifikasi. Selesaikan pemeriksaan pada menu Verifikasi Mahasiswa.";
     }
 
