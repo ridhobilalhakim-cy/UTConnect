@@ -81,6 +81,7 @@ const demoServicePath = join(root, 'src/services/demo.js');
 const demoHtmlPath = join(root, 'index.html');
 const demoEdgePath = join(root, 'supabase/functions/demo-mode/index.ts');
 const demoMigrationPath = join(root, 'supabase/migrations/20261101110000_utconnect_demo_mode_isolation.sql');
+const chatServicePath = join(root, 'src/services/chat.js');
 
 for (const [label, path] of [
   ['Demo Mode browser client', demoClientPath],
@@ -89,6 +90,13 @@ for (const [label, path] of [
   ['Demo Mode isolation migration', demoMigrationPath],
 ]) {
   if (!existsSync(path)) failures.push(`${label}: required source file is missing`);
+}
+
+if (existsSync(chatServicePath)) {
+  const chatService = readFileSync(chatServicePath, 'utf8');
+  if (!chatService.includes('const DIRECT_MESSAGE_SELECT = IS_DEMO_BUILD')) failures.push('Chat service: demo message selector must be conditional on the isolated build');
+  if (!chatService.includes('.select(DIRECT_MESSAGE_SELECT)')) failures.push('Chat service: list and send queries must use the conditional message selector');
+  if (chatService.includes('.select(MESSAGE_SELECT)')) failures.push('Chat service: stale message selector reference remains');
 }
 
 if (existsSync(demoClientPath) && existsSync(demoHtmlPath)) {
