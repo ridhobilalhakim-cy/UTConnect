@@ -1662,3 +1662,174 @@ $function$;
 
 revoke all on function public.demo_reset_bot_events(uuid) from public, anon, authenticated;
 grant execute on function public.demo_reset_bot_events(uuid) to service_role;
+
+
+-- Demo-scoped group notifications: demo profiles remain pending but are recognized by the
+-- private server-side verification helper, and notifications never cross demo sessions.
+create or replace function private.notify_group_message_received()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_sender_name text;
+begin
+  select p.full_name into v_sender_name
+  from public.profiles p where p.id = new.sender_id;
+
+  insert into public.notifications(user_id, notification_type, title, body, reference_id)
+  select gm.user_id,
+    'group_message',
+    'Pesan baru di grup',
+    left(coalesce(v_sender_name, 'Anggota grup') || ' mengirim pesan di ' || sg.name, 500),
+    new.group_id
+  from public.group_members gm
+  join public.profiles recipient on recipient.id = gm.user_id
+  join public.study_groups sg on sg.id = new.group_id
+  where gm.group_id = new.group_id
+    and gm.status = 'active'::public.group_member_status
+    and gm.user_id <> new.sender_id
+    and private.is_verified_user(recipient.id)
+    and private.same_demo_session(new.sender_id, recipient.id);
+
+  return new;
+end
+$function$;
+
+create or replace function private.notify_group_material_received()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_sender_name text;
+  v_group_name text;
+begin
+  select p.full_name into v_sender_name
+  from public.profiles p where p.id = new.uploaded_by;
+  select g.name into v_group_name
+  from public.study_groups g where g.id = new.group_id;
+
+  insert into public.notifications(user_id, notification_type, title, body, reference_id)
+  select gm.user_id,
+    'group_material',
+    'Materi baru di grup',
+    left(coalesce(v_sender_name, 'Anggota grup') || ' membagikan ' || new.title || ' di ' || coalesce(v_group_name, 'grup belajar'), 500),
+    new.group_id
+  from public.group_members gm
+  join public.profiles recipient on recipient.id = gm.user_id
+  where gm.group_id = new.group_id
+    and gm.status = 'active'::public.group_member_status
+    and gm.user_id <> new.uploaded_by
+    and private.is_verified_user(recipient.id)
+    and private.same_demo_session(new.uploaded_by, recipient.id);
+
+  return new;
+end
+$function$;
+
+create or replace function private.notify_group_agenda_received()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_sender_name text;
+  v_group_name text;
+begin
+  select p.full_name into v_sender_name
+  from public.profiles p where p.id = new.created_by;
+  select g.name into v_group_name
+  from public.study_groups g where g.id = new.group_id;
+
+  insert into public.notifications(user_id, notification_type, title, body, reference_id)
+  select gm.user_id,
+    'group_agenda',
+    'Agenda baru di grup',
+    left(coalesce(v_sender_name, 'Anggota grup') || ' menambahkan ' || new.title || ' di ' || coalesce(v_group_name, 'grup belajar'), 500),
+    new.group_id
+  from public.group_members gm
+  join public.profiles recipient on recipient.id = gm.user_id
+  where gm.group_id = new.group_id
+    and gm.status = 'active'::public.group_member_status
+    and gm.user_id <> new.created_by
+    and private.is_verified_user(recipient.id)
+    and private.same_demo_session(new.created_by, recipient.id);
+
+  return new;
+end
+$function$;
+
+create or replace function private.notify_group_join_request_received()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_group_name text;
+  v_group_creator uuid;
+begin
+  if new.status <> 'pending'::public.group_member_status then
+    return new;
+  end if;
+
+  select g.name, g.created_by into v_group_name, v_group_creator
+  from public.study_groups g where g.id = new.group_id;
+
+  if v_group_name is not null then
+    insert into public.notifications(user_id, notification_type, title, body, reference_id)
+    select gm.user_id,
+      'group_join_request',
+      'Permohonan bergabung ke grup',
+      'Ada anggota yang meminta bergabung ke grup "' || left(v_group_name, 100) || '".',
+      new.group_id
+    from public.group_members gm
+    join public.profiles recipient on recipient.id = gm.user_id
+    where gm.group_id = new.group_id
+      and gm.status = 'active'::public.group_member_status
+      and gm.role in ('admin'::public.group_member_role, 'co_admin'::public.group_member_role)
+      and gm.user_id <> new.user_id
+      and private.is_verified_user(recipient.id)
+      and private.same_demo_session(new.user_id, recipient.id)
+      and private.same_demo_session(new.user_id, v_group_creator);
+  end if;
+  return new;
+end
+$function$;
+
+create or replace function private.notify_group_join_decision()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_group_name text;
+  v_group_creator uuid;
+begin
+  if old.status = 'pending'::public.group_member_status
+    and new.status in ('active'::public.group_member_status, 'rejected'::public.group_member_status) then
+    select g.name, g.created_by into v_group_name, v_group_creator
+    from public.study_groups g where g.id = new.group_id;
+
+    if private.same_demo_session(new.user_id, v_group_creator) then
+      insert into public.notifications(user_id, notification_type, title, body, reference_id)
+      values (
+        new.user_id,
+        case when new.status = 'active'::public.group_member_status then 'group_join_approved' else 'group_join_rejected' end,
+        case when new.status = 'active'::public.group_member_status then 'Permohonan grup disetujui' else 'Permohonan grup ditolak' end,
+        case when new.status = 'active'::public.group_member_status
+          then 'Permohonan bergabung ke grup "' || left(coalesce(v_group_name, 'belajar'), 100) || '" telah disetujui.'
+          else 'Permohonan bergabung ke grup "' || left(coalesce(v_group_name, 'belajar'), 100) || '" tidak disetujui.'
+        end,
+        new.group_id
+      );
+    end if;
+  end if;
+  return new;
+end
+$function$;
