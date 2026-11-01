@@ -106,6 +106,8 @@ if (existsSync(demoClientPath) && existsSync(demoHtmlPath)) {
     ['environment flag defaults off', demoClient.includes('VITE_UTCONNECT_DEMO_MODE === "true"')],
     ['demo project reference must match the Supabase URL', demoClient.includes('DEMO_PROJECT_REF !== SUPABASE_PROJECT_REF')],
     ['shared Supabase project is blocked', demoClient.includes('hqyusbyndtlfypdbmatw') && demoClient.includes('lguqtplssimkwwyzmwzz')],
+    ['normal build preserves the existing browser auth storage key', demoClient.includes('utconnect-hqyusbyndtlfypdbmatw-auth') && demoClient.includes('IS_DEMO_BUILD')],
+    ['demo build uses a project-specific auth storage key', demoClient.includes('utconnect-') && demoClient.includes('-demo-auth')],
     ['scenario chooser is hidden by default', /id="demoEntryPanel"[^>]*hidden/.test(demoHtml)],
     ['demo entry button is hidden by default', /id="demoStartBtn"[^>]*hidden/.test(demoHtml)],
   ]) {
