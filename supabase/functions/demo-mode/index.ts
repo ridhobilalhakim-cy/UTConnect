@@ -248,7 +248,7 @@ async function seedSession(ctx: DemoContext, scenario: string) {
     topic_tags: ["basis data", "analisis sistem", "persiapan UAS"],
     interests: ["belajar kelompok", "diskusi materi"],
     study_times: ["Malam hari", "Akhir pekan"],
-    preferred_programs: ["Sistem Informasi", "Manajemen"],
+    preferred_programs: [],
   }, { onConflict: "user_id" }), "Preferensi pengunjung demo gagal disimpan");
 
   const { data: accepted, error: acceptedError } = await admin.from("connections").insert({
