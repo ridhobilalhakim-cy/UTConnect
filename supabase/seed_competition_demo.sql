@@ -247,20 +247,17 @@ set category=excluded.category, audience=excluded.audience, title=excluded.title
     published_at=now(), updated_at=now();
 
 -- Three connection states per presenter: accepted chat, incoming request, and outgoing request.
-insert into public.connections (id, initiator_id, recipient_id, pair_low, pair_high, status, created_at, updated_at)
-values
-('c0000000-0000-4000-8000-000000000001','4cbf0d2b-8c73-49f0-8939-c44eb32fd58f','b0000000-0000-4000-8000-000000000001',least('4cbf0d2b-8c73-49f0-8939-c44eb32fd58f'::uuid,'b0000000-0000-4000-8000-000000000001'::uuid),greatest('4cbf0d2b-8c73-49f0-8939-c44eb32fd58f'::uuid,'b0000000-0000-4000-8000-000000000001'::uuid),'accepted',now()-interval '2 days',now()),
-('c0000000-0000-4000-8000-000000000002','b0000000-0000-4000-8000-000000000002','4cbf0d2b-8c73-49f0-8939-c44eb32fd58f',least('4cbf0d2b-8c73-49f0-8939-c44eb32fd58f'::uuid,'b0000000-0000-4000-8000-000000000002'::uuid),greatest('4cbf0d2b-8c73-49f0-8939-c44eb32fd58f'::uuid,'b0000000-0000-4000-8000-000000000002'::uuid),'pending',now()-interval '1 hour',now()),
-('c0000000-0000-4000-8000-000000000003','4cbf0d2b-8c73-49f0-8939-c44eb32fd58f','b0000000-0000-4000-8000-000000000003',least('4cbf0d2b-8c73-49f0-8939-c44eb32fd58f'::uuid,'b0000000-0000-4000-8000-000000000003'::uuid),greatest('4cbf0d2b-8c73-49f0-8939-c44eb32fd58f'::uuid,'b0000000-0000-4000-8000-000000000003'::uuid),'pending',now()-interval '30 minutes',now()),
-('c0000000-0000-4000-8000-000000000004','228d4d62-a223-4ead-92cc-d3480101c1de','b0000000-0000-4000-8000-000000000005',least('228d4d62-a223-4ead-92cc-d3480101c1de'::uuid,'b0000000-0000-4000-8000-000000000005'::uuid),greatest('228d4d62-a223-4ead-92cc-d3480101c1de'::uuid,'b0000000-0000-4000-8000-000000000005'::uuid),'accepted',now()-interval '2 days',now()),
-('c0000000-0000-4000-8000-000000000005','b0000000-0000-4000-8000-000000000006','228d4d62-a223-4ead-92cc-d3480101c1de',least('228d4d62-a223-4ead-92cc-d3480101c1de'::uuid,'b0000000-0000-4000-8000-000000000006'::uuid),greatest('228d4d62-a223-4ead-92cc-d3480101c1de'::uuid,'b0000000-0000-4000-8000-000000000006'::uuid),'pending',now()-interval '2 hours',now()),
-('c0000000-0000-4000-8000-000000000006','228d4d62-a223-4ead-92cc-d3480101c1de','b0000000-0000-4000-8000-000000000007',least('228d4d62-a223-4ead-92cc-d3480101c1de'::uuid,'b0000000-0000-4000-8000-000000000007'::uuid),greatest('228d4d62-a223-4ead-92cc-d3480101c1de'::uuid,'b0000000-0000-4000-8000-000000000007'::uuid),'pending',now()-interval '50 minutes',now()),
-('c0000000-0000-4000-8000-000000000007','cd3e82a5-8d6a-4e56-9400-c0d6423c0ab4','b0000000-0000-4000-8000-000000000009',least('cd3e82a5-8d6a-4e56-9400-c0d6423c0ab4'::uuid,'b0000000-0000-4000-8000-000000000009'::uuid),greatest('cd3e82a5-8d6a-4e56-9400-c0d6423c0ab4'::uuid,'b0000000-0000-4000-8000-000000000009'::uuid),'accepted',now()-interval '2 days',now()),
-('c0000000-0000-4000-8000-000000000008','b0000000-0000-4000-8000-000000000010','cd3e82a5-8d6a-4e56-9400-c0d6423c0ab4',least('cd3e82a5-8d6a-4e56-9400-c0d6423c0ab4'::uuid,'b0000000-0000-4000-8000-000000000010'::uuid),greatest('cd3e82a5-8d6a-4e56-9400-c0d6423c0ab4'::uuid,'b0000000-0000-4000-8000-000000000010'::uuid),'pending',now()-interval '3 hours',now()),
-('c0000000-0000-4000-8000-000000000009','cd3e82a5-8d6a-4e56-9400-c0d6423c0ab4','b0000000-0000-4000-8000-000000000011',least('cd3e82a5-8d6a-4e56-9400-c0d6423c0ab4'::uuid,'b0000000-0000-4000-8000-000000000011'::uuid),greatest('cd3e82a5-8d6a-4e56-9400-c0d6423c0ab4'::uuid,'b0000000-0000-4000-8000-000000000011'::uuid),'pending',now()-interval '25 minutes',now())
-on conflict (pair_low,pair_high) do update
-set initiator_id=excluded.initiator_id, recipient_id=excluded.recipient_id,
-    status=excluded.status, updated_at=now();
+insert into public.connections (id,initiator_id,recipient_id,status,created_at,updated_at) values
+('c0000000-0000-4000-8000-000000000001','4cbf0d2b-8c73-49f0-8939-c44eb32fd58f','b0000000-0000-4000-8000-000000000001','accepted',now()-interval '2 days',now()),
+('c0000000-0000-4000-8000-000000000002','b0000000-0000-4000-8000-000000000002','4cbf0d2b-8c73-49f0-8939-c44eb32fd58f','pending',now()-interval '1 hour',now()),
+('c0000000-0000-4000-8000-000000000003','4cbf0d2b-8c73-49f0-8939-c44eb32fd58f','b0000000-0000-4000-8000-000000000003','pending',now()-interval '30 minutes',now()),
+('c0000000-0000-4000-8000-000000000004','228d4d62-a223-4ead-92cc-d3480101c1de','b0000000-0000-4000-8000-000000000005','accepted',now()-interval '2 days',now()),
+('c0000000-0000-4000-8000-000000000005','b0000000-0000-4000-8000-000000000006','228d4d62-a223-4ead-92cc-d3480101c1de','pending',now()-interval '2 hours',now()),
+('c0000000-0000-4000-8000-000000000006','228d4d62-a223-4ead-92cc-d3480101c1de','b0000000-0000-4000-8000-000000000007','pending',now()-interval '50 minutes',now()),
+('c0000000-0000-4000-8000-000000000007','cd3e82a5-8d6a-4e56-9400-c0d6423c0ab4','b0000000-0000-4000-8000-000000000009','accepted',now()-interval '2 days',now()),
+('c0000000-0000-4000-8000-000000000008','b0000000-0000-4000-8000-000000000010','cd3e82a5-8d6a-4e56-9400-c0d6423c0ab4','pending',now()-interval '3 hours',now()),
+('c0000000-0000-4000-8000-000000000009','cd3e82a5-8d6a-4e56-9400-c0d6423c0ab4','b0000000-0000-4000-8000-000000000011','pending',now()-interval '25 minutes',now())
+on conflict (id) do update set initiator_id=excluded.initiator_id,recipient_id=excluded.recipient_id,status=excluded.status,updated_at=now();
 
 insert into public.direct_messages (id, connection_id, sender_id, body, created_at, read_at)
 values
