@@ -1141,6 +1141,8 @@ test('active group member can read, send and pin group chat messages', async ({ 
 
   await page.locator('[data-page="groups"]').first().click();
   await page.locator('[data-group-open="' + groupId + '"]').click();
+  await expect(page.locator('#modal-cancel')).toBeVisible();
+  await expect(page.locator('#modal-confirm')).toBeHidden();
   await expect(page.locator('#modal-content')).toContainText('Selamat datang di ruang diskusi.');
   await page.locator('#group-message-input').fill('Saya siap belajar bersama.');
   await page.locator('#group-message-form button[type="submit"]').click();
