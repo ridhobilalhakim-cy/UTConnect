@@ -1,8 +1,12 @@
 import { supabase } from "../lib/supabase.js";
 import { runDemoAutomation, listDemoGroups, IS_DEMO_BUILD } from "./demo.js";
 
-const GROUP_SELECT = "id,created_by,name,description,course_id,program,mode,capacity,access_type,schedule_text,online_url,offline_area_label,is_archived,created_at,updated_at,is_demo,course:courses!study_groups_course_id_fkey(id,course_code,course_name)";
-const MEMBERSHIP_SELECT = "group_id,user_id,role,status,created_at,joined_at,is_demo";
+const GROUP_SELECT = IS_DEMO_BUILD
+  ? "id,created_by,name,description,course_id,program,mode,capacity,access_type,schedule_text,online_url,offline_area_label,is_archived,created_at,updated_at,is_demo,course:courses!study_groups_course_id_fkey(id,course_code,course_name)"
+  : "id,created_by,name,description,course_id,program,mode,capacity,access_type,schedule_text,online_url,offline_area_label,is_archived,created_at,updated_at,course:courses!study_groups_course_id_fkey(id,course_code,course_name)";
+const MEMBERSHIP_SELECT = IS_DEMO_BUILD
+  ? "group_id,user_id,role,status,created_at,joined_at,is_demo"
+  : "group_id,user_id,role,status,created_at,joined_at";
 
 function throwIfError(error) {
   if (error) throw error;
@@ -84,8 +88,15 @@ export async function respondGroupJoinRequest(groupId, userId, accept) {
   return data;
 }
 
-const GROUP_MESSAGE_SELECT = "id,group_id,sender_id,reply_to_id,body,mentioned_user_ids,pinned_at,pinned_by,created_at,is_demo";
-const GROUP_AGENDA_SELECT = "id,group_id,created_by,item_type,title,details,due_at,poll_options,created_at,updated_at,is_demo";
+const GROUP_MESSAGE_SELECT = IS_DEMO_BUILD
+  ? "id,group_id,sender_id,reply_to_id,body,mentioned_user_ids,pinned_at,pinned_by,created_at,is_demo"
+  : "id,group_id,sender_id,reply_to_id,body,mentioned_user_ids,pinned_at,pinned_by,created_at";
+const GROUP_AGENDA_SELECT = IS_DEMO_BUILD
+  ? "id,group_id,created_by,item_type,title,details,due_at,poll_options,created_at,updated_at,is_demo"
+  : "id,group_id,created_by,item_type,title,details,due_at,poll_options,created_at,updated_at";
+const GROUP_MATERIAL_SELECT = IS_DEMO_BUILD
+  ? "id,group_id,uploaded_by,title,storage_path,content_type,file_size_bytes,created_at,is_demo"
+  : "id,group_id,uploaded_by,title,storage_path,content_type,file_size_bytes,created_at";
 const GROUP_MATERIAL_BUCKET = "group-materials";
 const MAX_GROUP_MATERIAL_BYTES = 50 * 1024 * 1024;
 const GROUP_MATERIAL_TYPES = new Map([
@@ -161,7 +172,7 @@ export async function listGroupMaterials(groupId) {
   if (!groupId) return [];
   const { data, error } = await supabase
     .from("group_materials")
-    .select("id,group_id,uploaded_by,title,storage_path,content_type,file_size_bytes,created_at,is_demo")
+    .select(GROUP_MATERIAL_SELECT)
     .eq("group_id", groupId)
     .order("created_at", { ascending: false });
   throwIfError(error);
