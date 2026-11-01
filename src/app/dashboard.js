@@ -1661,6 +1661,19 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     const queuePanel = $("#verification-admin-panel");
     const queue = $("#verification-queue");
 
+    if (isDemo) {
+      if (statusPanel) {
+        statusPanel.hidden = false;
+        statusPanel.innerHTML = '<div class="verification-result pending"><span class="verification-symbol">D</span><div><strong>Akun demo · bukan status mahasiswa</strong><p>Identitas ini dibuat khusus untuk simulasi UTConnect. Akun demo tidak mengklaim status mahasiswa UT.</p></div></div>';
+      }
+      if (submitPanel) {
+        submitPanel.hidden = false;
+        submitPanel.innerHTML = '<div class="verification-result pending"><span class="verification-symbol">i</span><div><strong>Verifikasi asli tidak dijalankan pada akun demo</strong><p>Pengiriman bukti dan pemeriksaan admin hanya tersedia melalui akun mahasiswa biasa.</p></div></div>';
+      }
+      if (queuePanel) queuePanel.hidden = true;
+      return;
+    }
+
     // Administrators manage student reviews; their own student verification state is not applicable.
     if (isAdmin) {
       if (statusPanel) statusPanel.hidden = true;
@@ -1786,6 +1799,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     list.innerHTML = state.chatRooms.map(room => {
       const active = room.connection_id === state.activeChatConnectionId;
       const name = room.other_full_name || "Mahasiswa UT";
+      const demoTag = room.is_demo ? '<span class="demo-user-tag">DEMO</span>' : "";
       const avatar = getProfileAvatarUrl(room.avatar_path);
       const avatarHtml = avatar
         ? '<span class="message-room-avatar"><img src="' + escapeText(avatar) + '" alt=""></span>'
@@ -1793,7 +1807,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       const preview = room.last_message || "Belum ada pesan";
       const unread = Number(room.unread_count || 0);
       return '<button type="button" class="message-room-item ' + (active ? "active" : "") + '" data-message-room="' + escapeText(room.connection_id) + '">' +
-        avatarHtml + '<span class="message-room-copy"><strong>' + escapeText(name) + '</strong><small>' + escapeText(preview) + '</small></span>' +
+        avatarHtml + '<span class="message-room-copy"><strong>' + escapeText(name) + demoTag + '</strong><small>' + escapeText(preview) + '</small></span>' +
         '<span class="message-room-meta">' + (unread ? '<b>' + escapeText(String(unread > 99 ? "99+" : unread)) + '</b>' : '') +
         '<time>' + escapeText(room.last_message_at ? new Date(room.last_message_at).toLocaleDateString("id-ID", {day:"2-digit",month:"short"}) : "") + '</time></span></button>';
     }).join("");
