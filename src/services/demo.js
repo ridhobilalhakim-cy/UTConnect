@@ -17,14 +17,14 @@ async function invokeDemo(action, payload = {}) {
   return data;
 }
 
-export async function startDemoSession() {
+export async function startDemoSession(scenario = "all") {
   requireDemoBuild();
   const { data, error } = await supabase.auth.signInAnonymously();
   if (error) throw error;
   if (!data?.user) throw new Error("Sesi demo belum berhasil dibuat.");
 
   try {
-    const result = await invokeDemo("bootstrap");
+    const result = await invokeDemo("bootstrap", { scenario });
     const { error: refreshError } = await supabase.auth.refreshSession();
     if (refreshError) throw refreshError;
     return result;
