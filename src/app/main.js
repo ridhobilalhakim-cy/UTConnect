@@ -75,6 +75,12 @@ async function bootAuthenticatedApp() {
     const demoBadge = document.getElementById("demoModeBadge");
     if (demoBanner) demoBanner.hidden = !isDemo;
     if (demoBadge) demoBadge.hidden = !isDemo;
+    const demoScenarioText = document.getElementById("demoScenarioText");
+    if (demoScenarioText && isDemo) {
+      const scenario = session.user.app_metadata?.utconnect_demo_scenario || new URLSearchParams(window.location.search).get("demoScenario") || "all";
+      const labels = { all: "Skenario: Semua fitur", matching: "Fokus: Matching dan Peta Sekitar", chat: "Fokus: Koneksi dan Chat", groups: "Fokus: Kelompok dan Agenda" };
+      demoScenarioText.textContent = labels[scenario] || labels.all;
+    }
     const demoReset = document.getElementById("demoResetBtn");
     if (demoReset && isDemo) demoReset.addEventListener("click", async () => {
       demoReset.disabled = true;
