@@ -753,22 +753,19 @@ begin
   select s.id into v_session_id
   from private.demo_sessions s
   where s.visitor_user_id = p_visitor_user_id
-    and s.status = 'active'
-    and s.expires_at > now();
+  for update;
 
-  if v_session_id is not null then
-    return v_session_id;
+  if v_session_id is null then
+    v_session_id := gen_random_uuid();
+    insert into private.demo_sessions(id, visitor_user_id, status, expires_at)
+    values (v_session_id, p_visitor_user_id, 'active', now() + interval '8 hours');
+  else
+    update private.demo_sessions
+    set status = 'active',
+        expires_at = now() + interval '8 hours',
+        reset_at = now()
+    where id = v_session_id;
   end if;
-
-  v_session_id := gen_random_uuid();
-  insert into private.demo_sessions(id, visitor_user_id, status, expires_at)
-  values (v_session_id, p_visitor_user_id, 'active', now() + interval '8 hours')
-  on conflict (visitor_user_id) do update
-    set id = excluded.id,
-        status = 'active',
-        created_at = now(),
-        expires_at = excluded.expires_at,
-        reset_at = now();
 
   update auth.users
   set raw_app_meta_data = coalesce(v_metadata, '{}'::jsonb)
