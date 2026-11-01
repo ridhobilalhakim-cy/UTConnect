@@ -6,6 +6,9 @@ const MESSAGE_SELECT = IS_DEMO_BUILD
   ? "id,connection_id,sender_id,body,created_at,read_at,is_demo"
   : "id,connection_id,sender_id,body,created_at,read_at";
 const MAX_MESSAGE_LENGTH = 5000;
+const DIRECT_MESSAGE_SELECT = IS_DEMO_BUILD
+  ? "id,connection_id,sender_id,body,created_at,read_at,is_demo"
+  : "id,connection_id,sender_id,body,created_at,read_at";
 
 function throwIfError(error) {
   if (error) throw error;
