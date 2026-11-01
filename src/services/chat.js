@@ -2,9 +2,6 @@ import { supabase, IS_DEMO_BUILD } from "../lib/supabase.js";
 import { runDemoAutomation } from "./demo.js";
 
 const MESSAGE_LIMIT = 60;
-const MESSAGE_SELECT = IS_DEMO_BUILD
-  ? "id,connection_id,sender_id,body,created_at,read_at,is_demo"
-  : "id,connection_id,sender_id,body,created_at,read_at";
 const MAX_MESSAGE_LENGTH = 5000;
 const DIRECT_MESSAGE_SELECT = IS_DEMO_BUILD
   ? "id,connection_id,sender_id,body,created_at,read_at,is_demo"
