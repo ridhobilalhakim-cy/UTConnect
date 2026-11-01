@@ -1833,3 +1833,64 @@ begin
   return new;
 end
 $function$;
+
+
+-- The connection decision RPC is SECURITY DEFINER, so enforce the demo boundary explicitly.
+create or replace function public.respond_connection_request(
+  p_connection_id uuid,
+  p_accept boolean
+)
+returns public.connection_status
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_actor_id uuid := auth.uid();
+  v_connection public.connections%rowtype;
+  v_status public.connection_status;
+begin
+  if v_actor_id is null then
+    raise exception 'Authenticated user required' using errcode = '42501';
+  end if;
+  if p_connection_id is null or p_accept is null then
+    raise exception 'Invalid connection decision';
+  end if;
+  if not private.is_verified_user(v_actor_id) then
+    raise exception 'Verified student account required' using errcode = '42501';
+  end if;
+
+  select * into v_connection
+  from public.connections c
+  where c.id = p_connection_id
+    and c.recipient_id = v_actor_id
+    and c.status = 'pending'::public.connection_status
+  for update;
+
+  if not found then
+    raise exception 'Incoming connection request not found';
+  end if;
+
+  if not private.same_demo_session(v_actor_id, v_connection.initiator_id) then
+    raise exception 'Connection belongs to a different demo session' using errcode = '42501';
+  end if;
+  if not private.is_verified_user(v_connection.initiator_id) then
+    raise exception 'Requester is not a verified student' using errcode = '42501';
+  end if;
+  if private.is_blocked_between(v_actor_id, v_connection.initiator_id) then
+    raise exception 'Connection is not available';
+  end if;
+
+  v_status := case
+    when p_accept then 'accepted'::public.connection_status
+    else 'rejected'::public.connection_status
+  end;
+
+  update public.connections
+    set status = v_status,
+        updated_at = now()
+    where id = v_connection.id;
+
+  return v_status;
+end
+$function$;
