@@ -82,11 +82,11 @@ import {
 import { listMyChatRooms, updateMyStudentProfile, uploadMyProfileAvatar, setMyProfileAvatarPreset, getProfileAvatarUrl } from "../services/profile.js";
 import { UT_PROGRAMS, populateUTFacultyProgramSelects, resolveUTFaculty, resolveUTProgram } from "../data/ut-programs.js";
 
-export function initDashboard({ isAdmin = false, isVerified = false, verificationStatus = "pending", currentUserId = null, currentUserName = "Mahasiswa UT", currentProfile = {} } = {}) {
+export function initDashboard({ isAdmin = false, isDemo = false, isVerified = false, verificationStatus = "pending", currentUserId = null, currentUserName = "Mahasiswa UT", currentProfile = {} } = {}) {
   window.L = L;
   const lucide = window.lucide;
 const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root.querySelectorAll(s)];
-  const state={page:'home',radius:3000,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,myMarker:null,center:null,myLocation:null,nearbyStudents:[],homeMapRequestId:0,connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumAuthors:new Map(),profile:{...currentProfile},chatRooms:[],activeChatRoom:null,groups:[],groupMemberships:new Map(),groupMembers:[],groupInvitations:[],activeGroupChannel:null,activeGroupId:null,groupWorkspace:{messages:[],materials:[],agenda:[],invites:[],pollResults:{}},matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredPrograms:[],matchRadius:3000};
+  const state={isDemo,page:'home',radius:3000,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,myMarker:null,center:null,myLocation:null,nearbyStudents:[],homeMapRequestId:0,connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumAuthors:new Map(),profile:{...currentProfile},chatRooms:[],activeChatRoom:null,groups:[],groupMemberships:new Map(),groupMembers:[],groupInvitations:[],activeGroupChannel:null,activeGroupId:null,groupWorkspace:{messages:[],materials:[],agenda:[],invites:[],pollResults:{}},matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredPrograms:[],matchRadius:3000};
   const NOTIFICATION_META = {
     connection_request: { icon: "user-plus", page: "matching" },
     connection_accepted: { icon: "user-check", page: "matching" },
@@ -133,7 +133,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
         <button type="button" class="notification-item ${item.read_at ? "" : "unread"}" data-notification-id="${escapeText(item.id)}">
           <span class="notification-icon"><i data-lucide="${escapeText(meta.icon)}"></i></span>
           <span class="notification-content">
-            <strong>${escapeText(item.title)}</strong>
+            <strong>${escapeText(item.title)} ${item.is_demo ? '<span class="demo-user-tag">DEMO</span>' : ""}</strong>
             <span>${escapeText(item.body)}</span>
             <small>${escapeText(notificationDate(item.created_at))}</small>
           </span>
@@ -283,7 +283,21 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     if(page==='messages')pageLoad=loadMessages();
     icons();return pageLoad;
   }
-  $$('[data-page]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));$$('[data-go]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.go)));
+  $('[data-page]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));$('[data-go]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.go)));
+  if (isDemo) {
+    $$("#demoShowcase [data-demo-nav]").forEach(button => {
+      button.addEventListener("click", () => navigate(button.dataset.demoNav));
+    });
+    $$("#demoShowcase [data-demo-notifications]").forEach(button => {
+      button.addEventListener("click", () => $("#notif-btn")?.click());
+    });
+    const shareInfoButton = $("#share-info");
+    if (shareInfoButton) {
+      shareInfoButton.disabled = true;
+      shareInfoButton.textContent = "Konten simulasi · lihat saja";
+      shareInfoButton.title = "Pengelolaan informasi hanya tersedia bagi administrator.";
+    }
+  }
   function setMapStatus(message, status = "idle") {
     const statusText = $("#map-location-status");
     const statusPill = $("#map-status-pill");
@@ -332,7 +346,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       return `
         <div class="map-nearby-row">
           <div class="person-avatar">${escapeText(student.initials || "UT")}</div>
-          <div class="person-meta"><strong>Mahasiswa ${escapeText(student.initials || "UT")}</strong><span>${escapeText(student.program || "Program studi tidak tersedia")}</span></div>
+          <div class="person-meta"><strong>${student.is_demo ? "Akun simulasi" : "Mahasiswa"} ${escapeText(student.initials || "UT")} ${student.is_demo ? '<span class="demo-user-tag">DEMO</span>' : ""}</strong><span>${escapeText(student.program || "Program studi tidak tersedia")}</span></div>
           <span class="distance">${distanceLabel}</span>
         </div>`;
     }).join("");
@@ -348,6 +362,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       attribution: "&copy; OpenStreetMap contributors",
     }).addTo(map);
     map.on("click", event => {
+      if (isDemo) { toast("Mode DEMO memakai lokasi simulasi di sekitar kampus UT. GPS dan pemilihan lokasi pribadi dinonaktifkan."); return; }
       const consent = $("#map-location-consent");
       if (!state.myLocation?.consented_at && !consent?.checked) {
         toast("Setujui penggunaan lokasi sebelum memilih titik pada peta.");
@@ -408,11 +423,11 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       const marker = L.marker([lat, lng], {
         icon: L.divIcon({
           className: "",
-          html: `<div class="map-marker">${initialsLabel}</div>`,
+          html: `<div class="map-marker ${student.is_demo ? "demo" : ""}">${student.is_demo ? "D·" : ""}${initialsLabel}</div>`,
           iconSize: [31, 31],
           iconAnchor: [15, 15],
         }),
-      }).addTo(state.map).bindPopup(`<b>Mahasiswa ${initialsLabel}</b><br><small>${programLabel} · ${distanceLabel}</small>`);
+      }).addTo(state.map).bindPopup(`<b>${student.is_demo ? "Akun simulasi DEMO" : `Mahasiswa ${initialsLabel}`}</b><br><small>${programLabel} · ${distanceLabel}</small>`);
       state.markers.push(marker);
     });
 
@@ -531,6 +546,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   }
 
   async function locateHomeMap() {
+    if (isDemo) { toast("Mode DEMO memakai titik lokasi simulasi sekitar kampus UT, bukan lokasi GPS perangkat."); return; }
     if (!navigator.geolocation) {
       toast("Browser ini tidak mendukung akses lokasi. Klik peta untuk menentukan titik secara manual.");
       return;
@@ -655,6 +671,16 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   }
 
   bindHomeMapControls();
+  if (isDemo) {
+    const nimInput = $("#nim-search");
+    if (nimInput) {
+      nimInput.disabled = true;
+      nimInput.placeholder = "Pencarian NIM asli tidak digunakan pada DEMO";
+      nimInput.title = "Akun DEMO tidak memiliki NIM mahasiswa sungguhan.";
+    }
+    const locateButton = $("#locate-btn");
+    if (locateButton) locateButton.title = "Demo memakai titik lokasi simulasi sekitar kampus UT.";
+  }
     function renderMatchingAccess() {
     const notice = $("#match-access-notice");
     const layout = $("#match-layout");
@@ -739,7 +765,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       return;
     }
     list.innerHTML = rows.map(connection => {
-      const identity = `Mahasiswa UT · ${escapeText(connection.initials || "UT")}`;
+      const identity = connection.is_demo ? `Akun simulasi · ${escapeText(connection.initials || "DEMO")}` : `Mahasiswa UT · ${escapeText(connection.initials || "UT")}`;
       const incoming = connection.is_incoming && connection.status === "pending";
       const labels = {
         pending: connection.is_incoming ? "Permintaan masuk" : "Menunggu jawaban",
@@ -755,7 +781,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       return `
         <article class="connection-row">
           <div class="person-avatar">${escapeText(connection.initials || "UT")}</div>
-          <div class="connection-person"><strong>${identity}</strong><span>${escapeText(connection.program || "Program studi tidak tersedia")}</span><small>${escapeText(forumDate(connection.created_at))}</small></div>
+          <div class="connection-person"><strong>${identity}${connection.is_demo ? '<span class="demo-user-tag">DEMO</span>' : ""}</strong><span>${escapeText(connection.program || "Program studi tidak tersedia")}</span><small>${escapeText(forumDate(connection.created_at))}</small></div>
           ${actions}
         </article>`;
     }).join("");
@@ -801,8 +827,8 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
         <article class="surface match-card">
           <div class="match-top">
             <div class="person-avatar">${escapeText(student.initials || "UT")}</div>
-            <div class="person-meta"><strong>Mahasiswa UT · ${escapeText(student.initials || "UT")}</strong><span>${escapeText(student.program || "Program studi tidak tersedia")} · ${escapeText(matchingDistance(student.approx_distance_m))}</span></div>
-            <span class="match-score">Relevan</span>
+            <div class="person-meta"><strong>${student.is_demo ? "Akun simulasi · " : "Mahasiswa UT · "}${escapeText(student.initials || "UT")} ${student.is_demo ? '<span class="demo-user-tag">DEMO</span>' : ""}</strong><span>${escapeText(student.program || "Program studi tidak tersedia")} · ${escapeText(matchingDistance(student.approx_distance_m))}</span></div>
+            <span class="match-score">${student.is_demo ? "DEMO" : "Relevan"}</span>
           </div>
           <div class="match-tags">${tags.length ? tags.map(tag => `<span class="tag">${escapeText(tag)}</span>`).join("") : '<span class="tiny muted">Belum mengisi program studi atau topik.</span>'}</div>
           <div class="match-card-foot"><span class="tiny muted">${escapeText((student.study_times || []).join(", ") || label)}</span>${action}</div>
@@ -1166,13 +1192,14 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     ).join("");
     $("#group-list").innerHTML = invitationHtml + (filtered.map(group => {
       const courseName = group.program || group.course?.course_name || "Kelompok umum";
+      const demoBadge = group.is_demo ? '<span class="demo-user-tag">DEMO · SIMULASI</span>' : "";
       const membership = state.groupMemberships.get(group.id);
       const isActiveMember = membership?.status === "active";
       const isPending = membership?.status === "pending";
       const isManager = isActiveMember && ["admin", "co_admin"].includes(membership.role);
       const activeCount = isActiveMember
         ? state.groupMembers.filter(member => member.group_id === group.id && member.status === "active").length
-        : null;
+        : (state.isDemo && Number.isFinite(Number(group.active_member_count)) ? Number(group.active_member_count) : null);
       const pendingCount = isManager
         ? state.groupMembers.filter(member => member.group_id === group.id && member.status === "pending").length
         : 0;
@@ -1202,7 +1229,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
           : `<button type="button" class="btn btn-primary btn-sm" data-group-join="${escapeText(group.id)}">${group.access_type === "approval" ? "Minta bergabung" : group.access_type === "private" ? "Terima undangan" : "Gabung grup"}</button>`;
       return `
         <article class="surface group-card">
-          <div class="group-head"><div><h3>${escapeText(group.name)}</h3><div class="group-sub">${escapeText(courseName)}</div></div><span class="mode ${escapeText(group.mode)}">${group.mode === "online" ? "Online" : "Offline"}</span></div>
+          <div class="group-head"><div><h3>${escapeText(group.name)}</h3><div class="group-sub">${escapeText(courseName)}</div>${demoBadge}</div><span class="mode ${escapeText(group.mode)}">${group.mode === "online" ? "Online" : "Offline"}</span></div>
           <p class="group-card-description">${escapeText(group.description || "Belum ada deskripsi kelompok.")}</p>
           <div class="group-sub group-detail-line"><i data-lucide="calendar-days"></i>${schedule}</div>
           <div class="group-sub group-detail-line"><i data-lucide="${group.mode === "online" ? "video" : "map-pin"}"></i>${place}</div>
@@ -1660,6 +1687,19 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     const queuePanel = $("#verification-admin-panel");
     const queue = $("#verification-queue");
 
+    if (isDemo) {
+      if (statusPanel) {
+        statusPanel.hidden = false;
+        statusPanel.innerHTML = '<div class="verification-result pending"><span class="verification-symbol">D</span><div><strong>Akun demo · bukan status mahasiswa</strong><p>Identitas ini dibuat khusus untuk simulasi UTConnect. Akun demo tidak mengklaim status mahasiswa UT.</p></div></div>';
+      }
+      if (submitPanel) {
+        submitPanel.hidden = false;
+        submitPanel.innerHTML = '<div class="verification-result pending"><span class="verification-symbol">i</span><div><strong>Verifikasi asli tidak dijalankan pada akun demo</strong><p>Pengiriman bukti dan pemeriksaan admin hanya tersedia melalui akun mahasiswa biasa.</p></div></div>';
+      }
+      if (queuePanel) queuePanel.hidden = true;
+      return;
+    }
+
     // Administrators manage student reviews; their own student verification state is not applicable.
     if (isAdmin) {
       if (statusPanel) statusPanel.hidden = true;
@@ -1727,6 +1767,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       const receipt = own ? (message.read_at ? "Dibaca" : "Terkirim") : "";
       return `
         <article class="direct-chat-message ${own ? "own" : "other"}">
+          ${message.is_demo ? '<div class="direct-chat-meta"><span class="demo-user-tag">DEMO · SIMULASI</span></div>' : ""}
           <div class="direct-chat-bubble">${escapeText(message.body)}</div>
           <div class="direct-chat-meta">${escapeText(chatTimestamp(message.created_at))}${receipt ? ` · ${receipt}` : ""}</div>
         </article>`;
@@ -1785,6 +1826,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     list.innerHTML = state.chatRooms.map(room => {
       const active = room.connection_id === state.activeChatConnectionId;
       const name = room.other_full_name || "Mahasiswa UT";
+      const demoTag = room.is_demo ? '<span class="demo-user-tag">DEMO</span>' : "";
       const avatar = getProfileAvatarUrl(room.avatar_path);
       const avatarHtml = avatar
         ? '<span class="message-room-avatar"><img src="' + escapeText(avatar) + '" alt=""></span>'
@@ -1792,7 +1834,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       const preview = room.last_message || "Belum ada pesan";
       const unread = Number(room.unread_count || 0);
       return '<button type="button" class="message-room-item ' + (active ? "active" : "") + '" data-message-room="' + escapeText(room.connection_id) + '">' +
-        avatarHtml + '<span class="message-room-copy"><strong>' + escapeText(name) + '</strong><small>' + escapeText(preview) + '</small></span>' +
+        avatarHtml + '<span class="message-room-copy"><strong>' + escapeText(name) + demoTag + '</strong><small>' + escapeText(preview) + '</small></span>' +
         '<span class="message-room-meta">' + (unread ? '<b>' + escapeText(String(unread > 99 ? "99+" : unread)) + '</b>' : '') +
         '<time>' + escapeText(room.last_message_at ? new Date(room.last_message_at).toLocaleDateString("id-ID", {day:"2-digit",month:"short"}) : "") + '</time></span></button>';
     }).join("");
@@ -2004,7 +2046,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
         if (file) updated.avatar_path = await uploadMyProfileAvatar(file);
         else if (selectedAvatarPreset) updated.avatar_path = await setMyProfileAvatarPreset(selectedAvatarPreset);
         state.profile = { ...state.profile, ...updated };
-        isVerified = state.profile.verification_status === "verified";
+        isVerified = isDemo || state.profile.verification_status === "verified";
         verificationStatus = state.profile.verification_status || "pending";
         renderProfileSummary();
         await Promise.all([loadForum(), loadMatching(), loadGroups(), loadVerification()]);

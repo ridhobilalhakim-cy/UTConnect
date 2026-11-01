@@ -82,13 +82,30 @@ Deno.serve(async (req: Request) => {
     const user = authData?.user;
     if (authError || !user) return json({ error: "Sesi tidak valid. Silakan masuk kembali." }, 401);
 
-    const { data: profile, error: profileError } = await admin
-      .from("profiles")
-      .select("verification_status")
-      .eq("id", user.id)
-      .maybeSingle();
+    const demoModeEnabled = Deno.env.get("UTCONNECT_DEMO_MODE") === "true";
+    let profile: { verification_status?: string; is_demo?: boolean } | null = null;
+    let profileError: { message: string } | null = null;
+    if (demoModeEnabled) {
+      // The normal project's generated DB types intentionally do not include demo-only columns.
+      // Keep the demo-only select inside an explicit, server-configured branch.
+      const demoProfiles = admin.from("profiles") as any;
+      const result = await demoProfiles
+        .select("verification_status,is_demo")
+        .eq("id", user.id)
+        .maybeSingle();
+      profile = result.data as { verification_status?: string; is_demo?: boolean } | null;
+      profileError = result.error;
+    } else {
+      const result = await admin
+        .from("profiles")
+        .select("verification_status")
+        .eq("id", user.id)
+        .maybeSingle();
+      profile = result.data as { verification_status?: string; is_demo?: boolean } | null;
+      profileError = result.error;
+    }
     if (profileError) return json({ error: "Status verifikasi belum dapat diperiksa." }, 500);
-    if (profile?.verification_status !== "verified") {
+    if (profile?.verification_status !== "verified" && !(demoModeEnabled && profile?.is_demo === true)) {
       return json({ error: "Peta mahasiswa sekitar hanya tersedia untuk mahasiswa terverifikasi." }, 403);
     }
 
@@ -145,6 +162,7 @@ Deno.serve(async (req: Request) => {
       approx_distance_m: row.approx_distance_m,
       marker_lat: row.marker_lat,
       marker_lng: row.marker_lng,
+      is_demo: demoModeEnabled && row.is_demo === true,
     }));
     return json({
       radius,

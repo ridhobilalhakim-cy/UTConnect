@@ -1,7 +1,12 @@
-import { supabase } from "../lib/supabase.js";
+import { supabase, IS_DEMO_BUILD } from "../lib/supabase.js";
+import { runDemoAutomation, listDemoGroups } from "./demo.js";
 
-const GROUP_SELECT = "id,created_by,name,description,course_id,program,mode,capacity,access_type,schedule_text,online_url,offline_area_label,is_archived,created_at,updated_at,course:courses!study_groups_course_id_fkey(id,course_code,course_name)";
-const MEMBERSHIP_SELECT = "group_id,user_id,role,status,created_at,joined_at";
+const GROUP_SELECT = IS_DEMO_BUILD
+  ? "id,created_by,name,description,course_id,program,mode,capacity,access_type,schedule_text,online_url,offline_area_label,is_archived,created_at,updated_at,is_demo,course:courses!study_groups_course_id_fkey(id,course_code,course_name)"
+  : "id,created_by,name,description,course_id,program,mode,capacity,access_type,schedule_text,online_url,offline_area_label,is_archived,created_at,updated_at,course:courses!study_groups_course_id_fkey(id,course_code,course_name)";
+const MEMBERSHIP_SELECT = IS_DEMO_BUILD
+  ? "group_id,user_id,role,status,created_at,joined_at,is_demo"
+  : "group_id,user_id,role,status,created_at,joined_at";
 
 function throwIfError(error) {
   if (error) throw error;
@@ -16,6 +21,7 @@ async function requireUserId() {
 }
 
 export async function listStudyGroups(limit = 100) {
+  if (IS_DEMO_BUILD) return listDemoGroups(limit);
   const { data, error } = await supabase
     .from("study_groups")
     .select(GROUP_SELECT)
@@ -55,6 +61,7 @@ export async function createStudyGroup(input) {
     .select(GROUP_SELECT)
     .single();
   throwIfError(error);
+  await runDemoAutomation("group_created", { group_id: data.id });
   return data;
 }
 
@@ -65,6 +72,17 @@ export async function joinStudyGroup(groupId) {
     p_group_id: groupId,
   });
   throwIfError(error);
+  await runDemoAutomation("group_join", { group_id: groupId, membership_status: data });
+  if (IS_DEMO_BUILD) {
+    const { data: membership, error: membershipError } = await supabase
+      .from("group_members")
+      .select("status")
+      .eq("group_id", groupId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    throwIfError(membershipError);
+    return membership?.status || data;
+  }
   return data;
 }
 
@@ -80,8 +98,15 @@ export async function respondGroupJoinRequest(groupId, userId, accept) {
   return data;
 }
 
-const GROUP_MESSAGE_SELECT = "id,group_id,sender_id,reply_to_id,body,mentioned_user_ids,pinned_at,pinned_by,created_at";
-const GROUP_AGENDA_SELECT = "id,group_id,created_by,item_type,title,details,due_at,poll_options,created_at,updated_at";
+const GROUP_MESSAGE_SELECT = IS_DEMO_BUILD
+  ? "id,group_id,sender_id,reply_to_id,body,mentioned_user_ids,pinned_at,pinned_by,created_at,is_demo"
+  : "id,group_id,sender_id,reply_to_id,body,mentioned_user_ids,pinned_at,pinned_by,created_at";
+const GROUP_AGENDA_SELECT = IS_DEMO_BUILD
+  ? "id,group_id,created_by,item_type,title,details,due_at,poll_options,created_at,updated_at,is_demo"
+  : "id,group_id,created_by,item_type,title,details,due_at,poll_options,created_at,updated_at";
+const GROUP_MATERIAL_SELECT = IS_DEMO_BUILD
+  ? "id,group_id,uploaded_by,title,storage_path,content_type,file_size_bytes,created_at,is_demo"
+  : "id,group_id,uploaded_by,title,storage_path,content_type,file_size_bytes,created_at";
 const GROUP_MATERIAL_BUCKET = "group-materials";
 const MAX_GROUP_MATERIAL_BYTES = 50 * 1024 * 1024;
 const GROUP_MATERIAL_TYPES = new Map([
@@ -124,6 +149,7 @@ export async function sendGroupMessage(groupId, body, replyToId = null) {
     .select(GROUP_MESSAGE_SELECT)
     .single();
   throwIfError(error);
+  await runDemoAutomation("group_message", { group_id: groupId, message_id: data.id });
   return data;
 }
 
@@ -156,7 +182,7 @@ export async function listGroupMaterials(groupId) {
   if (!groupId) return [];
   const { data, error } = await supabase
     .from("group_materials")
-    .select("id,group_id,uploaded_by,title,storage_path,content_type,file_size_bytes,created_at")
+    .select(GROUP_MATERIAL_SELECT)
     .eq("group_id", groupId)
     .order("created_at", { ascending: false });
   throwIfError(error);
@@ -315,7 +341,9 @@ export async function castGroupPollVote(itemId, option) {
     p_option: option,
   });
   throwIfError(error);
-  return data || { options: [], total_votes: 0 };
+  const result = data || { options: [], total_votes: 0 };
+  await runDemoAutomation("poll_vote", { item_id: itemId, selected_option: option });
+  return result;
 }
 
 export async function listMyGroupInvitations() {

@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase.js";
+import { runDemoAutomation } from "./demo.js";
 
 function throwIfError(error) {
   if (error) throw error;
@@ -64,6 +65,7 @@ export async function sendConnectionRequest(recipientId) {
     .select("id,initiator_id,recipient_id,status,created_at")
     .single();
   throwIfError(error);
+  await runDemoAutomation("connection_request", { connection_id: data.id });
   return data;
 }
 
@@ -73,5 +75,9 @@ export async function respondConnectionRequest(connectionId, accept) {
     p_accept: Boolean(accept),
   });
   throwIfError(error);
+  await runDemoAutomation("connection_response", {
+    connection_id: connectionId,
+    accepted: Boolean(accept),
+  });
   return data;
 }

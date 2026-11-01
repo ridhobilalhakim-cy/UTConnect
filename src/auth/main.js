@@ -1,4 +1,5 @@
-import { supabase } from "../lib/supabase.js";
+import { supabase, IS_DEMO_BUILD } from "../lib/supabase.js";
+import { startDemoSession } from "../services/demo.js";
 import L from "leaflet";
 import { populateUTFacultyProgramSelects } from "../data/ut-programs.js";
 import "leaflet/dist/leaflet.css";
@@ -12,6 +13,7 @@ window.L = L;
   const L = window.L;
   let map = null, marker = null, chosenLocation = null, mapReady = false, activeUser = null;
   let handlingSession = false;
+  let demoSessionStarting = false;
   let suppressRecoverySignOutNavigation = false;
   const initialParams = new URLSearchParams(window.location.search);
   let recoveryMode = initialParams.get("mode") === "recovery";
@@ -131,6 +133,7 @@ window.L = L;
       return;
     }
     if (["SIGNED_IN", "TOKEN_REFRESHED", "INITIAL_SESSION", "USER_UPDATED"].includes(event)) {
+      if (demoSessionStarting && session?.user?.is_anonymous === true) return;
       setTimeout(() => handleSession(session), 0);
     }
     if (event === "SIGNED_OUT") {
@@ -156,6 +159,26 @@ window.L = L;
   }
 
   // Basic navigation is wired before the network libraries load, so the UI never appears inert.
+  const demoStartButton = $("demoStartBtn");
+  if (demoStartButton) {
+    demoStartButton.hidden = !IS_DEMO_BUILD;
+    const demoEntryPanel = $("demoEntryPanel");
+    if (demoEntryPanel) demoEntryPanel.hidden = !IS_DEMO_BUILD;
+    demoStartButton.addEventListener("click", async () => {
+      if (!IS_DEMO_BUILD) return;
+      busy("demoStartBtn", true, "Menyiapkan sesi demo...");
+      demoSessionStarting = true;
+      try {
+        const scenario = $("demoScenario")?.value || "all";
+        const result = await startDemoSession(scenario);
+        window.location.replace("/app.html?demoScenario=" + encodeURIComponent(result?.scenario || scenario));
+      } catch (error) {
+        demoSessionStarting = false;
+        alertBox(error?.message || "Sesi demo belum dapat dimulai.", "error");
+        busy("demoStartBtn", false);
+      }
+    });
+  }
   $("goRegister").addEventListener("click",()=>{
     showView("registerView");
     $("oauthAccountBox").classList.add("hidden");

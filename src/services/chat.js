@@ -1,7 +1,11 @@
-import { supabase } from "../lib/supabase.js";
+import { supabase, IS_DEMO_BUILD } from "../lib/supabase.js";
+import { runDemoAutomation } from "./demo.js";
 
 const MESSAGE_LIMIT = 60;
 const MAX_MESSAGE_LENGTH = 5000;
+const DIRECT_MESSAGE_SELECT = IS_DEMO_BUILD
+  ? "id,connection_id,sender_id,body,created_at,read_at,is_demo"
+  : "id,connection_id,sender_id,body,created_at,read_at";
 
 function throwIfError(error) {
   if (error) throw error;
@@ -26,7 +30,7 @@ export async function listDirectMessages(connectionId, { limit = MESSAGE_LIMIT, 
   const safeLimit = Math.max(1, Math.min(Number(limit) || MESSAGE_LIMIT, 100));
   let query = supabase
     .from("direct_messages")
-    .select("id,connection_id,sender_id,body,created_at,read_at")
+    .select(DIRECT_MESSAGE_SELECT)
     .eq("connection_id", connectionId)
     .order("created_at", { ascending: false })
     .limit(safeLimit);
@@ -54,10 +58,11 @@ export async function sendDirectMessage(connectionId, body) {
       sender_id: userId,
       body: message,
     })
-    .select("id,connection_id,sender_id,body,created_at,read_at")
+    .select(DIRECT_MESSAGE_SELECT)
     .single();
 
   throwIfError(error);
+  await runDemoAutomation("direct_message", { message_id: data.id });
   return data;
 }
 
