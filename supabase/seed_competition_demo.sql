@@ -284,4 +284,9 @@ on conflict (id) do update
 set title=excluded.title, body=excluded.body, reference_id=excluded.reference_id,
     read_at=excluded.read_at;
 
+insert into public.notifications (id,user_id,notification_type,title,body,reference_id,read_at,created_at) values
+('a4000000-0000-4000-8000-000000000010','228d4d62-a223-4ead-92cc-d3480101c1de','group_invite','Undangan grup privat','Bot Siti mengundangmu ke Komunitas Diskusi Privat.','d0000000-0000-4000-8000-000000000003',null,now()-interval '12 minutes'),
+('a4000000-0000-4000-8000-000000000011','cd3e82a5-8d6a-4e56-9400-c0d6423c0ab4','group_invite','Undangan grup privat','Bot Siti mengundangmu ke Komunitas Diskusi Privat.','d0000000-0000-4000-8000-000000000003',null,now()-interval '12 minutes')
+on conflict (id) do update set title=excluded.title,body=excluded.body,reference_id=excluded.reference_id,read_at=excluded.read_at;
+
 commit;
