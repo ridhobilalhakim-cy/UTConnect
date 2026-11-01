@@ -1424,3 +1424,43 @@ begin
   limit 50;
 end;
 $function$;
+
+
+-- Expired demo identities must never be treated as ordinary non-demo accounts.
+create or replace function private.same_demo_session(
+  p_left_user_id uuid,
+  p_right_user_id uuid
+)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $function$
+declare
+  v_left uuid := private.demo_session_for_user(p_left_user_id);
+  v_right uuid := private.demo_session_for_user(p_right_user_id);
+  v_left_is_demo boolean := false;
+  v_right_is_demo boolean := false;
+begin
+  select coalesce(
+    u.raw_app_meta_data ->> 'utconnect_demo_role' in ('visitor', 'bot'),
+    false
+  ) into v_left_is_demo
+  from auth.users u
+  where u.id = p_left_user_id;
+
+  select coalesce(
+    u.raw_app_meta_data ->> 'utconnect_demo_role' in ('visitor', 'bot'),
+    false
+  ) into v_right_is_demo
+  from auth.users u
+  where u.id = p_right_user_id;
+
+  if v_left_is_demo or v_right_is_demo then
+    return v_left is not null and v_left = v_right;
+  end if;
+
+  return true;
+end
+$function$;
