@@ -1506,6 +1506,9 @@ declare
   v_group_session uuid;
   v_connection_demo boolean;
   v_connection_session uuid;
+  v_post_id uuid;
+  v_post_demo boolean;
+  v_post_session uuid;
 begin
   if tg_table_name = 'profiles' then
     v_user_id := (v_json ->> 'id')::uuid;
@@ -1518,6 +1521,29 @@ begin
   elsif tg_table_name = 'study_groups' then
     v_user_id := (v_json ->> 'created_by')::uuid;
     v_session_id := private.demo_identity_session_id(v_user_id);
+
+  elsif tg_table_name = 'forum_posts' then
+    v_user_id := (v_json ->> 'author_id')::uuid;
+    v_session_id := private.demo_identity_session_id(v_user_id);
+
+  elsif tg_table_name = 'forum_comments' then
+    v_post_id := (v_json ->> 'post_id')::uuid;
+    v_user_id := (v_json ->> 'author_id')::uuid;
+    select fp.is_demo, fp.demo_session_id
+      into v_post_demo, v_post_session
+    from public.forum_posts fp
+    where fp.id = v_post_id;
+    if not found then
+      raise exception 'Forum post does not exist' using errcode = '23503';
+    end if;
+    v_session_id := private.demo_identity_session_id(v_user_id);
+    if v_post_demo is distinct from (v_session_id is not null)
+      or (v_post_demo and v_session_id is distinct from v_post_session) then
+      raise exception 'Forum comment is outside the post demo session'
+        using errcode = '42501';
+    end if;
+    v_is_demo := v_post_demo;
+    v_session_id := v_post_session;
 
   elsif tg_table_name = 'connections' then
     v_user_id := (v_json ->> 'initiator_id')::uuid;
@@ -2027,4 +2053,96 @@ begin
     'submitted_at', v_submitted_at
   );
 end;
+$function$;
+
+-- Keep every Forum post and comment inside the author/post's own demo session.
+alter table public.forum_posts
+  add column if not exists is_demo boolean not null default false,
+  add column if not exists demo_session_id uuid;
+
+alter table public.forum_comments
+  add column if not exists is_demo boolean not null default false,
+  add column if not exists demo_session_id uuid;
+
+create trigger forum_posts_demo_scope
+before insert or update on public.forum_posts
+for each row execute function private.sync_demo_scope();
+
+create trigger forum_comments_demo_scope
+before insert or update on public.forum_comments
+for each row execute function private.sync_demo_scope();
+
+create policy demo_scope_guard on public.forum_posts as restrictive
+for all to authenticated
+using (private.can_access_demo_scope(is_demo, demo_session_id))
+with check (private.can_access_demo_scope(is_demo, demo_session_id));
+
+create policy demo_scope_guard on public.forum_comments as restrictive
+for all to authenticated
+using (private.can_access_demo_scope(is_demo, demo_session_id))
+with check (private.can_access_demo_scope(is_demo, demo_session_id));
+
+create or replace function public.get_forum_author_profiles(p_user_ids uuid[])
+returns table(user_id uuid, full_name text, avatar_path text)
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_actor_id uuid := auth.uid();
+begin
+  if v_actor_id is null or not private.is_current_user_verified() then
+    raise exception 'Verified student account required' using errcode = '42501';
+  end if;
+  if p_user_ids is null or cardinality(p_user_ids) > 100 then
+    raise exception 'Invalid author list' using errcode = '22023';
+  end if;
+
+  return query
+  select p.id, p.full_name, p.avatar_path
+  from public.profiles p
+  where p.id = any(p_user_ids)
+    and private.is_verified_user(p.id)
+    and private.same_demo_session(v_actor_id, p.id)
+    and (
+      exists (select 1 from public.forum_posts fp where fp.author_id = p.id)
+      or exists (select 1 from public.forum_comments fc where fc.author_id = p.id)
+    )
+  order by p.full_name;
+end
+$function$;
+
+create or replace function private.notify_forum_comment_received()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_post_author_id uuid;
+  v_post_title text;
+  v_post_demo boolean;
+  v_post_session uuid;
+begin
+  select p.author_id, p.title, p.is_demo, p.demo_session_id
+  into v_post_author_id, v_post_title, v_post_demo, v_post_session
+  from public.forum_posts p
+  where p.id = new.post_id;
+
+  if v_post_author_id is not null
+    and v_post_author_id <> new.author_id
+    and v_post_demo = new.is_demo
+    and v_post_session is not distinct from new.demo_session_id
+    and private.same_demo_session(new.author_id, v_post_author_id) then
+    insert into public.notifications(user_id, notification_type, title, body, reference_id)
+    values (
+      v_post_author_id,
+      'forum_comment',
+      'Diskusimu mendapat tanggapan',
+      'Ada tanggapan baru pada diskusi "' || left(v_post_title, 120) || '".',
+      new.post_id
+    );
+  end if;
+  return new;
+end
 $function$;
