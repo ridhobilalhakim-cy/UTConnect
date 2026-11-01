@@ -26,8 +26,8 @@ function jsonResponse(body, status = 200) {
   return { status, contentType: 'application/json', body: JSON.stringify(body) };
 }
 
-async function mockSupabase(page, { isAdmin = false, informationPosts = [], verificationStatus = { profile_status: 'pending', latest_request: null }, verificationQueue = [], profile = PROFILE, forumPosts = [], forumComments = [], courses = [], studyGroups = [], groupMembers = [], groupMessages = [], groupMaterials = [], groupAgendaItems = [], groupInvites = [], myGroupInvitations = [], matchingPreferences = null, profileCourseIds = [], matchingCandidates = [], connectionSummaries = [], directMessages = [], notifications = [], homeMapLocation = null, nearbyResults = [] } = {}) {
-  const state = { loginCalls: 0, recoveryCalls: 0, passwordUpdates: 0, logoutCalls: 0, informationPosts: [...informationPosts], informationCreateCalls: 0, verificationStatus: structuredClone(verificationStatus), verificationQueue: [...verificationQueue], verificationUploadCalls: 0, verificationSubmitCalls: 0, verificationReviewCalls: [], profile, forumPosts: [...forumPosts], forumComments: [...forumComments], courses: [...courses], studyGroups: [...studyGroups], groupMembers: [...groupMembers], groupMessages: structuredClone(groupMessages), groupMessageSendCalls: [], groupMessagePinCalls: [], groupMaterials: structuredClone(groupMaterials), groupMaterialUploadCalls: [], groupMaterialDeleteCalls: [], groupAgendaItems: structuredClone(groupAgendaItems), groupAgendaCreateCalls: [], groupAgendaUpdateCalls: [], groupAgendaDeleteCalls: [], groupPollVotes: [], groupInvites: structuredClone(groupInvites), myGroupInvitations: structuredClone(myGroupInvitations), groupInviteCalls: [], groupInviteCancelCalls: [], groupCreateCalls: 0, groupJoinCalls: [], groupReviewCalls: [], matchingPreferences: matchingPreferences ? structuredClone(matchingPreferences) : null, profileCourseIds: [...profileCourseIds], matchingCandidates: [...matchingCandidates], connectionSummaries: [...connectionSummaries], directMessages: structuredClone(directMessages), directMessageSendCalls: [], directMessageReadCalls: [], notifications: structuredClone(notifications), notificationReadCalls: [], notificationBulkReadCalls: 0, homeMapLocation: structuredClone(homeMapLocation), nearbyResults: structuredClone(nearbyResults), nearbyCalls: [], locationSaveCalls: [], locationVisibilityCalls: [], matchingPreferenceSaveCalls: 0, profileCourseInsertCalls: 0, profileCourseDeleteCalls: 0, matchingSearchCalls: [], connectionCreateCalls: [], connectionResponseCalls: [], forumPostCreateCalls: 0, forumCommentCreateCalls: 0 };
+async function mockSupabase(page, { isAdmin = false, informationPosts = [], verificationStatus = { profile_status: 'pending', latest_request: null }, verificationQueue = [], profile = PROFILE, forumPosts = [], forumComments = [], forumAuthorProfiles = [], courses = [], studyGroups = [], groupMembers = [], groupMessages = [], groupMaterials = [], groupAgendaItems = [], groupInvites = [], myGroupInvitations = [], matchingPreferences = null, profileCourseIds = [], matchingCandidates = [], connectionSummaries = [], directMessages = [], chatRooms = [], notifications = [], homeMapLocation = null, nearbyResults = [] } = {}) {
+  const state = { loginCalls: 0, recoveryCalls: 0, passwordUpdates: 0, logoutCalls: 0, informationPosts: [...informationPosts], informationCreateCalls: 0, verificationStatus: structuredClone(verificationStatus), verificationQueue: [...verificationQueue], verificationUploadCalls: 0, verificationSubmitCalls: 0, verificationReviewCalls: [], profile, profileUpdateCalls: [], avatarUpdateCalls: [], forumPosts: [...forumPosts], forumComments: [...forumComments], forumAuthorProfiles: [...forumAuthorProfiles], courses: [...courses], studyGroups: [...studyGroups], groupMembers: [...groupMembers], groupMessages: structuredClone(groupMessages), groupMessageSendCalls: [], groupMessagePinCalls: [], groupMaterials: structuredClone(groupMaterials), groupMaterialUploadCalls: [], groupMaterialDeleteCalls: [], groupAgendaItems: structuredClone(groupAgendaItems), groupAgendaCreateCalls: [], groupAgendaUpdateCalls: [], groupAgendaDeleteCalls: [], groupPollVotes: [], groupInvites: structuredClone(groupInvites), myGroupInvitations: structuredClone(myGroupInvitations), groupInviteCalls: [], groupInviteCancelCalls: [], groupCreateCalls: 0, groupJoinCalls: [], groupReviewCalls: [], matchingPreferences: matchingPreferences ? structuredClone(matchingPreferences) : null, profileCourseIds: [...profileCourseIds], matchingCandidates: [...matchingCandidates], connectionSummaries: [...connectionSummaries], directMessages: structuredClone(directMessages), chatRooms: structuredClone(chatRooms), directMessageSendCalls: [], directMessageReadCalls: [], notifications: structuredClone(notifications), notificationReadCalls: [], notificationBulkReadCalls: 0, homeMapLocation: structuredClone(homeMapLocation), nearbyResults: structuredClone(nearbyResults), nearbyCalls: [], locationSaveCalls: [], locationVisibilityCalls: [], matchingPreferenceSaveCalls: 0, profileCourseInsertCalls: 0, profileCourseDeleteCalls: 0, matchingSearchCalls: [], connectionCreateCalls: [], connectionResponseCalls: [], forumPostCreateCalls: 0, forumCommentCreateCalls: 0 };
   await page.addInitScript(() => { window.__UTCONNECT_DISABLE_REALTIME__ = true; });
   for (const pattern of [
     /^https:\/\/fonts\.googleapis\.com\//,
@@ -74,6 +74,57 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
     }
     if (path.endsWith('/rest/v1/rpc/is_current_user_admin') && method === 'POST') {
       return route.fulfill(jsonResponse(isAdmin));
+    }
+    if (path.endsWith('/rest/v1/rpc/get_forum_author_profiles') && method === 'POST') {
+      const input = request.postDataJSON();
+      const ids = new Set(input.p_user_ids || []);
+      return route.fulfill(jsonResponse(state.forumAuthorProfiles.filter(row => ids.has(row.user_id))));
+    }
+    if (path.endsWith('/rest/v1/rpc/get_my_chat_rooms') && method === 'POST') {
+      return route.fulfill(jsonResponse(state.chatRooms));
+    }
+    if (path.endsWith('/rest/v1/rpc/update_my_student_profile') && method === 'POST') {
+      const input = request.postDataJSON();
+      const facultyAliases = {
+        FEB: 'Fakultas Ekonomi dan Bisnis (FEB)',
+        FHISIP: 'Fakultas Hukum, Ilmu Sosial, dan Ilmu Politik (FHISIP)',
+        FKIP: 'Fakultas Keguruan dan Ilmu Pendidikan (FKIP)',
+        FST: 'Fakultas Sains dan Teknologi (FST)',
+      };
+      const programAliases = {
+        'Ilmu Administrasi Negara': 'Ilmu Administrasi Publik',
+        'Ilmu Administrasi Bisnis': 'Administrasi Bisnis',
+        'Ilmu Hukum': 'Hukum',
+        'Ilmu Perpustakaan': 'Perpustakaan dan Sains Informasi',
+        'Ilmu dan Teknologi Pangan': 'Teknologi Pangan',
+        'Pendidikan Agama Islam': 'Pendidikan Agama Islam (PAI)',
+      };
+      const currentFaculty = facultyAliases[state.profile.faculty] || state.profile.faculty;
+      const currentProgram = programAliases[state.profile.program] || state.profile.program;
+      const identityChanged =
+        state.profile.full_name !== input.p_full_name ||
+        currentFaculty !== input.p_faculty ||
+        currentProgram !== input.p_program ||
+        Number(state.profile.semester) !== Number(input.p_semester);
+      const updated = {
+        ...state.profile,
+        full_name: input.p_full_name,
+        faculty: input.p_faculty,
+        program: input.p_program,
+        semester: input.p_semester,
+        bio: input.p_bio,
+        verification_status: state.profile.verification_status === 'verified' && identityChanged
+          ? 'pending' : state.profile.verification_status,
+      };
+      state.profileUpdateCalls.push(input);
+      state.profile = updated;
+      return route.fulfill(jsonResponse({ ...updated, identity_changed: identityChanged }));
+    }
+    if (path.endsWith('/rest/v1/rpc/update_my_profile_avatar') && method === 'POST') {
+      const input = request.postDataJSON();
+      state.avatarUpdateCalls.push(input);
+      state.profile.avatar_path = input.p_avatar_path;
+      return route.fulfill(jsonResponse(input.p_avatar_path));
     }
     if (path.endsWith('/rest/v1/rpc/get_my_student_verification_status') && method === 'POST') {
       return route.fulfill(jsonResponse(state.verificationStatus));
@@ -272,6 +323,11 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
         };
         state.directMessageSendCalls.push(input);
         state.directMessages.push(created);
+        const room = state.chatRooms.find(item => item.connection_id === input.connection_id);
+        if (room) {
+          room.last_message = body;
+          room.last_message_at = created.created_at;
+        }
         return route.fulfill(jsonResponse(created, 201));
       }
       if (method === 'PATCH') {
@@ -569,6 +625,12 @@ async function mockSupabase(page, { isAdmin = false, informationPosts = [], veri
         return route.fulfill(jsonResponse({ id }, 200));
       }
     }
+    if (path.includes('/storage/v1/object/profile-avatars/') && method === 'POST') {
+      return route.fulfill(jsonResponse({ Key: 'profile-avatars/' + USER.id + '/avatar-e2e.png' }));
+    }
+    if (path.includes('/storage/v1/object/profile-avatars/') && method === 'DELETE') {
+      return route.fulfill(jsonResponse({}));
+    }
     if (path.includes('/storage/v1/object/student-verification-evidence/') && method === 'DELETE') {
       return route.fulfill(jsonResponse({}));
     }
@@ -608,6 +670,24 @@ test('login and registration are separate views', async ({ page }) => {
   await page.getByRole('button', { name: 'Daftar sekarang' }).click();
   await expect(page.getByRole('heading', { name: 'Buat akun UT Connect' })).toBeVisible();
   await expect(page.getByLabel('NIM')).toBeVisible();
+  await expect(page.locator('#faculty')).toHaveJSProperty('tagName', 'SELECT');
+  await expect(page.locator('#program')).toBeDisabled();
+  await page.locator('#faculty').selectOption({ label: 'Fakultas Sains dan Teknologi (FST)' });
+  await expect(page.locator('#program')).toBeEnabled();
+  await expect(page.locator('#program')).toContainText('Sistem Informasi');
+
+  const facultyProgrammeCounts = [
+    { faculty: 'Fakultas Ekonomi dan Bisnis (FEB)', count: 7 },
+    { faculty: 'Fakultas Hukum, Ilmu Sosial, dan Ilmu Politik (FHISIP)', count: 9 },
+    { faculty: 'Fakultas Keguruan dan Ilmu Pendidikan (FKIP)', count: 12 },
+    { faculty: 'Fakultas Sains dan Teknologi (FST)', count: 8 },
+  ];
+  for (const item of facultyProgrammeCounts) {
+    await page.locator('#faculty').selectOption({ label: item.faculty });
+    await expect(page.locator('#program option')).toHaveCount(item.count + 1);
+  }
+  await page.locator('#faculty').selectOption({ label: 'Fakultas Sains dan Teknologi (FST)' });
+  await page.locator('#program').selectOption({ label: 'Sistem Informasi' });
 
   await page.getByRole('button', { name: 'Masuk', exact: true }).last().click();
   await expect(page.getByRole('heading', { name: 'Selamat datang kembali' })).toBeVisible();
@@ -855,7 +935,8 @@ test('verified student can publish a forum post and add a comment', async ({ pag
 
   await page.locator('[data-page="forum"]').first().click();
   await expect(page.locator('#forum-compose')).toBeVisible();
-  await expect(page.locator('#post-course')).toContainText('Diskusi umum');
+  await expect(page.locator('#post-program')).toContainText('Diskusi umum');
+  await expect(page.locator('#post-program')).toContainText('Sistem Informasi');
   await page.locator('#post-title').fill('Memahami perulangan bersarang');
   await page.locator('#post-type').selectOption('need_help');
   await page.locator('#post-content').fill('Bagaimana menentukan kondisi berhenti pada perulangan bersarang?');
@@ -874,12 +955,13 @@ test('verified student can publish a forum post and add a comment', async ({ pag
   expect(state.forumCommentCreateCalls).toBe(1);
 });
 
-test('verified student can read a live forum post without exposing another profile identity', async ({ page }) => {
+test('verified student can read a live forum post with the original author name', async ({ page }) => {
+  const authorId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
   const state = await mockSupabase(page, {
     profile: { ...PROFILE, verification_status: 'verified' },
     forumPosts: [{
       id: 'forum-post-public-001',
-      author_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      author_id: authorId,
       course_id: null,
       post_type: 'discussion',
       title: 'Belajar mandiri di UT',
@@ -888,6 +970,7 @@ test('verified student can read a live forum post without exposing another profi
       updated_at: '2026-10-30T10:00:00.000Z',
       course: null,
     }],
+    forumAuthorProfiles: [{ user_id: authorId, full_name: 'Rina Aulia', avatar_path: null }],
   });
   await page.goto('/');
   await page.locator('#loginEmail').fill(USER.email);
@@ -896,10 +979,10 @@ test('verified student can read a live forum post without exposing another profi
 
   await page.locator('[data-page="forum"]').first().click();
   await expect(page.locator('.forum-post-title')).toHaveText('Belajar mandiri di UT');
-  await expect(page.locator('.post-author')).toContainText('Mahasiswa UT');
+  await expect(page.locator('.post-author')).toContainText('Rina Aulia');
+  await expect(page.locator('.post-author')).not.toContainText('Andi Bintang');
   expect(state.forumPosts).toHaveLength(1);
 });
-
 
 test('unverified student cannot discover or create study groups', async ({ page }) => {
   const state = await mockSupabase(page, {
@@ -931,7 +1014,7 @@ test('verified student can create a persisted general study group', async ({ pag
   await page.locator('#create-group').click();
   await page.locator('#new-group-name').fill('Kelompok Belajar Sistem Informasi');
   await page.locator('#new-group-description').fill('Belajar bersama dan membahas materi perkuliahan.');
-  await page.locator('#new-group-course').selectOption('');
+  await page.locator('#new-group-program').selectOption('Sistem Informasi');
   await page.locator('#new-group-mode').selectOption('online');
   await page.locator('#new-group-access').selectOption('open');
   await page.locator('#new-group-capacity').fill('12');
@@ -939,7 +1022,7 @@ test('verified student can create a persisted general study group', async ({ pag
   await page.locator('#modal-confirm').click();
 
   await expect(page.locator('.group-card')).toContainText('Kelompok Belajar Sistem Informasi');
-  await expect(page.locator('.group-card')).toContainText('Kelompok umum');
+  await expect(page.locator('.group-card')).toContainText('Sistem Informasi');
   expect(state.groupCreateCalls).toBe(1);
   expect(state.studyGroups[0].created_by).toBe(USER.id);
   expect(state.studyGroups[0].access_type).toBe('open');
@@ -1058,6 +1141,8 @@ test('active group member can read, send and pin group chat messages', async ({ 
 
   await page.locator('[data-page="groups"]').first().click();
   await page.locator('[data-group-open="' + groupId + '"]').click();
+  await expect(page.locator('#modal-cancel')).toBeVisible();
+  await expect(page.locator('#modal-confirm')).toBeHidden();
   await expect(page.locator('#modal-content')).toContainText('Selamat datang di ruang diskusi.');
   await page.locator('#group-message-input').fill('Saya siap belajar bersama.');
   await page.locator('#group-message-form button[type="submit"]').click();
@@ -1291,7 +1376,7 @@ test('verified student NIM search is sent only in the authenticated request body
 
   await page.locator('#nim-search').fill('049123456');
   await expect.poll(() => state.nearbyCalls.length).toBe(2);
-  expect(state.nearbyCalls[1]).toEqual({ radius: 3000, nim: '049123456' });
+  expect(state.nearbyCalls[1]).toEqual({ nim: '049123456' });
   expect(await page.locator('#nim-search').inputValue()).toBe('049123456');
   expect(page.url()).not.toContain('049123456');
 });
@@ -1344,12 +1429,12 @@ test('unverified student cannot access matching search or connection controls', 
   expect(state.connectionCreateCalls).toHaveLength(0);
 });
 
-test('verified student can save personal matching preferences and selected courses', async ({ page }) => {
+test('verified student can save personal matching preferences and preferred programmes', async ({ page }) => {
   const state = await mockSupabase(page, {
     profile: { ...PROFILE, verification_status: 'verified' },
-    courses: [
-      { id: 'course-001', course_code: 'MSIM4201', course_name: 'Sistem Operasi', is_active: true },
-      { id: 'course-002', course_code: 'MSIM4301', course_name: 'Algoritma Pemrograman', is_active: true },
+    matchingCandidates: [
+      { student_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', initials: 'SI', program: 'Sistem Informasi', approx_distance_m: 850, topic_tags: [], interests: [], study_times: [] },
+      { student_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', initials: 'MA', program: 'Manajemen', approx_distance_m: 900, topic_tags: [], interests: [], study_times: [] },
     ],
   });
   await page.goto('/');
@@ -1361,7 +1446,8 @@ test('verified student can save personal matching preferences and selected cours
   await page.locator('#preference-topics').fill('struktur data, algoritma');
   await page.locator('#preference-interests').fill('belajar kelompok, persiapan UAS');
   await page.locator('#preference-study-times').selectOption(['Malam hari', 'Akhir pekan']);
-  await page.locator('#preferred-courses').selectOption(['course-001']);
+  await expect(page.locator('#preferred-programs')).toContainText('Sistem Informasi');
+  await page.locator('#preferred-programs').selectOption(['Sistem Informasi']);
   await page.locator('#save-matching-preferences').click();
 
   await expect(page.locator('#toast')).toContainText('Preferensi belajar berhasil disimpan');
@@ -1369,8 +1455,11 @@ test('verified student can save personal matching preferences and selected cours
   expect(state.matchingPreferences.topic_tags).toEqual(['struktur data', 'algoritma']);
   expect(state.matchingPreferences.interests).toEqual(['belajar kelompok', 'persiapan UAS']);
   expect(state.matchingPreferences.study_times).toEqual(['Malam hari', 'Akhir pekan']);
-  expect(state.profileCourseIds).toEqual(['course-001']);
-  expect(state.profileCourseInsertCalls).toBe(1);
+  expect(state.matchingPreferences.preferred_programs).toEqual(['Sistem Informasi']);
+  await expect(page.locator('.match-card')).toHaveCount(1);
+  await expect(page.locator('.match-card')).toContainText('Sistem Informasi');
+  expect(state.profileCourseIds).toEqual([]);
+  expect(state.profileCourseInsertCalls).toBe(0);
   expect(state.matchingSearchCalls.length).toBeGreaterThan(0);
 });
 
@@ -1471,22 +1560,34 @@ test('verified student can reject an incoming connection request', async ({ page
   expect(state.connectionSummaries[0].status).toBe('rejected');
 });
 
-test('verified student can open an accepted connection chat, read messages and send a persisted message', async ({ page }) => {
+test('verified student can open a dedicated chat room, read messages and send a persisted message', async ({ page }) => {
+  const connectionId = '11111111-1111-4111-8111-111111111111';
+  const otherId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
   const state = await mockSupabase(page, {
     profile: { ...PROFILE, verification_status: 'verified' },
     connectionSummaries: [{
-      connection_id: '11111111-1111-4111-8111-111111111111',
-      other_student_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      connection_id: connectionId,
+      other_student_id: otherId,
       initials: 'RA',
       program: 'Manajemen',
       status: 'accepted',
       created_at: '2026-10-30T10:00:00.000Z',
       is_incoming: false,
     }],
+    chatRooms: [{
+      connection_id: connectionId,
+      other_user_id: otherId,
+      other_full_name: 'Rina Aulia',
+      avatar_path: null,
+      program: 'Manajemen',
+      last_message: 'Halo! Kita belajar bareng?',
+      last_message_at: '2026-10-30T11:00:00.000Z',
+      unread_count: 1,
+    }],
     directMessages: [{
       id: 'direct-message-incoming-001',
-      connection_id: '11111111-1111-4111-8111-111111111111',
-      sender_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      connection_id: connectionId,
+      sender_id: otherId,
       body: '<script>window.__chatInjected = true</script>Halo! Kita belajar bareng?',
       created_at: '2026-10-30T11:00:00.000Z',
       read_at: null,
@@ -1498,20 +1599,21 @@ test('verified student can open an accepted connection chat, read messages and s
   await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
 
   await page.locator('[data-page="matching"]').first().click();
-  await page.locator('[data-chat-open="11111111-1111-4111-8111-111111111111"]').click();
+  await page.locator('[data-chat-open="' + connectionId + '"]').click();
 
-  await expect(page.locator('#modal-backdrop')).toHaveClass(/open/);
-  await expect(page.locator('#modal-title')).toContainText('Mahasiswa UT · RA');
-  await expect(page.locator('#direct-chat-messages')).toContainText('Halo! Kita belajar bareng?');
-  await expect(page.locator('#direct-chat-messages script')).toHaveCount(0);
+  await expect(page.locator('#page-messages')).toHaveClass(/active/);
+  await expect(page.locator('#message-room-name')).toHaveText('Rina Aulia');
+  await expect(page.locator('#message-room-messages')).toContainText('Halo! Kita belajar bareng?');
+  await expect(page.locator('#message-room-messages script')).toHaveCount(0);
   await expect.poll(() => state.directMessages[0].read_at).not.toBeNull();
+  await expect(page.locator('[data-message-room="' + connectionId + '"]')).not.toContainText('1');
 
-  await page.locator('#direct-chat-input').fill('Siap, aku akan bahas materi Sistem Operasi.');
-  await page.locator('#direct-chat-send').click();
-  await expect(page.locator('#direct-chat-messages')).toContainText('Siap, aku akan bahas materi Sistem Operasi.');
+  await page.locator('#message-room-input').fill('Siap, aku akan bahas materi Sistem Operasi.');
+  await page.locator('#message-room-send').click();
+  await expect(page.locator('#message-room-messages')).toContainText('Siap, aku akan bahas materi Sistem Operasi.');
   expect(state.directMessageSendCalls).toHaveLength(1);
   expect(state.directMessageSendCalls[0]).toEqual({
-    connection_id: '11111111-1111-4111-8111-111111111111',
+    connection_id: connectionId,
     sender_id: USER.id,
     body: 'Siap, aku akan bahas materi Sistem Operasi.',
   });
@@ -1543,22 +1645,25 @@ test('chat action is unavailable while a connection request is still pending', a
   expect(state.directMessageReadCalls).toHaveLength(0);
 });
 
-test('verified student can open a direct-message notification and mark it read', async ({ page }) => {
+test('verified student can open a chat inbox notification and mark it read', async ({ page }) => {
+  const connectionId = '22222222-2222-4222-8222-222222222222';
+  const otherId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
   const state = await mockSupabase(page, {
     profile: { ...PROFILE, verification_status: 'verified' },
-    connectionSummaries: [{
-      connection_id: '22222222-2222-4222-8222-222222222222',
-      other_student_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-      initials: 'RA',
+    chatRooms: [{
+      connection_id: connectionId,
+      other_user_id: otherId,
+      other_full_name: 'Rina Aulia',
+      avatar_path: null,
       program: 'Manajemen',
-      status: 'accepted',
-      created_at: '2026-10-30T10:00:00.000Z',
-      is_incoming: false,
+      last_message: 'Ada waktu untuk diskusi?',
+      last_message_at: '2026-10-30T11:00:00.000Z',
+      unread_count: 1,
     }],
     directMessages: [{
       id: 'direct-message-notification-001',
-      connection_id: '22222222-2222-4222-8222-222222222222',
-      sender_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      connection_id: connectionId,
+      sender_id: otherId,
       body: 'Ada waktu untuk diskusi?',
       created_at: '2026-10-30T11:00:00.000Z',
       read_at: null,
@@ -1569,7 +1674,7 @@ test('verified student can open a direct-message notification and mark it read',
       notification_type: 'direct_message',
       title: 'Pesan baru',
       body: 'Kamu menerima pesan baru dari koneksimu.',
-      reference_id: '22222222-2222-4222-8222-222222222222',
+      reference_id: connectionId,
       read_at: null,
       created_at: '2026-10-30T11:00:00.000Z',
     }],
@@ -1585,10 +1690,198 @@ test('verified student can open a direct-message notification and mark it read',
   await expect(page.locator('[data-notification-id="notification-chat-001"]')).toContainText('Pesan baru');
   await page.locator('[data-notification-id="notification-chat-001"]').click();
 
-  await expect(page.locator('#modal-title')).toContainText('Mahasiswa UT · RA');
-  await expect(page.locator('#direct-chat-messages')).toContainText('Ada waktu untuk diskusi?');
+  await expect(page.locator('#page-messages')).toHaveClass(/active/);
+  await expect(page.locator('#message-room-name')).toHaveText('Rina Aulia');
+  await expect(page.locator('#message-room-messages')).toContainText('Ada waktu untuk diskusi?');
   expect(state.notificationReadCalls).toEqual(['notification-chat-001']);
   expect(state.notifications[0].read_at).not.toBeNull();
+});
+
+
+test('student can open an Information UT publication notification in the correct menu', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+    informationPosts: [{
+      id: 'information-notification-001',
+      author_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      category: 'seminar',
+      audience: 'verified_students',
+      title: 'Webinar Akademik UT',
+      body: 'Informasi kegiatan akademik untuk mahasiswa.',
+      source_url: null,
+      is_published: true,
+      published_at: '2026-11-01T08:00:00.000Z',
+      created_at: '2026-11-01T08:00:00.000Z',
+      updated_at: '2026-11-01T08:00:00.000Z',
+    }],
+    notifications: [{
+      id: 'notification-information-001',
+      user_id: USER.id,
+      notification_type: 'information_post',
+      title: 'Informasi UT baru',
+      body: 'Informasi baru: Webinar Akademik UT',
+      reference_id: 'information-notification-001',
+      read_at: null,
+      created_at: '2026-11-01T08:00:00.000Z',
+    }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('#notif-btn').click();
+  await page.locator('[data-notification-id="notification-information-001"]').click();
+
+  await expect(page.locator('#page-info')).toHaveClass(/active/);
+  await expect(page.locator('#info-grid')).toContainText('Webinar Akademik UT');
+  expect(state.notificationReadCalls).toEqual(['notification-information-001']);
+});
+
+test('student can open a verification decision notification in the correct menu', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'pending' },
+    verificationStatus: { profile_status: 'rejected', latest_request: { status: 'rejected', review_note: 'Bukti registrasi semester berjalan belum terlihat.' } },
+    notifications: [{
+      id: 'notification-verification-001',
+      user_id: USER.id,
+      notification_type: 'student_verification',
+      title: 'Verifikasi mahasiswa perlu diperbaiki',
+      body: 'Buka halaman Verifikasi Mahasiswa untuk membaca catatan administrator.',
+      reference_id: USER.id,
+      read_at: null,
+      created_at: '2026-11-01T08:00:00.000Z',
+    }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+
+  await page.locator('#notif-btn').click();
+  await page.locator('[data-notification-id="notification-verification-001"]').click();
+
+  await expect(page.locator('#page-verification')).toHaveClass(/active/);
+  await expect(page.locator('#verification-status-panel')).toContainText('Perlu perbaikan');
+  expect(state.notificationReadCalls).toEqual(['notification-verification-001']);
+});
+
+test('pending student cannot open private chat inbox', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'pending' },
+    chatRooms: [{
+      connection_id: '33333333-3333-4333-8333-333333333333',
+      other_user_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      other_full_name: 'Rina Aulia',
+      program: 'Manajemen',
+      unread_count: 0,
+    }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+  await page.locator('[data-page="messages"]').first().click();
+  await expect(page.locator('#messages-access-notice')).toContainText('Verifikasi mahasiswa diperlukan');
+  await expect(page.locator('#message-inbox')).toBeHidden();
+  expect(state.chatRooms).toHaveLength(1);
+});
+
+test('administrator dashboard shows the admin role without a student PENDING status', async ({ page }) => {
+  await mockSupabase(page, { isAdmin: true, profile: { ...PROFILE, verification_status: 'pending' } });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+  await expect(page.locator('#topUserMeta')).toHaveText('Administrator UT Connect');
+  await expect(page.locator('#profileStatusTag')).toHaveText('Role: ADMINISTRATOR');
+  await expect(page.locator('#sessionNotice')).toBeHidden();
+  await expect(page.locator('.demo-badge')).toHaveCount(0);
+  await expect(page.locator('#profileStatusTag')).not.toContainText('PENDING');
+
+  await page.locator('[data-page="verification"]').first().click();
+  await expect(page.locator('#verification-admin-panel')).toBeVisible();
+  await expect(page.locator('#verification-status-panel')).toBeHidden();
+  await expect(page.locator('#verification-submit-panel')).toBeHidden();
+});
+
+test('legacy UT programme labels preserve a verified student during profile edits', async ({ page }) => {
+  const state = await mockSupabase(page, {
+    profile: {
+      ...PROFILE,
+      faculty: 'Fakultas Hukum, Ilmu Sosial, dan Ilmu Politik (FHISIP)',
+      program: 'Ilmu Administrasi Negara',
+      verification_status: 'verified',
+    },
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+  await page.locator('[data-page="profile"]').first().click();
+  await page.locator('#edit-profile').click();
+  await expect(page.locator('#profile-edit-faculty')).toHaveValue('Fakultas Hukum, Ilmu Sosial, dan Ilmu Politik (FHISIP)');
+  await expect(page.locator('#profile-edit-program')).toHaveValue('Ilmu Administrasi Publik');
+  await page.locator('#profile-edit-bio').fill('Bio mahasiswa yang diperbarui.');
+  await page.locator('#modal-confirm').click();
+  await expect(page.locator('#profileStatusTag')).toHaveText('Status: VERIFIED');
+  expect(state.profileUpdateCalls).toHaveLength(1);
+  expect(state.profileUpdateCalls[0].p_program).toBe('Ilmu Administrasi Publik');
+});
+
+test('student can edit profile using the save action instead of a close-only modal', async ({ page }) => {
+  const state = await mockSupabase(page, { profile: { ...PROFILE, verification_status: 'pending' } });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+  await page.locator('[data-page="profile"]').first().click();
+  await page.locator('#edit-profile').click();
+  await expect(page.locator('#modal-confirm')).toHaveText('Simpan perubahan');
+  await expect(page.locator('#modal-cancel')).toHaveText('Tutup');
+  await page.locator('#profile-edit-name').fill('Mahasiswa Uji Diperbarui');
+  await page.locator('#profile-edit-bio').fill('Suka belajar algoritma dan basis data.');
+  await page.locator('#modal-confirm').click();
+  await expect(page.locator('#profileFullName')).toHaveText('Mahasiswa Uji Diperbarui');
+  expect(state.profileUpdateCalls).toHaveLength(1);
+  expect(state.profileUpdateCalls[0].p_full_name).toBe('Mahasiswa Uji Diperbarui');
+});
+
+test('student can upload a profile photo from the profile editor', async ({ page }) => {
+  const state = await mockSupabase(page, { profile: { ...PROFILE, verification_status: 'pending' } });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+  await page.locator('[data-page="profile"]').first().click();
+  await page.locator('#edit-profile').click();
+  await page.locator('#profile-avatar-file').setInputFiles({
+    name: 'avatar.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('test-image-bytes'),
+  });
+  await expect(page.locator('#profile-edit-avatar-preview img')).toBeVisible();
+  await page.locator('#modal-confirm').click();
+  await expect(page.locator('#profileInitials img')).toBeVisible();
+  expect(state.profileUpdateCalls).toHaveLength(1);
+  expect(state.avatarUpdateCalls).toHaveLength(1);
+  expect(state.avatarUpdateCalls[0].p_avatar_path).toMatch(new RegExp('^' + USER.id + '/'));
+});
+
+test('student can choose a preset avatar from the profile editor', async ({ page }) => {
+  const state = await mockSupabase(page, { profile: { ...PROFILE, verification_status: 'pending' } });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+  await page.locator('[data-page="profile"]').first().click();
+  await page.locator('#edit-profile').click();
+  await page.locator('[data-profile-avatar-preset="avatar-02"]').click();
+  await expect(page.locator('#profile-edit-avatar-preview img')).toHaveAttribute('src', '/avatars/avatar-02.svg');
+  await page.locator('#modal-confirm').click();
+  await expect(page.locator('#profileInitials img')).toHaveAttribute('src', '/avatars/avatar-02.svg');
+  expect(state.avatarUpdateCalls).toHaveLength(1);
+  expect(state.avatarUpdateCalls[0].p_avatar_path).toBe('preset:avatar-02');
 });
 
 test('student can mark all notifications as read and clear the unread counter', async ({ page }) => {
@@ -1615,3 +1908,25 @@ test('student can mark all notifications as read and clear the unread counter', 
   expect(state.notifications.every(item => item.read_at !== null)).toBe(true);
 });
 
+
+test('verified NIM lookup is independent from radius and location and offers a connection', async ({ page }) => {
+  const targetId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+    homeMapLocation: null,
+    nearbyResults: [{ student_id: targetId, initials: 'RA', program: 'Manajemen' }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+  await page.locator('#nim-search').fill('123456789');
+  await expect(page.locator('#nearby-list')).toContainText('Mahasiswa RA');
+  await expect(page.locator('[data-nim-connect="' + targetId + '"]')).toBeVisible();
+  expect(state.nearbyCalls).toHaveLength(1);
+  expect(state.nearbyCalls[0]).toEqual({ nim: '123456789' });
+  await page.locator('[data-nim-connect="' + targetId + '"]').click();
+  await expect(page.locator('#toast')).toContainText('Permintaan koneksi berhasil dikirim');
+  expect(state.connectionCreateCalls).toHaveLength(1);
+  expect(state.connectionCreateCalls[0].recipient_id).toBe(targetId);
+});

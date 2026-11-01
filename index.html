@@ -61,8 +61,8 @@
         </div>
         <div class="field"><label for="fullName">Nama lengkap</label><input id="fullName" type="text" autocomplete="name" placeholder="Nama sesuai identitas" required minlength="2" maxlength="100"></div>
         <div class="field"><label for="nim">NIM</label><input id="nim" type="text" inputmode="numeric" autocomplete="off" placeholder="Masukkan NIM" required pattern="[0-9]{9}" minlength="9" maxlength="9"></div>
-        <div class="field"><label for="faculty">Fakultas</label><input id="faculty" type="text" placeholder="Masukkan fakultas" required minlength="2" maxlength="80"></div>
-        <div class="field"><label for="program">Program studi</label><input id="program" type="text" placeholder="Masukkan program studi" required minlength="2" maxlength="100"></div>
+        <div class="field"><label for="faculty">Fakultas</label><select id="faculty" required><option value="">Pilih fakultas</option></select></div>
+        <div class="field"><label for="program">Program studi</label><select id="program" required disabled><option value="">Pilih program studi</option></select><small class="field-hint">Pilihan program studi mengikuti katalog Program Sarjana UT.</small></div>
         <div class="field"><label for="semester">Semester</label><select id="semester" required><option value="">Pilih semester</option><option value="1">Semester 1</option><option value="2">Semester 2</option><option value="3">Semester 3</option><option value="4">Semester 4</option><option value="5">Semester 5</option><option value="6">Semester 6</option><option value="7">Semester 7</option><option value="8">Semester 8</option><option value="9">Semester 9</option><option value="10">Semester 10</option><option value="11">Semester 11</option><option value="12">Semester 12</option><option value="13">Semester 13</option><option value="14">Semester 14</option><option value="15">Semester 15</option><option value="16">Semester 16</option></select></div>
         <div class="section-title">Tandai lokasi belajar</div>
         <p class="section-help">Klik peta untuk menentukan titik lokasi, atau gunakan lokasi perangkatmu.</p>

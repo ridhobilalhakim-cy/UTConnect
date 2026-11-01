@@ -2,6 +2,13 @@
 // The Supabase Dashboard remains the source of truth until this function is deployed from this repository.
 import { createClient } from "npm:@supabase/supabase-js@2.118.0";
 
+const UT_FACULTY_PROGRAMS: Record<string, string[]> = {
+  "Fakultas Ekonomi dan Bisnis (FEB)": ["Manajemen", "Ekonomi Pembangunan", "Ekonomi Syariah", "Akuntansi", "Akuntansi Keuangan Publik", "Pariwisata", "Kewirausahaan"],
+  "Fakultas Hukum, Ilmu Sosial, dan Ilmu Politik (FHISIP)": ["Ilmu Administrasi Publik", "Administrasi Bisnis", "Hukum", "Ilmu Pemerintahan", "Ilmu Komunikasi", "Perpustakaan dan Sains Informasi", "Sosiologi", "Sastra Inggris", "Perpajakan"],
+  "Fakultas Keguruan dan Ilmu Pendidikan (FKIP)": ["Pendidikan Bahasa dan Sastra Indonesia", "Pendidikan Bahasa Inggris", "Pendidikan Biologi", "Pendidikan Fisika", "Pendidikan Kimia", "Pendidikan Matematika", "Pendidikan Ekonomi", "Pendidikan Pancasila dan Kewarganegaraan", "Teknologi Pendidikan", "Pendidikan Guru Sekolah Dasar (PGSD)", "Pendidikan Guru Pendidikan Anak Usia Dini (PGPAUD)", "Pendidikan Agama Islam (PAI)"],
+  "Fakultas Sains dan Teknologi (FST)": ["Statistika", "Matematika", "Biologi", "Teknologi Pangan", "Agribisnis", "Perencanaan Wilayah dan Kota", "Sistem Informasi", "Sains Data"],
+};
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
@@ -58,8 +65,8 @@ Deno.serve(async (req: Request) => {
     const locationConsent = payload.location_consent === true;
     if (!validText(fullName, 2, 100)) return jsonResponse({ error: "Nama lengkap harus 2–100 karakter." }, 400);
     if (!/^\d{9}$/.test(nim)) return jsonResponse({ error: "Format NIM saat ini harus 9 digit. Format resmi UT masih perlu dikonfirmasi." }, 400);
-    if (!validText(faculty, 2, 80)) return jsonResponse({ error: "Fakultas harus 2–80 karakter." }, 400);
-    if (!validText(program, 2, 100)) return jsonResponse({ error: "Program studi harus 2–100 karakter." }, 400);
+    if (!UT_FACULTY_PROGRAMS[faculty]) return jsonResponse({ error: "Pilih fakultas yang tercantum pada daftar resmi UT." }, 400);
+    if (!UT_FACULTY_PROGRAMS[faculty].includes(program)) return jsonResponse({ error: "Program studi tidak sesuai dengan fakultas yang dipilih." }, 400);
     if (!Number.isInteger(semester) || semester < 1 || semester > 16) return jsonResponse({ error: "Semester harus dipilih antara 1 dan 16." }, 400);
     if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180) return jsonResponse({ error: "Tandai lokasi belajar pada peta terlebih dahulu." }, 400);
     if (!locationConsent) return jsonResponse({ error: "Persetujuan penggunaan lokasi diperlukan untuk fitur peta sekitar." }, 400);

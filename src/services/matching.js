@@ -12,38 +12,18 @@ async function requireUserId() {
   return userId;
 }
 
-export async function listActiveMatchingCourses() {
-  const { data, error } = await supabase
-    .from("courses")
-    .select("id,course_code,course_name")
-    .eq("is_active", true)
-    .order("course_name", { ascending: true });
-  throwIfError(error);
-  return data || [];
-}
-
 export async function getMyMatchingPreferences(userId) {
   if (!userId) return null;
   const { data, error } = await supabase
     .from("matching_preferences")
-    .select("user_id,topic_tags,interests,study_times,updated_at")
+    .select("user_id,topic_tags,interests,study_times,preferred_programs,updated_at")
     .eq("user_id", userId)
     .maybeSingle();
   throwIfError(error);
   return data;
 }
 
-export async function getMyMatchingCourseIds(userId) {
-  if (!userId) return [];
-  const { data, error } = await supabase
-    .from("profile_courses")
-    .select("course_id")
-    .eq("user_id", userId);
-  throwIfError(error);
-  return (data || []).map(row => row.course_id);
-}
-
-export async function saveMyMatchingPreferences({ topicTags = [], interests = [], studyTimes = [] }) {
+export async function saveMyMatchingPreferences({ topicTags = [], interests = [], studyTimes = [], preferredPrograms = [] }) {
   const userId = await requireUserId();
   const { data, error } = await supabase
     .from("matching_preferences")
@@ -52,35 +32,13 @@ export async function saveMyMatchingPreferences({ topicTags = [], interests = []
       topic_tags: topicTags,
       interests,
       study_times: studyTimes,
+      preferred_programs: preferredPrograms,
       updated_at: new Date().toISOString(),
     }, { onConflict: "user_id" })
-    .select("user_id,topic_tags,interests,study_times,updated_at")
+    .select("user_id,topic_tags,interests,study_times,preferred_programs,updated_at")
     .single();
   throwIfError(error);
   return data;
-}
-
-export async function replaceMyMatchingCourseIds(courseIds = []) {
-  const userId = await requireUserId();
-  const uniqueIds = [...new Set(courseIds.filter(Boolean))];
-  const currentIds = await getMyMatchingCourseIds(userId);
-  const removeIds = currentIds.filter(id => !uniqueIds.includes(id));
-  const addIds = uniqueIds.filter(id => !currentIds.includes(id));
-
-  if (removeIds.length) {
-    const { error } = await supabase
-      .from("profile_courses")
-      .delete()
-      .eq("user_id", userId)
-      .in("course_id", removeIds);
-    throwIfError(error);
-  }
-  if (addIds.length) {
-    const { error } = await supabase
-      .from("profile_courses")
-      .insert(addIds.map(courseId => ({ user_id: userId, course_id: courseId })));
-    throwIfError(error);
-  }
 }
 
 export async function findMatchingStudents(radiusMeters = 3000) {
@@ -102,11 +60,7 @@ export async function sendConnectionRequest(recipientId) {
   if (!recipientId || recipientId === userId) throw new Error("Tujuan koneksi tidak valid.");
   const { data, error } = await supabase
     .from("connections")
-    .insert({
-      initiator_id: userId,
-      recipient_id: recipientId,
-      status: "pending",
-    })
+    .insert({ initiator_id: userId, recipient_id: recipientId, status: "pending" })
     .select("id,initiator_id,recipient_id,status,created_at")
     .single();
   throwIfError(error);
@@ -120,4 +74,18 @@ export async function respondConnectionRequest(connectionId, accept) {
   });
   throwIfError(error);
   return data;
+}
+
+
+export function subscribeToMyConnections(userId, onChange, onStatus) {
+  if (!userId || typeof onChange !== "function") return null;
+  if (typeof window !== "undefined" && window.__UTCONNECT_DISABLE_REALTIME__) return null;
+  const channel = supabase.channel(`connections-${userId}-${crypto.randomUUID()}`);
+  for (const column of ["initiator_id", "recipient_id"]) {
+    channel.on("postgres_changes", {
+      event: "*", schema: "public", table: "connections",
+      filter: `${column}=eq.${userId}`,
+    }, payload => onChange(payload));
+  }
+  return channel.subscribe((status, error) => onStatus?.(status, error));
 }

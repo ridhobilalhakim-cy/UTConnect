@@ -1,6 +1,6 @@
 import { supabase } from "../lib/supabase.js";
 
-const GROUP_SELECT = "id,created_by,name,description,course_id,mode,capacity,access_type,schedule_text,online_url,offline_area_label,is_archived,created_at,updated_at,course:courses!study_groups_course_id_fkey(id,course_code,course_name)";
+const GROUP_SELECT = "id,created_by,name,description,course_id,program,mode,capacity,access_type,schedule_text,online_url,offline_area_label,is_archived,created_at,updated_at,course:courses!study_groups_course_id_fkey(id,course_code,course_name)";
 const MEMBERSHIP_SELECT = "group_id,user_id,role,status,created_at,joined_at";
 
 function throwIfError(error) {
@@ -13,16 +13,6 @@ async function requireUserId() {
   const userId = data?.user?.id;
   if (!userId) throw new Error("Sesi login tidak ditemukan. Silakan masuk kembali.");
   return userId;
-}
-
-export async function listActiveStudyCourses() {
-  const { data, error } = await supabase
-    .from("courses")
-    .select("id,course_code,course_name")
-    .eq("is_active", true)
-    .order("course_name", { ascending: true });
-  throwIfError(error);
-  return data || [];
 }
 
 export async function listStudyGroups(limit = 100) {

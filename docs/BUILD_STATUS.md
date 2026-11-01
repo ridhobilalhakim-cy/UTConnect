@@ -1,22 +1,23 @@
 # Build and verification status — UT Connect web app integrations
 
-Date: 2026-10-31
+Date: 2026-11-01
 
 ## Latest CI result
 
-Latest confirmed successful GitHub Actions run for the complete Group workspace: **run #171** on 2026-10-31.
-
-Commit: `3fb584e089c87c552f805842974b5fb3be9aa813`
+Latest confirmed successful PR-head GitHub Actions run: **run #230** on commit `9b6e02fca72bdcc232d94771847fcaa80aae8776`.
 
 - Dependency installation with committed lockfile — PASS.
 - `npm run check` — PASS.
 - `npm run build` — PASS; Vite generated the production site in `dist/`.
 - Playwright Chromium installation — PASS.
-- Browser end-to-end suite — **35 passed, 0 failed**.
+- Browser end-to-end suite — **43 passed, 0 failed**.
 
-Workflow run: https://github.com/ridhobilalhakim-cy/UTConnect/actions/runs/41208606720
+Workflow run: https://github.com/ridhobilalhakim-cy/UTConnect/actions/runs/41226183647
 
-These browser tests use mocked Supabase/Storage HTTP responses and synthetic fixtures. They verify the UI wiring and production bundle but do not establish real two-account Realtime, real Storage access, OAuth/email delivery, or deployment to Netlify. Documentation/migration-history cleanup commits were pushed after run #171; the newest PR-head CI run is tracked separately in GitHub Actions.
+Run #230 verifies the current PR branch, including navigation/selector fixes, the 36-programme registration selectors, administrator role presentation, profile editor/avatar flows, forum replies and author identity, the group workspace, the dedicated direct-message inbox, and notification routing for chat, Information UT and student-verification decisions.
+
+The Playwright tests mock Supabase HTTP responses and Storage. They verify client behavior and the production bundle but do **not** prove live cross-account Realtime, real storage access between two students, Google OAuth/email delivery, or deployment to production. Netlify has successfully built the PR preview for this exact commit; the production deployment remains paused by the Netlify operational-credit notice in the project dashboard. Do not treat a green PR preview as a production deployment.
+
 
 ## Information UT milestone
 
@@ -33,7 +34,7 @@ Student feed behavior:
 - Students can read published posts allowed by the database audience policy.
 - Drafts are visible to administrators only.
 - The management button is hidden for non-admin accounts.
-- The production table currently has zero information posts; no sample posts have been inserted.
+- One published Information UT row was present during live staging inspection on 2026-11-01. No sample post was inserted by the implementation; row counts can change as administrators publish content.
 
 The 13 mocked Playwright tests cover auth UI/session behavior, admin Information UT CRUD/publication, student read-only visibility, Student Verification upload/review, and Forum Diskusi verified-only access, post creation, and comments. They verify client-side behavior but do not substitute for a real-browser test against live Supabase.
 
@@ -43,7 +44,7 @@ The 13 mocked Playwright tests cover auth UI/session behavior, admin Information
 - `public.is_current_user_admin()` returned `true` for an assigned admin and `false` for a non-admin student profile.
 - An authenticated admin insert into `information_posts` passed RLS.
 - An authenticated non-admin student insert was rejected by RLS.
-- The admin insert acceptance test was rolled back; the live Information UT table remains empty.
+- The admin insert acceptance test was rolled back. A separate published Information UT row created before the notification migration was observed on 2026-11-01.
 - Administrator privilege does not change `profiles.verification_status`.
 
 At the last database check:
@@ -69,7 +70,7 @@ This environment could not independently resolve the public Netlify domain. The 
 
 ## Source-control caveats
 
-- The remote staging project has twenty-one recorded migrations. The first five original SQL bodies and the student_verification_workflow SQL body still need reconstruction/review in repository source. Do not re-run them blindly against the live staging database.
+- The remote staging project has twenty-eight recorded migrations (latest checked 2026-11-01). The first five original SQL bodies and the student_verification_workflow SQL body still need reconstruction/review in repository source. Do not re-run them blindly against the live staging database.
 - Edge Function source edits in GitHub do not automatically deploy to Supabase. The Home Map functions were explicitly deployed to staging; the registration Edge Function remains a separately deployed source mirror.
 - Never put the Supabase service-role key, secret keys, or NIM HMAC secret in browser code or public GitHub files.
 
@@ -157,7 +158,7 @@ Security changes applied to staging:
 
 Live staging counts remain 0 study_groups, 0 group_members, 0 group_invites, and 0 active courses. No group test records were retained.
 
-The repository defines 35 mocked Playwright scenarios. Run #171 passed all 35 tests, including the five Group workspace scenarios for chat/pinning, private material upload, poll creation/voting, private invitation by NIM, and invite acceptance. Later changes clean up migration-history and status documentation; the latest PR-head CI run remains the merge gate. Real two-account group chat, Storage access, invitation notification, poll Realtime and membership approval remain external acceptance checks.
+At the Group workspace milestone on 2026-10-31 the repository defined 35 mocked Playwright scenarios. The suite has since expanded to 43 scenarios; PR-head run #230 passed all 43. Real two-account group chat, Storage access, invitation notification, poll Realtime and membership approval remain external acceptance checks.
 
 
 ## Matching & Connections milestone — implementation added 2026-10-31
@@ -182,7 +183,7 @@ Database and privacy boundary:
 
 Live staging counts after migration: 0 matching preferences, 0 profile-course links, 0 connections, 0 direct messages, and 0 matching search events. Four profiles exist, with one verified and three pending; all four current location records have radar visibility enabled, but only verified profiles are eligible for matching.
 
-The repository now defines 35 Playwright scenarios in total. Run #119 passed all 30 tests that existed at that point, including Matching, Direct Messaging, Notifications, and Home Map integration scenarios. The five Group workspace scenarios were added afterwards and still require confirmation on the current PR head. Home Map tests use mocked Edge Function responses; live multi-account location and privacy behavior remains an external acceptance check.
+At the earlier Home Map milestone, run #119 passed the 30 tests then present. The current suite has expanded to 43 scenarios and PR-head run #230 passed all 43. Home Map tests use mocked Edge Function responses; live multi-account location and privacy behavior remains an external acceptance check.
 
 The Supabase security advisor previously flagged the Matching-related SECURITY DEFINER functions because authenticated users can execute them; their function bodies validate the authenticated caller and constrain results/actions to that caller. The Home Map location and search RPCs are separately restricted to service_role and are called only through JWT-verified Edge Functions. The private search-event tables have RLS enabled and no public table privileges. The advisor also reports leaked-password protection disabled; this is a separate Auth configuration item.
 
@@ -220,7 +221,7 @@ Database update:
 
 Verification:
 - Temporary database transactions verified that all six event types create notifications and that authenticated users see only their own rows. A read receipt update succeeded; direct insert and title update privileges were absent. All synthetic database changes were rolled back.
-- Two mocked Playwright tests cover opening a direct-message notification and marking all notifications read. The current suite defines 26 tests; the two new scenarios are not counted as passing until a current CI run confirms them.
+- Two mocked Playwright tests cover opening a direct-message notification and marking all notifications read. The current PR-head CI run #230 passed all 43 Playwright scenarios, including the direct-message notification, Information UT publication notification, verification-decision notification, and mark-all-read flows.
 - Live staging has zero stored notification records, zero connection/message/forum/group test data, one verified student and three pending students. Real cross-account notification and Realtime behavior remains an acceptance test after a second verified test account is available.
 
 ## Home Map milestone — integrated 2026-10-31
@@ -246,4 +247,28 @@ The former group details modal is now a tabbed workspace for Chat grup, Materi, 
 
 Backend features: RLS-protected group messages with admin pinning; private Storage materials with 50 MiB limit and signed URLs; agenda schedule/target/task/note/poll items; private per-member poll voting with aggregate-only result RPCs; private-group invites by server-side NIM lookup; invitee inbox accept/decline; group invitation notifications; and RLS-filtered Realtime for messages, materials, agenda, invites and membership changes.
 
-The seven Group workspace security/realtime migrations and `manage-group-invites` Edge Function are applied/deployed in staging. No test accounts or group content have been written to live staging. The PR currently defines 35 mocked Playwright scenarios; the CI result must be rechecked for the latest PR head before merge. See `docs/STAGING_STATE.md`, `docs/API_CONTRACT.md`, and `supabase/migrations/REMOTE_MIGRATIONS.md`.
+The seven Group workspace security/realtime migrations and `manage-group-invites` Edge Function are applied/deployed in staging. No test accounts or group content have been written to live staging. The PR currently defines 43 mocked Playwright scenarios; run #230 passed all 43. Real two-account acceptance is still required before production. See `docs/STAGING_STATE.md`, `docs/API_CONTRACT.md`, and `supabase/migrations/REMOTE_MIGRATIONS.md`.
+
+
+## Reported user bug fixes — 2026-10-31
+
+PR #4 (`fix/20261031-student-bug-report`) adds the following UI and backend integrations: UT S1 faculty/programme registration selectors with server-side validation; corrected administrator role presentation; forum author identity and reply lookups; a dedicated accepted-connection chat inbox; persisted profile editing and avatar upload; and notifications for group chat/material/agenda inserts. The staging migration and registration Edge Function v5 are applied/deployed.
+
+CI run #230 for PR #4 passed source checks, production build, and all 43 Playwright scenarios. The PR remains OPEN and unmerged. Netlify Deploy Preview for commit `9b6e02fca72bdcc232d94771847fcaa80aae8776` is ready at https://deploy-preview-4--cheery-puffpuff-ca0a08.netlify.app. The published production site remains unchanged while production deploys are paused by the account credit limit. Live two-account acceptance, OAuth/email checks, and real Storage access remain separate release gates.
+
+
+## Notification coverage update — checked 2026-11-01
+
+Applied migration `20261031174525_notifications_for_information_and_verification` adds owner-scoped notifications for student-verification approval/rejection and first publication of an Information UT post. Dashboard routing opens the corresponding Verifikasi Mahasiswa or Informasi UT page. An edit to an already-published post does not generate duplicate publication notifications.
+
+Rollback-only live SQL checks verified the verification-decision notification, Information UT publication notification, and no-duplicate-on-edit behavior. The transaction rolled back; the staging notifications table remained empty.
+
+
+## Two-account database acceptance and Cloudflare staging preparation — 2026-11-01
+
+- Supabase rollback-only two-account acceptance passed for connection request/acceptance, dedicated chat rooms, direct-message send/read receipt, group creator admin membership, approval-based join, group chat visibility, pending/non-member denial, and owner-scoped notifications.
+- Synthetic auth/profile rows and all related data were rolled back. Post-test counts remained 5 auth users, 4 profiles, and zero connections, direct messages, groups, group messages and notifications.
+- Reusable acceptance script: `supabase/tests/two_account_acceptance.rollback.sql`. It validates database/RLS/RPC behavior with simulated JWT subjects, not real browser Auth or WebSocket Realtime.
+- Cloudflare Pages build config and staging runbook are prepared in `wrangler.toml`, `public/_headers`, and `docs/CLOUDFLARE_PAGES_STAGING.md`.
+- GitHub Actions run #239 passed source checks, Vite build, and 43/43 Playwright tests for the branch including these files.
+- Cloudflare project creation, GitHub authorization, Pages environment variables, Supabase Auth redirect configuration, DNS, and production migration remain unperformed; they require authenticated Cloudflare/dashboard access.

@@ -25,6 +25,11 @@ These migrations have been applied on Supabase project `hqyusbyndtlfypdbmatw` (S
 | 20261031134443 | group_poll_realtime_touch |
 | 20261031135852 | group_membership_verification_guard |
 | 20261031140523 | group_materials_verified_delete_guard |
+| 20261031162034 | bugfix_forum_chat_profile_avatars_group_notifications |
+| 20261031163243 | profile_avatar_presets |
+| 20261031164151 | legacy_faculty_code_profile_compatibility |
+| 20261031173449 | normalize_legacy_ut_programme_aliases |
+| 20261031174525 | notifications_for_information_and_verification |
 
 The matching RPC SQL source is retained as `20261030232434_student_registration_profile_location_rpc_v1.sql`, but the file name timestamp is a local artifact name and not the remote migration version. Treat the remote migration history above as authoritative for the existing staging project.
 
@@ -62,3 +67,22 @@ The final Group membership verification guard is retained as `20261031135852_gro
 
 
 The `20261031140523_group_materials_verified_delete_guard.sql` migration further tightens material deletion: both the metadata row and Storage object deletion now require current verified active group membership, even when the caller uploaded the file. Active group admins/co-admins may still delete any material in their group.
+
+
+## Bug-fix migration — 2026-10-31
+
+- `20261031162034_bugfix_forum_chat_profile_avatars_group_notifications.sql` was applied to the connected staging project as remote version `20261031162034`.
+- Adds public-read, owner-write profile avatar storage (5 MiB, JPEG/PNG/WebP), `update_my_profile_avatar`, privacy-scoped `get_forum_author_profiles`, and verified accepted-connection `get_my_chat_rooms`.
+- Replaces `update_my_student_profile` with the official UT S1 faculty/programme validation, preserving its explicit acknowledgement requirement before verified identity changes reset verification to pending.
+- Adds group activity notifications for newly inserted group messages, materials, and agenda items. The new notification types route back to the group workspace.
+- `complete-student-registration` Edge Function is deployed as version 5 with JWT verification enabled and the same UT S1 faculty/programme validation.
+
+- `20261031163243_profile_avatar_presets.sql`: permits only the four bundled preset avatar identifiers in the owner-scoped avatar RPC; uploaded photos still require a caller-owned Storage object.
+
+
+The programme alias compatibility migration `20261031173449_normalize_legacy_ut_programme_aliases.sql` is applied to staging. It canonicalizes legacy UT S1 programme labels in the profile-edit RPC before validating and comparing academic identity. An alias-only normalization does not count as an identity change and does not reset a verified student's status. The function accepts both legacy and current names, while persisting the current canonical label.
+
+The remote migration list is authoritative. The migration filename must retain the exact applied remote version; do not reapply this migration to the existing staging project.
+
+
+The notification coverage migration `20261031174525_notifications_for_information_and_verification.sql` is applied to staging. It notifies a student when their verification status is approved or rejected, and notifies eligible profiles when an Information UT draft is first published. Editing a post that is already published does not create duplicate notifications. The existing notification owner RLS policy and Realtime publication remain in force.

@@ -478,6 +478,9 @@ export async function openGroupWorkspace(options) {
   }
   if (epoch !== workspaceEpoch || !activeGroup) return;
   openModalHandler("Ruang kelompok belajar", workspaceShell(), "Tutup");
+  // The shared modal already renders one cancel/close action. Hide the generic confirm action here.
+  const modalConfirm = document.querySelector("#modal-confirm");
+  if (modalConfirm) modalConfirm.style.display = "none";
   activeChannel = subscribeToGroupWorkspace(activeGroup.id, {
     onMessages: () => {
       reloadMessages().catch(error => toastHandler(error.message));

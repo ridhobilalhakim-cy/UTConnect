@@ -1,4 +1,4 @@
-# UT Connect — Live Staging State (checked 2026-10-31)
+# UT Connect — Live Staging State (checked 2026-11-01)
 
 Project ref: `hqyusbyndtlfypdbmatw`  
 Project name: `UTConnect Project 1`  
@@ -8,7 +8,7 @@ Project status at inspection: ACTIVE_HEALTHY
 
 ## Remote migration history
 
-The connected staging project reported these twenty-one applied migration entries:
+The connected staging project reported these twenty-eight applied migration entries (latest checked 2026-11-01):
 
 | Version | Name |
 |---|---|
@@ -33,8 +33,13 @@ The connected staging project reported these twenty-one applied migration entrie
 | 20261031134443 | group_poll_realtime_touch |
 | 20261031135852 | group_membership_verification_guard |
 | 20261031140523 | group_materials_verified_delete_guard |
+| 20261031162034 | bugfix_forum_chat_profile_avatars_group_notifications |
+| 20261031163243 | profile_avatar_presets |
+| 20261031164151 | legacy_faculty_code_profile_compatibility |
+| 20261031173449 | normalize_legacy_ut_programme_aliases |
+| 20261031174525 | notifications_for_information_and_verification |
 
-Live introspection found the public application tables with RLS enabled, plus private NIM search and student-verification tables. PostGIS is enabled. The deployed `complete-student-registration` Edge Function was last confirmed as ACTIVE version 4 with JWT verification enabled.
+Live introspection found the public application tables with RLS enabled, plus private NIM search and student-verification tables. PostGIS is enabled. The deployed `complete-student-registration` Edge Function is ACTIVE version 5 with JWT verification enabled.
 
 ## Important source-control caveat
 
@@ -94,7 +99,7 @@ Latest live introspection returned four rows in `profiles` and four rows in `use
 - Migration `20261031135852_group_membership_verification_guard` updates the central RLS membership/admin helpers to require the account to remain currently verified; group contents and admin actions stop working if verification is revoked. It also hardens membership decisions, poll RPCs, invite inbox, and message pinning.
 - Migration `20261031140523_group_materials_verified_delete_guard` also requires current verified active group membership to delete a material, including for its uploader. Admin/co-admin deletion remains scoped to active verified group admins.\n- The Storage bucket remains private with a 50 MiB file limit and three Storage policies. The current group schema has no active course rows, so users can create general groups.
 - Live staging counts remain 0 study groups, 0 group members, 0 group invites, and 0 active courses. No group test records were retained in Supabase.
-- The repository now defines 35 Playwright scenarios, including five group workspace tests for chat/pin, material upload, poll creation/voting, private invite by NIM, and invite acceptance. They use mocked Supabase/Storage responses; CI for the latest PR commit is still pending. Mocked browser tests do not replace live two-account acceptance.
+- The repository now defines 43 Playwright scenarios, including five group workspace tests for chat/pin, material upload, poll creation/voting, private invite by NIM, and invite acceptance. They use mocked Supabase/Storage responses; latest PR-head CI run #230 passed all 43 scenarios. Mocked browser tests do not replace live two-account acceptance.
 - Outstanding real-account checks: two verified synthetic accounts to verify cross-account chat, signed file access, poll Realtime updates, invite notification delivery, member approval and private-invite acceptance. Netlify production deployment is still unconfirmed.
 
 ## Matching & Connections state (checked 2026-10-31)
@@ -122,7 +127,7 @@ Latest data counts: 0 matching preference rows, 0 profile-course links, 0 connec
 - Authenticated users cannot INSERT or DELETE notifications and cannot edit title/body/owner. They have column-level UPDATE on `read_at` only, with an RLS check that restricts updates to their own unread notifications.
 - The dashboard bell displays an unread count, lists recent notifications, marks one or all as read, and routes direct-message, forum-comment, connection, and group notifications to the relevant feature.
 - A temporary SQL transaction verified all six trigger events using synthetic profiles, a connection, message, forum post/comment, and group join. Authenticated receiver/owner contexts saw only their own notification rows; read_at updates worked while attempts to insert or change title were not granted. The transaction ended with ROLLBACK.
-- Latest real staging counts remain 0 notifications, 0 connections, 0 direct messages, 0 forum posts/comments, and 0 groups/members. No test data was retained. Two mocked Playwright tests were added; CI has not yet confirmed them.
+- Latest real staging counts checked 2026-11-01: 0 notifications, 0 connections, 0 direct messages, 0 forum posts/comments, and 0 groups/members. No test data was retained. PR-head run #230 passed all 43 mocked Playwright scenarios; live cross-account acceptance remains outstanding.
 
 ## Direct Messaging state (checked 2026-10-31)
 
@@ -132,7 +137,7 @@ Latest data counts: 0 matching preference rows, 0 profile-course links, 0 connec
 - The table is included in the `supabase_realtime` publication. The browser subscribes to INSERT/UPDATE events for the active connection and removes the channel when the chat dialog closes. A manual refresh path remains available if Realtime disconnects.
 - The chat action appears only on accepted connection rows. The UI loads the latest 60 messages, displays initials/program rather than full identity, escapes message content, supports up to 5,000 characters, and marks unread incoming messages as read.
 - Live verification: one temporary SQL transaction created a synthetic accepted connection/message, switched to an authenticated recipient context, successfully updated `read_at`, then changed the connection to pending and confirmed the messages were no longer visible. The transaction ended with ROLLBACK; no synthetic record or profile status change remains.
-- Latest real counts remain 0 connections and 0 direct messages; there is one verified profile and three pending profiles. Two mocked browser tests were added, but CI has not yet confirmed them. Real two-account chat and Realtime testing is still required.
+- Latest real counts remain 0 connections and 0 direct messages; there is one verified profile and three pending profiles. The current PR-head CI run #230 passes the mocked browser tests; real two-account chat and Realtime testing is still required. Real two-account chat and Realtime testing is still required.
 
 ## Home Map state (checked 2026-10-31)
 
@@ -145,3 +150,72 @@ Latest data counts: 0 matching preference rows, 0 profile-course links, 0 connec
 - Both Edge Functions set Cache-Control: no-store. The Home Map UI includes explicit location consent, GPS refresh, confirmed manual map-point selection, radar visibility, and radius selection. The old fabricated student/NIM list and fixed Bandung center have been removed.
 - Latest mocked browser verification: GitHub Actions run #119, all 30 Playwright tests passed. This does not replace live acceptance with two verified synthetic accounts. The current staging database still has only one verified profile and no nearby test cohort; no live location rows or real student records were inserted or altered during this feature work.
 - Before public release, configure explicit CORS origin allowlists for the actual app domain and complete two-account location privacy tests. Netlify deployment status and production URL are still unconfirmed.
+
+
+## Reported UI integration fixes (checked 2026-10-31)
+
+- Registration now uses linked Faculty and Programme selectors for the 36 official UT undergraduate S1 programmes across FEB, FHISIP, FKIP and FST. The Edge Function rejects programme/faculty combinations outside that catalogue. Source catalogue: UT official Program Studi page.
+- Administrators are identified by the admin role in the dashboard/profile rather than displaying the student verification state as their role. Verified students no longer see the obsolete "modules still in backend integration" notice.
+- Forum author names now load through `get_forum_author_profiles`, which only returns verified users who authored a forum post/comment and exposes name/avatar fields required by the forum. Forum replies continue to use the existing RLS-protected `forum_comments` workflow.
+- Direct messages now have a dedicated inbox and per-connection rooms. `get_my_chat_rooms` only returns accepted connections where both participants are verified and not mutually blocked. It returns the other participant's name/avatar, programme, latest message and unread count.
+- Profile editing now calls the existing owner-scoped `update_my_student_profile` RPC, validates official faculty/programme combinations, supports a short bio, and allows an owner-scoped avatar upload. Changing academic identity for a verified student still requires acknowledgement and returns the student to pending verification.
+- Group notifications additionally cover new group chat messages, shared materials and agenda entries, in addition to existing join/decision/invite notifications.
+- New remote migration versions: `20261031162034_bugfix_forum_chat_profile_avatars_group_notifications` and `20261031163243_profile_avatar_presets`. Registration Edge Function: version 5, JWT verification ON. The profile editor offers four bundled avatar illustrations or an uploaded personal photo.
+- Live staging remains intentionally free of sample forum/group/chat/notification rows. Multi-account group/chat/realtime delivery still requires a verified second test account; the group workspace UI remains covered by mocked Playwright tests.
+- The active UT course catalogue `public.courses` still contains zero rows. General forum discussions and general study groups work without it; course-specific lists must be populated from an official UT course catalogue rather than synthesised from programme names.
+
+
+## UT programme alias compatibility — checked 2026-11-01
+
+- The linked registration and profile selectors use 36 S1 programmes across FEB, FHISIP, FKIP and FST.
+- Legacy programme labels are normalized to current canonical labels in the browser and in the database profile-edit RPC.
+- Remote migration `20261031173449_normalize_legacy_ut_programme_aliases` is applied. Direct SQL checks confirmed both the legacy `Ilmu Administrasi Negara` label and canonical `Ilmu Administrasi Publik` label validate for FHISIP.
+- Profile identity comparisons use canonical faculty/programme names. A legacy label being normalized does not by itself reset a verified user's student-verification status.
+- No profile rows were mass-updated by this migration.
+
+
+## Notification coverage update — checked 2026-11-01
+
+- Applied remote migration `20261031174525_notifications_for_information_and_verification`.
+- A profile status transition to `verified` or `rejected` now creates an owner-scoped `student_verification` notification.
+- A newly inserted published Information UT post, or a draft transitioning to published, creates an `information_post` notification for eligible profiles. Public posts notify all profiles except the author; verified-student posts notify verified profiles except the author.
+- Editing a post that is already published does not emit another notification.
+- Dashboard notification routing now opens the Student Verification or Information UT page for these two notification types.
+- Rollback-only staging SQL checks confirmed both trigger paths and confirmed that editing an already-published Information UT post does not create a duplicate. All temporary rows and status changes were rolled back.
+
+
+## Latest PR validation and production deployment boundary — checked 2026-11-01
+
+- PR #4 remains OPEN and unmerged. Its latest checked head is `9b6e02fca72bdcc232d94771847fcaa80aae8776`.
+- GitHub Actions run #230 passed `npm run check`, Vite production build, and all 43 Playwright scenarios.
+- Netlify Deploy Preview was ready for that exact commit at `https://deploy-preview-4--cheery-puffpuff-ca0a08.netlify.app`.
+- The Netlify dashboard screenshot reports production deploys and Agent Runners paused due to operational credits; the already published production site remains live. No production deploy or merge was performed.
+- The live `public.information_posts` table contained one previously published row at the latest count check; the notification acceptance test did not leave test content.
+- The `public.notifications` table remained at zero rows after rollback-only trigger acceptance checks.
+- New migration `20261031174525_notifications_for_information_and_verification` adds notifications for verified/rejected student verification decisions and first publication of Information UT content. Editing an already-published post does not create duplicate notifications.
+
+
+## Two-account Supabase staging acceptance — checked 2026-11-01
+
+A rollback-only SQL acceptance run passed using three synthetic identities inside one database transaction and `SET LOCAL ROLE authenticated` with synthetic JWT subjects:
+
+- A sent a connection request; B accepted it.
+- Both users resolved one dedicated room through `get_my_chat_rooms()`.
+- A sent a direct message; B read it and updated its read receipt.
+- A created an approval-based study group and the database trigger assigned A as active group admin.
+- B requested membership; A approved B; B sent a group message that A could read.
+- A pending/non-member C could not read the private direct message or group messages and could not insert a group message.
+- Notification rows were visible only to their owner.
+
+The transaction ended in `ROLLBACK`. Follow-up counts were unchanged: 5 auth users, 4 profiles, 0 connections, 0 direct messages, 0 study groups, 0 group messages and 0 notifications. The reusable script is `supabase/tests/two_account_acceptance.rollback.sql`.
+
+This validates database/RLS/RPC behavior with synthetic JWT subjects. It does not validate real browser Auth sessions, cross-account WebSocket/Realtime delivery, Google OAuth/email, or signed Storage download URLs.
+
+## Cloudflare Pages staging preparation — checked 2026-11-01
+
+- Added `wrangler.toml` for the static Vite Pages output at `./dist` and a compatibility date.
+- Added `docs/CLOUDFLARE_PAGES_STAGING.md` with the repository, build command, Node version, staging Supabase environment variables, branch strategy, Auth redirect checklist and acceptance gates.
+- `public/_headers` carries the existing security headers to Pages builds.
+- GitHub Actions run #239 passed source checks, production build and all 43 Playwright scenarios for the branch containing this preparation.
+- No Cloudflare Pages project was created or connected in this session; Cloudflare access/plugin connection is unavailable. The Pages project still needs to be created in the Cloudflare dashboard and GitHub authorized there.
+- No Supabase Auth URL, Google OAuth setting, custom domain, DNS, or production hosting setting was changed. Netlify production remains untouched.

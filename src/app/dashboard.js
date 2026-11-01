@@ -14,22 +14,20 @@ import {
   reviewStudentVerificationRequest,
 } from "../services/verification.js";
 import {
-  listActiveForumCourses,
   listForumPosts,
   createForumPost,
   deleteForumPost,
   listForumComments,
   createForumComment,
   deleteForumComment,
+  listForumAuthorProfiles,
 } from "../services/forum.js";
 import {
-  listActiveMatchingCourses,
   getMyMatchingPreferences,
-  getMyMatchingCourseIds,
   saveMyMatchingPreferences,
-  replaceMyMatchingCourseIds,
   findMatchingStudents,
   listMyConnectionSummaries,
+  subscribeToMyConnections,
   sendConnectionRequest,
   respondConnectionRequest,
 } from "../services/matching.js";
@@ -41,7 +39,6 @@ import {
   unsubscribeFromDirectMessages,
 } from "../services/chat.js";
 import {
-  listActiveStudyCourses,
   listStudyGroups,
   listMyGroupMemberships,
   listVisibleGroupMembers,
@@ -83,22 +80,29 @@ import {
   setMyLocationVisibility,
   findNearbyStudents,
 } from "../services/home-map.js";
+import { listMyChatRooms, updateMyStudentProfile, uploadMyProfileAvatar, setMyProfileAvatarPreset, getProfileAvatarUrl } from "../services/profile.js";
+import { UT_PROGRAMS, populateUTFacultyProgramSelects, resolveUTFaculty, resolveUTProgram } from "../data/ut-programs.js";
 
-export function initDashboard({ isAdmin = false, isVerified = false, verificationStatus = "pending", currentUserId = null, currentUserName = "Mahasiswa UT" } = {}) {
+export function initDashboard({ isAdmin = false, isVerified = false, verificationStatus = "pending", currentUserId = null, currentUserName = "Mahasiswa UT", currentProfile = {} } = {}) {
   window.L = L;
   const lucide = window.lucide;
 const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root.querySelectorAll(s)];
-  const state={page:'home',radius:3000,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,myMarker:null,center:null,myLocation:null,nearbyStudents:[],homeMapRequestId:0,connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumCourses:[],groups:[],groupCourses:[],groupMemberships:new Map(),groupMembers:[],groupInvitations:[],activeGroupChannel:null,activeGroupId:null,groupWorkspace:{messages:[],materials:[],agenda:[],invites:[],pollResults:{}},matchingCourses:[],matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredCourseIds:[],matchRadius:3000};
+  const state={page:'home',radius:3000,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,myMarker:null,center:null,myLocation:null,nearbyStudents:[],homeMapRequestId:0,lastNearbyRequestKey:null,lastNearbyRequestAt:0,connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,activeChatPollTimer:null,connectionChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumAuthors:new Map(),profile:{...currentProfile},chatRooms:[],activeChatRoom:null,groups:[],groupMemberships:new Map(),groupMembers:[],groupInvitations:[],activeGroupChannel:null,activeGroupId:null,groupWorkspace:{messages:[],materials:[],agenda:[],invites:[],pollResults:{}},matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredPrograms:[],matchRadius:3000};
   const NOTIFICATION_META = {
     connection_request: { icon: "user-plus", page: "matching" },
     connection_accepted: { icon: "user-check", page: "matching" },
     connection_rejected: { icon: "user-x", page: "matching" },
-    direct_message: { icon: "message-circle", page: "matching" },
+    direct_message: { icon: "message-circle", page: "messages" },
+    group_message: { icon: "messages-square", page: "groups" },
+    group_material: { icon: "folder-open", page: "groups" },
+    group_agenda: { icon: "calendar-check", page: "groups" },
     forum_comment: { icon: "messages-square", page: "forum" },
     group_join_request: { icon: "users-round", page: "groups" },
     group_join_approved: { icon: "check-circle-2", page: "groups" },
     group_join_rejected: { icon: "users-round", page: "groups" },
     group_invite: { icon: "mail-plus", page: "groups" },
+    student_verification: { icon: "shield-check", page: "verification" },
+    information_post: { icon: "megaphone", page: "info" },
   };
 
   function notificationDate(value) {
@@ -178,23 +182,25 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     try {
       if (route === "matching") {
         await navigate("matching");
-        if (notification.notification_type === "direct_message" && notification.reference_id) {
-          const summaries = await listMyConnectionSummaries();
-          state.connectionSummaries = summaries;
-          renderConnectionPanel();
-          renderMatches();
-          await openDirectChat(notification.reference_id);
-        }
+      } else if (route === "messages") {
+        await navigate("messages");
+        if (notification.reference_id) await openDirectChat(notification.reference_id);
       } else if (route === "forum") {
         await navigate("forum");
         if (notification.reference_id) await openForumThread(notification.reference_id);
       } else if (route === "groups") {
         await navigate("groups");
-        if (notification.notification_type === "group_join_request" && notification.reference_id) {
+        if (notification.reference_id && notification.notification_type === "group_join_request") {
+          await openGroupDetails(notification.reference_id);
+        } else if (notification.reference_id && ["group_message", "group_material", "group_agenda"].includes(notification.notification_type)) {
           await openGroupDetails(notification.reference_id);
         }
+      } else if (route === "info") {
+        await navigate("info");
+      } else if (route === "verification") {
+        await navigate("verification");
       } else {
-        navigate("home");
+        await navigate("home");
       }
     } catch (error) {
       console.error("Notification navigation failed:", error);
@@ -217,6 +223,26 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       console.error("Mark all notifications read failed:", error);
       toast(error?.message || "Notifikasi belum dapat diperbarui.");
       button.disabled = false;
+    }
+  }
+
+  function initConnectionRealtime() {
+    if (!currentUserId || !isVerified) return;
+    try {
+      state.connectionChannel = subscribeToMyConnections(
+        currentUserId,
+        () => {
+          loadConnectionSummaries().catch(error => console.warn("Connection realtime refresh failed:", error));
+          if (state.page === "matching") searchMatchingStudents({ showLoading: false }).catch(() => {});
+        },
+        (status, error) => {
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            console.warn("Connection realtime status:", status, error);
+          }
+        }
+      );
+    } catch (error) {
+      console.warn("Connection realtime is unavailable:", error);
     }
   }
 
@@ -257,7 +283,30 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
 
   function toast(message){const el=$('#toast');el.textContent=message;el.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove('show'),2500)}
   function icons(){if(window.lucide)lucide.createIcons()}
-  function navigate(page){state.page=page;$$('.page-section').forEach(s=>s.classList.toggle('active',s.id==='page-'+page));$$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));const labels={home:'Beranda',matching:'Matching',forum:'Forum',groups:'Grup Belajar',info:'Informasi UT',profile:'Profil Saya',verification:'Verifikasi Mahasiswa'};$('#crumb-current').textContent=labels[page]||'Beranda';window.scrollTo({top:0,behavior:'smooth'});if(page==='home'&&state.map)setTimeout(()=>state.map.invalidateSize(),80);let pageLoad=null;if(page==='verification')pageLoad=loadVerification();if(page==='forum')pageLoad=loadForum();if(page==='groups')pageLoad=loadGroups();if(page==='matching')pageLoad=loadMatching();icons();return pageLoad}
+  function navigate(page){
+    if(page!=="messages"){
+      if(state.activeChatChannel){
+        const channel=state.activeChatChannel;state.activeChatChannel=null;
+        unsubscribeFromDirectMessages(channel).catch(error=>console.warn("Chat channel cleanup failed:",error));
+      }
+      if(state.activeChatPollTimer){clearInterval(state.activeChatPollTimer);state.activeChatPollTimer=null;}
+      state.activeChatConnectionId=null;state.activeChatRoom=null;state.chatMessages=[];
+    }
+    state.page=page;
+    $$('.page-section').forEach(s=>s.classList.toggle('active',s.id==='page-'+page));
+    $$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
+    const labels={home:'Beranda',matching:'Matching',messages:'Pesan',forum:'Forum',groups:'Grup Belajar',info:'Informasi UT',profile:'Profil Saya',verification:'Verifikasi Mahasiswa'};
+    $('#crumb-current').textContent=labels[page]||'Beranda';
+    window.scrollTo({top:0,behavior:'smooth'});
+    if(page==='home'&&state.map)setTimeout(()=>state.map.invalidateSize(),80);
+    let pageLoad=null;
+    if(page==='verification')pageLoad=loadVerification();
+    if(page==='forum')pageLoad=loadForum();
+    if(page==='groups')pageLoad=loadGroups();
+    if(page==='matching')pageLoad=loadMatching();
+    if(page==='messages')pageLoad=loadMessages();
+    icons();return pageLoad;
+  }
   $$('[data-page]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));$$('[data-go]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.go)));
   function setMapStatus(message, status = "idle") {
     const statusText = $("#map-location-status");
@@ -285,20 +334,48 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     const count = $("#nearby-list-count");
     if (!list) return;
     const items = state.nearbyStudents || [];
+    const nimLookup = state.search.length === 9;
+    if (!isVerified) {
+      if (count) count.textContent = "Akses terbatas";
+      list.innerHTML = '<div class="map-nearby-empty">Pencarian tersedia setelah status mahasiswa kamu terverifikasi.</div>';
+      return;
+    }
+    if (nimLookup) {
+      if (count) count.textContent = items.length ? "Hasil pencarian NIM" : "Pencarian NIM";
+      if (!items.length) {
+        list.innerHTML = '<div class="map-nearby-empty">NIM tidak ditemukan pada akun mahasiswa terverifikasi.</div>';
+        return;
+      }
+      list.innerHTML = items.map(student => {
+        const connection = getConnectionFor(student.student_id);
+        let action = `<button type="button" class="btn btn-primary btn-sm" data-nim-connect="${escapeText(student.student_id)}">Connect</button>`;
+        if (connection?.status === "accepted") {
+          action = `<button type="button" class="btn btn-secondary btn-sm" data-nim-chat="${escapeText(connection.connection_id)}">Chat</button>`;
+        } else if (connection?.status === "pending") {
+          action = `<span class="connection-state">${connection.is_incoming ? "Permintaan masuk" : "Menunggu jawaban"}</span>`;
+        } else if (connection?.status === "rejected" || connection?.status === "blocked") {
+          action = '<span class="connection-state">Tidak tersedia</span>';
+        }
+        return `
+          <div class="map-nearby-row">
+            <div class="person-avatar">${escapeText(student.initials || "UT")}</div>
+            <div class="person-meta"><strong>Mahasiswa ${escapeText(student.initials || "UT")}</strong><span>${escapeText(student.program || "Program studi tidak tersedia")}</span></div>
+            <span class="distance">${action}</span>
+          </div>`;
+      }).join("");
+      list.querySelectorAll("[data-nim-connect]").forEach(button =>
+        button.addEventListener("click", () => createConnection(button.dataset.nimConnect, button)));
+      list.querySelectorAll("[data-nim-chat]").forEach(button =>
+        button.addEventListener("click", () => openDirectChat(button.dataset.nimChat)));
+      return;
+    }
     if (count) count.textContent = items.length ? `${items.length} mahasiswa ditemukan` : "Hasil pencarian area";
     if (!state.myLocation) {
       list.innerHTML = '<div class="map-nearby-empty">Tentukan lokasi belajar untuk mulai mencari mahasiswa terdekat.</div>';
       return;
     }
-    if (!isVerified) {
-      list.innerHTML = '<div class="map-nearby-empty">Peta sekitar tersedia setelah status mahasiswa kamu terverifikasi.</div>';
-      return;
-    }
     if (!items.length) {
-      const message = state.search.length === 9
-        ? "NIM tidak ditemukan dalam radius aktif."
-        : "Belum ada mahasiswa terverifikasi yang memilih tampil di radar pada radius ini.";
-      list.innerHTML = `<div class="map-nearby-empty">${escapeText(message)}</div>`;
+      list.innerHTML = '<div class="map-nearby-empty">Belum ada mahasiswa terverifikasi yang memilih tampil di radar pada radius ini.</div>';
       return;
     }
     list.innerHTML = items.slice(0, 5).map(student => {
@@ -394,40 +471,48 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     if (state.circle) state.circle.setRadius(state.radius);
     const result = $("#map-result");
     if (result) {
-      if (!ownCoordinates) {
-        result.textContent = "Pilih atau perbarui lokasi belajar untuk memulai pencarian.";
-      } else if (!isVerified) {
-        result.textContent = "Pencarian mahasiswa sekitar akan tersedia setelah verifikasi mahasiswa.";
-      } else {
-        result.textContent = `${state.nearbyStudents.length} mahasiswa terverifikasi dalam radius ${state.radius / 1000} km · pin perkiraan.`;
-      }
+      if (!isVerified) result.textContent = "Pencarian mahasiswa tersedia setelah verifikasi mahasiswa.";
+      else if (state.search.length === 9) {
+        result.textContent = state.nearbyStudents.length
+          ? "Mahasiswa terverifikasi ditemukan dari NIM. Pencarian tidak dibatasi radius dan lokasi tidak ditampilkan."
+          : "NIM tidak ditemukan pada akun mahasiswa terverifikasi.";
+      } else if (!ownCoordinates) result.textContent = "Pilih atau perbarui lokasi belajar untuk memulai pencarian area.";
+      else result.textContent = `${state.nearbyStudents.length} mahasiswa terverifikasi dalam radius ${state.radius / 1000} km · pin perkiraan.`;
     }
     renderNearby();
   }
 
   async function refreshNearbyStudents() {
-    if (!state.myLocation || !mapCoordinates(state.myLocation) || !isVerified) {
+    const nimLookup = state.search.length === 9;
+    if (!isVerified || (!nimLookup && (!state.myLocation || !mapCoordinates(state.myLocation)))) {
       state.nearbyStudents = [];
       renderMapMarkers();
       return;
     }
+    const requestKey = nimLookup ? `nim:${state.search}` : `radar:${state.radius}`;
+    const requestNow = Date.now();
+    if (state.lastNearbyRequestKey === requestKey && requestNow - state.lastNearbyRequestAt < 1500) return;
+    state.lastNearbyRequestKey = requestKey;
+    state.lastNearbyRequestAt = requestNow;
     const requestId = ++state.homeMapRequestId;
     const result = $("#map-result");
-    if (result) result.textContent = state.search.length === 9 ? "Mencari NIM dalam radius aktif..." : "Memuat mahasiswa terdekat...";
+    if (result) result.textContent = nimLookup
+      ? "Memeriksa NIM pada akun mahasiswa terverifikasi..."
+      : "Memuat mahasiswa terdekat...";
     try {
-      const students = await findNearbyStudents(state.radius, state.search);
+      const students = await findNearbyStudents(state.radius, nimLookup ? state.search : "");
+      if (requestId !== state.homeMapRequestId) return;
+      if (nimLookup) await loadConnectionSummaries();
       if (requestId !== state.homeMapRequestId) return;
       state.nearbyStudents = students;
       renderMapMarkers();
-      if (state.search.length === 9 && !students.length) {
-        if (result) result.textContent = "NIM tidak ditemukan dalam radius aktif.";
-      }
     } catch (error) {
       if (requestId !== state.homeMapRequestId) return;
       state.nearbyStudents = [];
       renderMapMarkers();
-      console.error("Nearby students load failed:", error);
-      if (result) result.textContent = error?.message || "Mahasiswa sekitar belum dapat dimuat.";
+      if (state.homeMapRequestId === requestId) state.lastNearbyRequestKey = null;
+      console.error("Student lookup failed:", error);
+      if (result) result.textContent = error?.message || "Pencarian mahasiswa belum dapat dimuat.";
       setMapStatus(error?.message || "Pencarian mahasiswa belum tersedia.", "error");
     }
   }
@@ -651,27 +736,23 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     icons();
   }
 
-  function populateMatchingCourses(courses) {
-    const courseFilter = $("#filter-course");
-    const preferredCourses = $("#preferred-courses");
-    const filterValue = courseFilter?.value || "";
-    if (courseFilter) {
-      courseFilter.innerHTML = '<option value="">Semua mata kuliah</option>' + courses.map(course =>
-        `<option value="${escapeText(course.course_name)}">${escapeText(course.course_name)}${course.course_code ? ` · ${escapeText(course.course_code)}` : ""}</option>`
-      ).join("");
-      courseFilter.value = filterValue;
+  function populateMatchingPrograms() {
+    const programFilter = $("#filter-program");
+    const preferredPrograms = $("#preferred-programs");
+    const filterValue = programFilter?.value || "";
+    const options = UT_PROGRAMS.map(program =>
+      `<option value="${escapeText(program)}">${escapeText(program)}</option>`
+    ).join("");
+    if (programFilter) {
+      programFilter.innerHTML = '<option value="">Semua program studi</option>' + options;
+      programFilter.value = filterValue;
     }
-    if (preferredCourses) {
-      preferredCourses.innerHTML = courses.map(course =>
-        `<option value="${escapeText(course.id)}">${escapeText(course.course_code ? `${course.course_code} · ${course.course_name}` : course.course_name)}</option>`
-      ).join("");
-      [...preferredCourses.options].forEach(option => {
-        option.selected = state.preferredCourseIds.includes(option.value);
+    if (preferredPrograms) {
+      preferredPrograms.innerHTML = options;
+      [...preferredPrograms.options].forEach(option => {
+        option.selected = state.preferredPrograms.includes(option.value);
       });
-      preferredCourses.disabled = courses.length === 0;
     }
-    const note = $("#matching-course-note");
-    if (note) note.hidden = courses.length > 0;
   }
 
   function splitPreferenceTags(value, label) {
@@ -689,8 +770,8 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     [...$("#preference-study-times").options].forEach(option => {
       option.selected = preferredTimes.has(option.value);
     });
-    [...$("#preferred-courses").options].forEach(option => {
-      option.selected = state.preferredCourseIds.includes(option.value);
+    [...$("#preferred-programs").options].forEach(option => {
+      option.selected = state.preferredPrograms.includes(option.value);
     });
   }
 
@@ -744,16 +825,18 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   }
 
   function renderMatches() {
-    const course = $("#filter-course").value;
+    const preferredPrograms = state.preferredPrograms || [];
+    const selectedProgram = $("#filter-program").value;
     const topic = $("#filter-topic").value.trim().toLowerCase();
     const time = $("#filter-time").value;
     const filtered = state.matchCandidates.filter(student => {
-      const courses = student.course_names || [];
+      const program = student.program || "";
       const topics = student.topic_tags || [];
       const interests = student.interests || [];
       const times = student.study_times || [];
-      const searchable = [...courses, ...topics, ...interests].join(" ").toLowerCase();
-      return (!course || courses.includes(course))
+      const searchable = [program, ...topics, ...interests].join(" ").toLowerCase();
+      return (!preferredPrograms.length || preferredPrograms.includes(program))
+        && (!selectedProgram || program === selectedProgram)
         && (!topic || searchable.includes(topic))
         && (!time || times.includes(time));
     });
@@ -761,11 +844,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     $("#match-count").textContent = `${filtered.length} mahasiswa dalam radius ${Number(state.matchRadius) / 1000} km · data Supabase`;
     $("#match-results").innerHTML = filtered.length ? filtered.map(student => {
       const connection = getConnectionFor(student.student_id);
-      const tags = [
-        ...(student.course_names || []),
-        ...(student.topic_tags || []),
-        ...(student.interests || []),
-      ];
+      const tags = [student.program, ...(student.topic_tags || []), ...(student.interests || [])].filter(Boolean);
       let action = `<button type="button" class="btn btn-primary btn-sm" data-connect="${escapeText(student.student_id)}">Connect</button>`;
       let label = "Belum terhubung";
       if (connection?.status === "accepted") {
@@ -785,12 +864,12 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
             <div class="person-meta"><strong>Mahasiswa UT · ${escapeText(student.initials || "UT")}</strong><span>${escapeText(student.program || "Program studi tidak tersedia")} · ${escapeText(matchingDistance(student.approx_distance_m))}</span></div>
             <span class="match-score">Relevan</span>
           </div>
-          <div class="match-tags">${tags.length ? tags.map(tag => `<span class="tag">${escapeText(tag)}</span>`).join("") : '<span class="tiny muted">Belum mengisi topik atau mata kuliah.</span>'}</div>
+          <div class="match-tags">${tags.length ? tags.map(tag => `<span class="tag">${escapeText(tag)}</span>`).join("") : '<span class="tiny muted">Belum mengisi program studi atau topik.</span>'}</div>
           <div class="match-card-foot"><span class="tiny muted">${escapeText((student.study_times || []).join(", ") || label)}</span>${action}</div>
         </article>`;
     }).join("") : '<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon"><i data-lucide="users"></i></div><h3>Belum ada rekomendasi yang sesuai</h3><p>Belum ada mahasiswa terverifikasi yang memenuhi radius, persetujuan radar, dan filter yang dipilih. Coba ubah radius atau preferensi.</p></div>';
 
-    $$("[data-connect]").forEach(button => button.addEventListener("click", () => createConnection(button.dataset.connect, button)));
+    $$("#match-results [data-connect]").forEach(button => button.addEventListener("click", () => createConnection(button.dataset.connect, button)));
     icons();
   }
 
@@ -831,17 +910,14 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     }
     if (showLoading) $("#match-results").innerHTML = '<div class="verification-loading">Memuat preferensi dan koneksi...</div>';
     try {
-      const [courses, preferences, preferredCourseIds, connections] = await Promise.all([
-        listActiveMatchingCourses(),
+      const [preferences, connections] = await Promise.all([
         getMyMatchingPreferences(currentUserId),
-        getMyMatchingCourseIds(currentUserId),
         listMyConnectionSummaries(),
       ]);
-      state.matchingCourses = courses;
-      state.matchingPreferences = preferences;
-      state.preferredCourseIds = preferredCourseIds;
+      state.matchingPreferences = preferences || {};
+      state.preferredPrograms = Array.isArray(preferences?.preferred_programs) ? preferences.preferred_programs : [];
       state.connectionSummaries = connections;
-      populateMatchingCourses(courses);
+      populateMatchingPrograms();
       renderMatchingPreferences();
       renderConnectionPanel();
       await searchMatchingStudents({ showLoading: false });
@@ -862,11 +938,10 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       const topicTags = splitPreferenceTags($("#preference-topics").value, "Topik");
       const interests = splitPreferenceTags($("#preference-interests").value, "Minat");
       const studyTimes = [...$("#preference-study-times").selectedOptions].map(option => option.value);
-      const courseIds = [...$("#preferred-courses").selectedOptions].map(option => option.value);
-      await saveMyMatchingPreferences({ topicTags, interests, studyTimes });
-      await replaceMyMatchingCourseIds(courseIds);
-      state.matchingPreferences = { topic_tags: topicTags, interests, study_times: studyTimes };
-      state.preferredCourseIds = courseIds;
+      const preferredPrograms = [...$("#preferred-programs").selectedOptions].map(option => option.value);
+      await saveMyMatchingPreferences({ topicTags, interests, studyTimes, preferredPrograms });
+      state.matchingPreferences = { topic_tags: topicTags, interests, study_times: studyTimes, preferred_programs: preferredPrograms };
+      state.preferredPrograms = preferredPrograms;
       renderMatchingPreferences();
       toast("Preferensi belajar berhasil disimpan.");
       await searchMatchingStudents({ showLoading: false });
@@ -914,10 +989,10 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   $("#match-radius").addEventListener("change", () => searchMatchingStudents());
   $("#refresh-matches").addEventListener("click", () => loadMatching({ showLoading: false }));
   $("#filter-topic").addEventListener("input", renderMatches);
-  $("#filter-course").addEventListener("change", renderMatches);
+  $("#filter-program").addEventListener("change", renderMatches);
   $("#filter-time").addEventListener("change", renderMatches);
   $("#reset-match").addEventListener("click", () => {
-    $("#filter-course").value = "";
+    $("#filter-program").value = "";
     $("#filter-topic").value = "";
     $("#filter-time").value = "";
     renderMatches();
@@ -944,14 +1019,12 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     }
     icons();
   }
-  function populateForumCourses(courses) {
-    const select = $("#post-course");
-    const notice = $("#forum-course-notice");
+  function populateForumPrograms() {
+    const select = $("#post-program");
     if (!select) return;
-    select.innerHTML = '<option value="">Diskusi umum</option>' + courses.map(course =>
-      `<option value="${escapeText(course.id)}">${escapeText(course.course_name)}${course.course_code ? ` · ${escapeText(course.course_code)}` : ""}</option>`
+    select.innerHTML = '<option value="">Diskusi umum</option>' + UT_PROGRAMS.map(program =>
+      `<option value="${escapeText(program)}">${escapeText(program)}</option>`
     ).join("");
-    if (notice) notice.hidden = courses.length > 0;
   }
   function renderForum() {
     const list = $("#post-list");
@@ -963,9 +1036,9 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     }
     list.innerHTML = state.forumPosts.map(post => {
       const ownPost = post.author_id === currentUserId;
-      const author = ownPost ? currentUserName : "Mahasiswa UT";
+      const author = ownPost ? currentUserName : (state.forumAuthors.get(post.author_id)?.full_name || "Mahasiswa UT");
       const typeLabel = FORUM_POST_TYPES[post.post_type] || "Diskusi";
-      const courseLabel = post.course?.course_name || "Diskusi umum";
+      const courseLabel = post.program || post.course?.course_name || "Diskusi umum";
       const deleteButton = ownPost
         ? `<button type="button" class="btn btn-quiet btn-sm forum-delete" data-forum-delete="${escapeText(post.id)}"><i data-lucide="trash-2"></i>Hapus</button>`
         : "";
@@ -991,10 +1064,11 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     renderForumAccess();
     if (showLoading) $("#post-list").innerHTML = '<div class="verification-loading">Memuat diskusi mahasiswa...</div>';
     try {
-      const [courses, posts] = await Promise.all([listActiveForumCourses(), listForumPosts()]);
-      state.forumCourses = courses;
+      const posts = await listForumPosts();
       state.forumPosts = posts;
-      populateForumCourses(courses);
+      const authorProfiles = await listForumAuthorProfiles(posts.map(post => post.author_id));
+      state.forumAuthors = new Map(authorProfiles.map(profile => [profile.user_id, profile]));
+      populateForumPrograms();
       renderForum();
     } catch (error) {
       console.error("Forum load failed:", error);
@@ -1008,7 +1082,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     const title = $("#post-title").value.trim();
     const body = $("#post-content").value.trim();
     const postType = $("#post-type").value;
-    const courseId = $("#post-course").value || null;
+    const program = $("#post-program").value || null;
     if (title.length < 3 || title.length > 140) { toast("Judul diskusi harus 3–140 karakter."); return; }
     if (!body || body.length > 5000) { toast("Isi diskusi wajib diisi dan maksimal 5.000 karakter."); return; }
     if (!Object.hasOwn(FORUM_POST_TYPES, postType)) { toast("Jenis diskusi tidak valid."); return; }
@@ -1016,11 +1090,11 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     button.disabled = true;
     button.textContent = "Mempublikasikan...";
     try {
-      await createForumPost({ title, body, postType, courseId });
+      await createForumPost({ title, body, postType, program });
       $("#post-title").value = "";
       $("#post-content").value = "";
       $("#post-type").value = "need_help";
-      $("#post-course").value = "";
+      $("#post-program").value = "";
       await loadForum({ showLoading: false });
       toast("Diskusi berhasil dipublikasikan.");
     } catch (error) {
@@ -1038,9 +1112,11 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     if (!post) return;
     try {
       const comments = await listForumComments(postId);
+      const commentProfiles = await listForumAuthorProfiles([post.author_id, ...comments.map(comment => comment.author_id)]);
+      commentProfiles.forEach(profile => state.forumAuthors.set(profile.user_id, profile));
       const commentsHtml = comments.length ? comments.map(comment => {
         const ownComment = comment.author_id === currentUserId;
-        const author = ownComment ? currentUserName : "Mahasiswa UT";
+        const author = ownComment ? currentUserName : (state.forumAuthors.get(comment.author_id)?.full_name || "Mahasiswa UT");
         const remove = ownComment
           ? `<button type="button" class="link-btn forum-comment-delete" data-forum-comment-delete="${escapeText(comment.id)}">Hapus</button>`
           : "";
@@ -1050,6 +1126,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
         <div class="forum-thread">
           <span class="tag">${escapeText(FORUM_POST_TYPES[post.post_type] || "Diskusi")}</span>
           <h3>${escapeText(post.title)}</h3>
+          <p class="tiny muted">Oleh ${escapeText(post.author_id === currentUserId ? currentUserName : (state.forumAuthors.get(post.author_id)?.full_name || "Mahasiswa UT"))}</p>
           <p class="forum-thread-body">${escapeText(post.body)}</p>
           <div class="forum-thread-comments"><strong>Tanggapan (${comments.length})</strong>${commentsHtml}</div>
           <div class="field"><label for="forum-comment-input">Tulis tanggapan</label><textarea id="forum-comment-input" class="textarea" rows="3" maxlength="3000" placeholder="Berikan penjelasan atau pertanyaan lanjutan..."></textarea></div>
@@ -1137,7 +1214,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   function renderGroups() {
     const search = $("#group-search")?.value.trim().toLowerCase() || "";
     const filtered = state.groups.filter(group => {
-      const courseName = group.course?.course_name || "Kelompok umum";
+      const courseName = group.program || group.course?.course_name || "Kelompok umum";
       const matchesMode = state.groupFilter === "Semua" || group.mode === state.groupFilter.toLowerCase();
       const matchesSearch = !search || `${group.name} ${courseName}`.toLowerCase().includes(search);
       return matchesMode && matchesSearch;
@@ -1148,7 +1225,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       '<div class="group-request-actions"><button class="btn btn-primary btn-sm" data-group-invite-accept="' + escapeText(invite.group_id) + '">Terima</button><button class="btn btn-secondary btn-sm" data-group-invite-decline="' + escapeText(invite.invite_id) + '">Tolak</button></div></article>'
     ).join("");
     $("#group-list").innerHTML = invitationHtml + (filtered.map(group => {
-      const courseName = group.course?.course_name || "Kelompok umum";
+      const courseName = group.program || group.course?.course_name || "Kelompok umum";
       const membership = state.groupMemberships.get(group.id);
       const isActiveMember = membership?.status === "active";
       const isPending = membership?.status === "pending";
@@ -1159,6 +1236,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       const pendingCount = isManager
         ? state.groupMembers.filter(member => member.group_id === group.id && member.status === "pending").length
         : 0;
+      const isFull = activeCount !== null && activeCount >= Number(group.capacity);
       const accessLabels = { open: "Terbuka", approval: "Perlu persetujuan", private: "Undangan pribadi" };
       const accessLabel = accessLabels[group.access_type] || "Akses terbatas";
       const capacityText = activeCount === null
@@ -1170,7 +1248,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
         ? (group.online_url ? `<a href="${escapeText(group.online_url)}" target="_blank" rel="noopener noreferrer">Buka tautan pertemuan</a>` : "Pertemuan online")
         : (group.offline_area_label ? escapeText(group.offline_area_label) : "Lokasi belum ditentukan");
       const status = isActiveMember
-        ? (isManager ? "Admin grup" : "Anggota")
+        ? (isFull ? (isManager ? "Penuh · Admin grup" : "Kapasitas penuh") : (isManager ? "Admin grup" : "Anggota"))
         : isPending
           ? "Menunggu persetujuan"
           : group.access_type === "approval"
@@ -1207,7 +1285,6 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     renderGroupAccess();
     if (!isVerified) {
       state.groups = [];
-      state.groupCourses = [];
       state.groupMemberships = new Map();
       state.groupMembers = [];
       state.groupInvitations = [];
@@ -1217,14 +1294,12 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
 
     if (showLoading) $("#group-list").innerHTML = '<div class="verification-loading">Memuat grup belajar...</div>';
     try {
-      const [groups, courses, memberships, invitations] = await Promise.all([
+      const [groups, memberships, invitations] = await Promise.all([
         listStudyGroups(),
-        listActiveStudyCourses(),
         listMyGroupMemberships(currentUserId),
         listMyGroupInvitations(),
       ]);
       state.groups = groups;
-      state.groupCourses = courses;
       state.groupMemberships = new Map(memberships.map(item => [item.group_id, item]));
       state.groupMembers = await listVisibleGroupMembers(groups.map(group => group.id));
       state.groupInvitations = invitations;
@@ -1321,47 +1396,54 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
 
   function openCreateGroupForm() {
     if (!isVerified) { toast("Verifikasi mahasiswa diperlukan untuk membuat kelompok."); return; }
-    const courseOptions = state.groupCourses.map(course =>
-      `<option value="${escapeText(course.id)}">${escapeText(course.course_code ? `${course.course_code} · ${course.course_name}` : course.course_name)}</option>`
+    const programOptions = UT_PROGRAMS.map(program =>
+      `<option value="${escapeText(program)}">${escapeText(program)}</option>`
     ).join("");
     const content = `
       <p class="section-note">Kelompok akan tersimpan di UT Connect. Pembuat otomatis menjadi admin pertama.</p>
-      <div class="field"><label for="new-group-name">Nama kelompok</label><input id="new-group-name" class="text-input" minlength="3" maxlength="100" placeholder="Contoh: Belajar Sistem Operasi Bersama"></div>
+      <div class="field"><label for="new-group-name">Nama kelompok</label><input id="new-group-name" class="text-input" minlength="3" maxlength="100" placeholder="Contoh: Belajar Sistem Informasi Bersama"></div>
       <div class="field"><label for="new-group-description">Deskripsi (opsional)</label><textarea id="new-group-description" class="text-input" rows="3" maxlength="1500" placeholder="Tujuan dan fokus belajar kelompok"></textarea></div>
-      <div class="field"><label for="new-group-course">Mata kuliah</label><select id="new-group-course" class="select"><option value="">Kelompok umum${state.groupCourses.length ? "" : " · katalog mata kuliah belum tersedia"}</option>${courseOptions}</select></div>
+      <div class="field"><label for="new-group-program">Program studi (opsional)</label><select id="new-group-program" class="select"><option value="">Kelompok umum</option>${programOptions}</select></div>
       <div class="field"><label for="new-group-mode">Mode pertemuan</label><select id="new-group-mode" class="select"><option value="online">Online</option><option value="offline">Offline</option></select></div>
       <div class="field"><label for="new-group-access">Akses kelompok</label><select id="new-group-access" class="select"><option value="open">Terbuka · langsung bergabung</option><option value="approval">Persetujuan admin · perlu ditinjau</option></select></div>
       <div class="field"><label for="new-group-capacity">Kapasitas (2–100 anggota)</label><input id="new-group-capacity" class="text-input" type="number" min="2" max="100" value="10"></div>
       <div class="field"><label for="new-group-schedule">Jadwal (opsional)</label><input id="new-group-schedule" class="text-input" maxlength="300" placeholder="Contoh: Sabtu, 19.00 WIB"></div>
-      <div class="field"><label for="new-group-online-url">Tautan online (opsional)</label><input id="new-group-online-url" class="text-input" type="url" maxlength="500" placeholder="https://meet.google.com/..."></div>
+      <div class="field"><label for="new-group-online-url">Tautan pertemuan online (opsional)</label><input id="new-group-online-url" class="text-input" type="url" maxlength="500" placeholder="https://meet.google.com/..."></div>
       <div class="field"><label for="new-group-offline-area">Area pertemuan offline (opsional)</label><input id="new-group-offline-area" class="text-input" maxlength="160" placeholder="Contoh: Area layanan belajar UPBJJ"></div>`;
     openModal("Buat kelompok belajar", content, "Buat kelompok", async () => {
       const name = $("#new-group-name").value.trim();
       const description = $("#new-group-description").value.trim();
-      const courseId = $("#new-group-course").value || null;
+      const program = $("#new-group-program").value || null;
       const mode = $("#new-group-mode").value;
       const accessType = $("#new-group-access").value;
       const capacity = Number($("#new-group-capacity").value);
       const schedule = $("#new-group-schedule").value.trim();
       const onlineUrl = $("#new-group-online-url").value.trim();
       const offlineArea = $("#new-group-offline-area").value.trim();
-
       if (name.length < 3 || name.length > 100) { toast("Nama kelompok harus 3–100 karakter."); return false; }
       if (description.length > 1500) { toast("Deskripsi maksimal 1.500 karakter."); return false; }
       if (!Number.isInteger(capacity) || capacity < 2 || capacity > 100) { toast("Kapasitas harus antara 2 dan 100 anggota."); return false; }
-      if (mode === "online" && onlineUrl && !/^https?:\/\//i.test(onlineUrl)) { toast("Tautan online harus diawali http:// atau https://."); return false; }
-
+      if (mode === "online" && onlineUrl) {
+        try {
+          const parsed = new URL(onlineUrl);
+          if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("protocol");
+        } catch {
+          toast("Masukkan tautan meeting yang valid dan diawali https:// atau http://.");
+          return false;
+        }
+      }
       try {
         await createStudyGroup({
           name,
           description: description || null,
-          course_id: courseId,
+          course_id: null,
+          program,
           mode,
           capacity,
           access_type: accessType,
           schedule_text: schedule || null,
-          online_url: mode === "online" && onlineUrl ? onlineUrl : null,
-          offline_area_label: mode === "offline" && offlineArea ? offlineArea : null,
+          online_url: mode === "online" ? onlineUrl : null,
+          offline_area_label: mode === "offline" ? offlineArea : null,
         });
         await loadGroups({ showLoading: false });
         return true;
@@ -1635,8 +1717,35 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   }
   async function loadVerification() {
     const statusPanel = $("#verification-status-panel");
+    const submitPanel = $("#verification-submit-panel");
     const queuePanel = $("#verification-admin-panel");
-    if (!statusPanel) return;
+    const queue = $("#verification-queue");
+
+    // Administrators manage student reviews; their own student verification state is not applicable.
+    if (isAdmin) {
+      if (statusPanel) statusPanel.hidden = true;
+      if (submitPanel) submitPanel.hidden = true;
+      if (!queuePanel) return;
+
+      queuePanel.hidden = false;
+      if (queue) queue.innerHTML = '<div class="verification-loading">Memuat antrean...</div>';
+      try {
+        const items = await listStudentVerificationQueue();
+        renderVerificationQueue(items);
+        const count = $("#verification-queue-count");
+        if (count) count.textContent = String(items.length);
+      } catch (error) {
+        console.error("Administrator verification queue load failed:", error);
+        if (queue) queue.innerHTML = '<p class="section-note">Antrean belum dapat dimuat. Coba muat ulang.</p>';
+      }
+      return;
+    }
+
+    if (!statusPanel || !submitPanel) return;
+    statusPanel.hidden = false;
+    submitPanel.hidden = false;
+    if (queuePanel) queuePanel.hidden = true;
+
     statusPanel.innerHTML = '<div class="verification-loading">Memuat status verifikasi...</div>';
     try {
       const status = await getMyStudentVerificationStatus();
@@ -1648,23 +1757,10 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
         <div class="verification-steps"><span class="verification-step done">1. Lengkapi profil</span><span class="verification-step ${status?.latest_request ? "done" : ""}">2. Kirim bukti</span><span class="verification-step ${profileStatus === "verified" ? "done" : ""}">3. Pemeriksaan admin</span></div>
       `;
       renderVerificationSubmission(status);
-      if (isAdmin && queuePanel) {
-        queuePanel.hidden = false;
-        $("#verification-queue").innerHTML = '<div class="verification-loading">Memuat antrean...</div>';
-        const items = await listStudentVerificationQueue();
-        renderVerificationQueue(items);
-        $("#verification-queue-count").textContent = String(items.length);
-      } else if (queuePanel) {
-        queuePanel.hidden = true;
-      }
     } catch (error) {
       console.error("Student verification load failed:", error);
       statusPanel.innerHTML = `<div class="verification-result rejected"><span class="verification-symbol">!</span><div><strong>Status belum dapat dimuat</strong><p>${escapeText(error?.message || "Periksa koneksi lalu coba lagi.")}</p><button class="btn btn-secondary btn-sm" id="verification-retry">Coba lagi</button></div></div>`;
       $("#verification-retry")?.addEventListener("click", loadVerification);
-      if (isAdmin && queuePanel) {
-        queuePanel.hidden = false;
-        $("#verification-queue").innerHTML = '<p class="section-note">Antrean belum dapat dimuat.</p>';
-      }
     }
   }
   $("#verification-refresh")?.addEventListener("click", loadVerification);
@@ -1684,7 +1780,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   }
 
   function renderDirectChatMessages() {
-    const container = $("#direct-chat-messages");
+    const container = $("#message-room-messages") || $("#direct-chat-messages");
     if (!container) return;
     const messages = state.chatMessages || [];
     container.innerHTML = messages.length ? messages.map(message => {
@@ -1706,13 +1802,18 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     if (state.activeChatConnectionId !== connectionId) return;
     state.chatMessages = messages;
     renderDirectChatMessages();
-    if (markRead) await markDirectMessagesRead(connectionId);
+    if (markRead) {
+      await markDirectMessagesRead(connectionId);
+      const activeRoom = state.chatRooms.find(room => room.connection_id === connectionId);
+      if (activeRoom) activeRoom.unread_count = 0;
+      renderMessageRooms();
+    }
   }
 
   async function submitDirectChatMessage() {
     const connectionId = state.activeChatConnectionId;
-    const input = $("#direct-chat-input");
-    const button = $("#direct-chat-send");
+    const input = $("#message-room-input") || $("#direct-chat-input");
+    const button = $("#message-room-send") || $("#direct-chat-send");
     if (!connectionId || !input || !button) return;
     const body = input.value.trim();
     if (!body) return;
@@ -1722,6 +1823,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       upsertDirectChatMessage(message);
       input.value = "";
       input.focus();
+      await refreshMessageRooms().catch(error => console.warn("Chat room refresh failed:", error));
     } catch (error) {
       console.error("Direct message send failed:", error);
       toast(error?.message || "Pesan belum berhasil dikirim.");
@@ -1730,65 +1832,151 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     }
   }
 
+  function initialsForName(value) {
+    return String(value || "UT").trim().split(/\s+/).slice(0, 2).map(part => part[0] || "").join("").toUpperCase() || "UT";
+  }
+
+  function renderMessageRooms() {
+    const list = $("#message-room-list");
+    if (!list) return;
+    if (!state.chatRooms.length) {
+      list.innerHTML = '<div class="message-room-empty">Belum ada chat pribadi. Hubungkan diri dengan mahasiswa melalui menu Matching, lalu mulai percakapan setelah permintaan diterima.</div>';
+      return;
+    }
+    list.innerHTML = state.chatRooms.map(room => {
+      const active = room.connection_id === state.activeChatConnectionId;
+      const name = room.other_full_name || "Mahasiswa UT";
+      const avatar = getProfileAvatarUrl(room.avatar_path);
+      const avatarHtml = avatar
+        ? '<span class="message-room-avatar"><img src="' + escapeText(avatar) + '" alt=""></span>'
+        : '<span class="message-room-avatar">' + escapeText(initialsForName(name)) + '</span>';
+      const preview = room.last_message || "Belum ada pesan";
+      const unread = Number(room.unread_count || 0);
+      return '<button type="button" class="message-room-item ' + (active ? "active" : "") + '" data-message-room="' + escapeText(room.connection_id) + '">' +
+        avatarHtml + '<span class="message-room-copy"><strong>' + escapeText(name) + '</strong><small>' + escapeText(preview) + '</small></span>' +
+        '<span class="message-room-meta">' + (unread ? '<b>' + escapeText(String(unread > 99 ? "99+" : unread)) + '</b>' : '') +
+        '<time>' + escapeText(room.last_message_at ? new Date(room.last_message_at).toLocaleDateString("id-ID", {day:"2-digit",month:"short"}) : "") + '</time></span></button>';
+    }).join("");
+    $$("[data-message-room]").forEach(button => button.addEventListener("click", () => openDirectChat(button.dataset.messageRoom)));
+  }
+
+  async function refreshMessageRooms() {
+    state.chatRooms = await listMyChatRooms();
+    if (state.activeChatRoom) {
+      state.activeChatRoom = state.chatRooms.find(room => room.connection_id === state.activeChatConnectionId) || state.activeChatRoom;
+    }
+    renderMessageRooms();
+    return state.chatRooms;
+  }
+
+  async function loadMessages({ showLoading = true } = {}) {
+    const notice = $("#messages-access-notice");
+    const inbox = $("#message-inbox");
+    if (!isVerified) {
+      if (notice) {
+        notice.hidden = false;
+        notice.innerHTML = '<div class="group-access-content"><div class="group-access-icon"><i data-lucide="shield-check"></i></div><div><strong>Verifikasi mahasiswa diperlukan</strong><p>Chat pribadi hanya tersedia untuk mahasiswa UT terverifikasi yang telah saling menerima koneksi.</p><button type="button" class="link-btn" id="messages-verification-link">Buka halaman verifikasi</button></div></div>';
+        $("#messages-verification-link")?.addEventListener("click", () => navigate("verification"));
+      }
+      if (inbox) inbox.hidden = true;
+      state.chatRooms = [];
+      renderMessageRooms();
+      icons();
+      return [];
+    }
+    if (notice) notice.hidden = true;
+    if (inbox) inbox.hidden = false;
+    if (showLoading) $("#message-room-list").innerHTML = '<div class="verification-loading">Memuat daftar percakapan...</div>';
+    try {
+      await refreshMessageRooms();
+      return state.chatRooms;
+    } catch (error) {
+      console.error("Chat inbox load failed:", error);
+      $("#message-room-list").innerHTML = '<div class="message-room-empty">Daftar chat belum dapat dimuat. ' + escapeText(error?.message || "Periksa koneksi.") + '</div><button class="btn btn-secondary btn-sm" id="message-rooms-retry">Coba lagi</button>';
+      $("#message-rooms-retry")?.addEventListener("click", () => loadMessages());
+      return [];
+    }
+  }
+
+  function stopDirectChatFallback() {
+    if (state.activeChatPollTimer) {
+      clearInterval(state.activeChatPollTimer);
+      state.activeChatPollTimer = null;
+    }
+  }
+
+  function startDirectChatFallback(connectionId) {
+    stopDirectChatFallback();
+    state.activeChatPollTimer = setInterval(async () => {
+      if (state.activeChatConnectionId !== connectionId || document.visibilityState !== "visible") return;
+      try {
+        await refreshDirectChat();
+        await refreshMessageRooms();
+      } catch (error) {
+        console.warn("Direct chat fallback sync failed:", error);
+      }
+    }, 5000);
+  }
+
   async function openDirectChat(connectionId) {
     if (!isVerified) {
       toast("Verifikasi mahasiswa diperlukan untuk menggunakan chat.");
       return;
     }
-    const connection = state.connectionSummaries.find(item => item.connection_id === connectionId);
-    if (!connection || connection.status !== "accepted") {
-      toast("Chat hanya tersedia setelah koneksi diterima kedua pihak.");
+    if (state.page !== "messages") await navigate("messages");
+    else if (!state.chatRooms.length) await refreshMessageRooms();
+    const room = state.chatRooms.find(item => item.connection_id === connectionId);
+    if (!room) {
+      toast("Ruang chat tidak ditemukan. Pastikan koneksi sudah diterima oleh kedua pihak.");
       return;
     }
+
     if (state.activeChatChannel) {
       const previousChannel = state.activeChatChannel;
       state.activeChatChannel = null;
-      unsubscribeFromDirectMessages(previousChannel).catch(error => console.warn("Chat channel cleanup failed:", error));
+      await unsubscribeFromDirectMessages(previousChannel).catch(error => console.warn("Chat channel cleanup failed:", error));
     }
-
+    stopDirectChatFallback();
     state.activeChatConnectionId = connectionId;
+    state.activeChatRoom = room;
     state.chatMessages = [];
-    const identity = `Mahasiswa UT · ${connection.initials || "UT"}`;
-    openModal(
-      `Chat · ${identity}`,
-      `
-        <div class="direct-chat-shell">
-          <div class="direct-chat-toolbar">
-            <span id="direct-chat-status">Memuat percakapan...</span>
-            <button type="button" class="btn btn-secondary btn-sm" id="direct-chat-refresh"><i data-lucide="refresh-cw"></i>Muat ulang</button>
-          </div>
-          <div class="direct-chat-messages" id="direct-chat-messages" role="log" aria-live="polite">
-            <div class="verification-loading">Memuat pesan...</div>
-          </div>
-          <form class="direct-chat-composer" id="direct-chat-form">
-            <textarea id="direct-chat-input" class="textarea" rows="2" maxlength="5000" placeholder="Tulis pesan untuk koneksimu..." aria-label="Tulis pesan"></textarea>
-            <button type="submit" class="btn btn-primary" id="direct-chat-send"><i data-lucide="send"></i>Kirim</button>
-          </form>
-          <p class="direct-chat-note">Pesan hanya dapat dibaca oleh dua peserta koneksi ini. Maksimal 5.000 karakter per pesan.</p>
-        </div>
-      `
-    );
-    $("#modal-confirm").style.display = "none";
-    $("#modal-cancel").textContent = "Tutup";
-    $("#direct-chat-form").addEventListener("submit", event => {
-      event.preventDefault();
-      submitDirectChatMessage();
-    });
-    $("#direct-chat-refresh").addEventListener("click", async () => {
-      const status = $("#direct-chat-status");
-      status.textContent = "Memuat ulang...";
+
+    const name = room.other_full_name || "Mahasiswa UT";
+    const avatar = getProfileAvatarUrl(room.avatar_path);
+    const avatarElement = $("#message-room-avatar");
+    if (avatarElement) {
+      if (avatar) {
+        const image = document.createElement("img");
+        image.src = avatar;
+        image.alt = "";
+        avatarElement.replaceChildren(image);
+      } else avatarElement.textContent = initialsForName(name);
+    }
+    $("#message-room-name").textContent = name;
+    $("#message-room-program").textContent = room.program || "Mahasiswa UT";
+    $("#message-room-placeholder").hidden = true;
+    $("#message-room-view").hidden = false;
+    renderMessageRooms();
+
+    $("#message-room-refresh").onclick = async () => {
+      $("#message-room-status").textContent = "Memuat ulang...";
       try {
         await refreshDirectChat();
-        status.textContent = "Percakapan diperbarui.";
+        await refreshMessageRooms();
+        $("#message-room-status").textContent = "Percakapan diperbarui.";
       } catch (error) {
-        status.textContent = "Belum dapat memuat percakapan.";
+        $("#message-room-status").textContent = "Belum dapat memuat percakapan.";
         toast(error?.message || "Gagal memuat pesan.");
       }
-    });
+    };
 
+    $("#message-room-status").textContent = "Memuat percakapan...";
     try {
       await refreshDirectChat();
       if (state.activeChatConnectionId !== connectionId) return;
+      // Start a short polling safety net while the WebSocket joins; it stops on SUBSCRIBED.
+      startDirectChatFallback(connectionId);
+      let postgresChangesReady = false;
       state.activeChatChannel = subscribeToDirectMessages(
         connectionId,
         payload => {
@@ -1799,34 +1987,171 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
           if (payload.eventType === "INSERT" && message.sender_id !== currentUserId) {
             markDirectMessagesRead(connectionId).catch(error => console.warn("Read receipt update failed:", error));
           }
+          refreshMessageRooms().catch(error => console.warn("Chat room preview refresh failed:", error));
         },
         (status, error) => {
-          const statusLabel = $("#direct-chat-status");
+          const statusLabel = $("#message-room-status");
           if (!statusLabel || state.activeChatConnectionId !== connectionId) return;
           if (status === "SUBSCRIBED") {
-            statusLabel.textContent = "Terhubung · pesan diperbarui langsung";
-            refreshDirectChat().catch(loadError => console.warn("Realtime chat refresh failed:", loadError));
+            if (postgresChangesReady) {
+              stopDirectChatFallback();
+              statusLabel.textContent = "Terhubung · Supabase Realtime aktif";
+              refreshDirectChat().catch(loadError => console.warn("Realtime chat refresh failed:", loadError));
+            } else {
+              statusLabel.textContent = "WebSocket terhubung · menyiapkan aliran pesan...";
+              startDirectChatFallback(connectionId);
+            }
           } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-            statusLabel.textContent = "Pembaruan langsung terputus. Gunakan Muat ulang.";
+            postgresChangesReady = false;
+            statusLabel.textContent = "Realtime terputus · sinkronisasi otomatis aktif.";
             if (error) console.warn("Realtime chat status:", status, error);
+            startDirectChatFallback(connectionId);
+          }
+        },
+        systemPayload => {
+          if (state.activeChatConnectionId !== connectionId) return;
+          if (systemPayload?.extension !== "postgres_changes") return;
+          const statusLabel = $("#message-room-status");
+          if (systemPayload.status === "ok") {
+            postgresChangesReady = true;
+            stopDirectChatFallback();
+            if (statusLabel) statusLabel.textContent = "Terhubung · Supabase Realtime aktif";
+            refreshDirectChat()
+              .then(() => refreshMessageRooms())
+              .catch(loadError => console.warn("Realtime-ready chat refresh failed:", loadError));
+          } else {
+            postgresChangesReady = false;
+            if (statusLabel) statusLabel.textContent = "Realtime belum siap · sinkronisasi otomatis aktif.";
+            console.warn("Postgres Changes subscription is not ready:", systemPayload.message || systemPayload.status);
+            startDirectChatFallback(connectionId);
           }
         }
       );
       if (!state.activeChatChannel) {
-        const statusLabel = $("#direct-chat-status");
-        if (statusLabel) statusLabel.textContent = "Pembaruan langsung tidak aktif. Gunakan Muat ulang.";
+        $("#message-room-status").textContent = "Realtime tidak aktif · sinkronisasi otomatis aktif.";
+        startDirectChatFallback(connectionId);
       }
     } catch (error) {
       console.error("Direct chat load failed:", error);
-      const statusLabel = $("#direct-chat-status");
-      if (statusLabel) statusLabel.textContent = "Percakapan belum dapat dimuat.";
+      $("#message-room-status").textContent = "Percakapan belum dapat dimuat.";
       toast(error?.message || "Gagal membuka percakapan.");
     }
     icons();
   }
 
-  function escapeText(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-  let modalAction=null,modalSuccessMessage='Perubahan diterapkan pada sesi demo.';function openModal(title,content,confirm='Mengerti',action=null,successMessage='Perubahan diterapkan pada sesi demo.'){ modalAction=action;modalSuccessMessage=successMessage;$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal-confirm').textContent=confirm;$('#modal-confirm').style.display='';$('#modal-confirm').disabled=false;$('#modal-cancel').textContent='Tutup';$('#modal-backdrop').classList.add('open'); }
+  $("#messages-refresh")?.addEventListener("click", () => loadMessages({ showLoading: false }));
+  $("#message-room-form")?.addEventListener("submit", event => {
+    event.preventDefault();
+    submitDirectChatMessage();
+  });
+
+  // Profile editor uses the authenticated update RPC; avatar uploads are owner-write and publicly served profile images.
+  function renderProfileSummary() {
+    const profile = state.profile || {};
+    const name = profile.full_name || currentUserName || "Mahasiswa UT";
+    currentUserName = name;
+    ["topUserName", "sideUserName"].forEach(id => { const element = $("#" + id); if (element) element.textContent = name; });
+    const status = $("#profileStatusTag");
+    if (status) status.textContent = isAdmin ? "Role: ADMINISTRATOR" : "Status: " + String(profile.verification_status || "pending").toUpperCase();
+    const faculty = $("#profileFaculty"); if (faculty) faculty.textContent = resolveUTFaculty(profile.faculty) || profile.faculty || "-";
+    const program = $("#profileProgram"); if (program) program.textContent = resolveUTProgram(profile.faculty, profile.program) || profile.program || "-";
+    const semester = $("#profileSemester"); if (semester) semester.textContent = profile.semester || "-";
+    const bio = $("#profileBio"); if (bio) bio.textContent = profile.bio || (isAdmin ? "Administrator UT Connect" : "Mahasiswa Universitas Terbuka");
+    $("#profileFullName").textContent = name;
+    const avatarUrl = getProfileAvatarUrl(profile.avatar_path);
+    ["topAvatar", "sideAvatar", "profileInitials"].forEach(id => {
+      const element = $("#" + id);
+      if (!element) return;
+      if (avatarUrl) {
+        const image = document.createElement("img");
+        image.src = avatarUrl;
+        image.alt = "";
+        image.loading = "lazy";
+        element.replaceChildren(image);
+      } else {
+        element.textContent = initialsForName(name);
+      }
+    });
+  }
+
+  function openProfileEditor() {
+    const profile = state.profile || {};
+    const currentFaculty = resolveUTFaculty(profile.faculty) || profile.faculty || "";
+    const currentProgram = resolveUTProgram(currentFaculty, profile.program) || profile.program || "";
+    const faculty = escapeText(currentFaculty);
+    const program = escapeText(currentProgram);
+    const verifiedIdentityMayReset = isVerified;
+    let selectedAvatarPreset = profile.avatar_path?.startsWith("preset:") ? profile.avatar_path.slice("preset:".length) : null;
+    const content = `
+      <form id="profile-edit-form" class="profile-edit-form">
+        <div class="profile-edit-avatar"><div class="profile-edit-avatar-preview" id="profile-edit-avatar-preview">${profile.avatar_path ? '<img src="' + escapeText(getProfileAvatarUrl(profile.avatar_path) || "") + '" alt="Foto profil saat ini">' : escapeText(initialsForName(profile.full_name || currentUserName))}</div>
+          <div><strong>Foto profil</strong><small>Pilih avatar bawaan atau unggah JPG, PNG, WebP (maks. 5 MB).</small><label class="btn btn-secondary btn-sm" for="profile-avatar-file">Unggah foto sendiri</label><input id="profile-avatar-file" type="file" accept="image/jpeg,image/png,image/webp" hidden></div>
+        </div>
+        <div class="profile-avatar-preset-grid" role="group" aria-label="Pilih avatar bawaan">
+          ${["avatar-01","avatar-02","avatar-03","avatar-04"].map((id,index) => '<button type="button" class="profile-avatar-preset ' + (profile.avatar_path === 'preset:' + id ? 'selected' : '') + '" data-profile-avatar-preset="' + id + '" aria-label="Pilih avatar ' + (index+1) + '"><img src="/avatars/' + id + '.svg" alt=""><span>Avatar ' + (index+1) + '</span></button>').join("")}
+        </div>
+        <div class="field"><label for="profile-edit-name">Nama lengkap</label><input id="profile-edit-name" class="text-input" maxlength="100" minlength="2" required value="${escapeText(profile.full_name || currentUserName)}"></div>
+        <div class="field"><label for="profile-edit-faculty">Fakultas</label><select id="profile-edit-faculty" class="select" required></select></div>
+        <div class="field"><label for="profile-edit-program">Program studi</label><select id="profile-edit-program" class="select" required></select></div>
+        <div class="field"><label for="profile-edit-semester">Semester</label><select id="profile-edit-semester" class="select" required>${Array.from({length:16},(_,i)=>'<option value="' + (i+1) + '"' + (Number(profile.semester)===(i+1) ? ' selected' : '') + '>Semester ' + (i+1) + '</option>').join("")}</select></div>
+        <div class="field"><label for="profile-edit-bio">Bio singkat (opsional)</label><textarea id="profile-edit-bio" class="textarea" rows="3" maxlength="280" placeholder="Ceritakan minat belajar atau bidang yang kamu sukai.">${escapeText(profile.bio || "")}</textarea></div>
+        ${verifiedIdentityMayReset ? '<label class="profile-reset-confirm"><input id="profile-reset-verification" type="checkbox"><span>Saya memahami bahwa mengubah nama/fakultas/program studi/semester akan mengembalikan status verifikasi mahasiswa menjadi Pending dan perlu diverifikasi ulang.</span></label>' : ''}
+      </form>`;
+    openModal("Edit profil", content, "Simpan perubahan", async () => {
+      const name = $("#profile-edit-name").value.trim();
+      const faculty = $("#profile-edit-faculty").value;
+      const program = $("#profile-edit-program").value;
+      const semester = Number($("#profile-edit-semester").value);
+      const bio = $("#profile-edit-bio").value.trim();
+      const file = $("#profile-avatar-file").files?.[0] || null;
+      const identityChanged = name !== profile.full_name || faculty !== currentFaculty || program !== currentProgram || semester !== Number(profile.semester);
+      const acknowledge = Boolean($("#profile-reset-verification")?.checked);
+      if (identityChanged && verifiedIdentityMayReset && !acknowledge) {
+        toast("Centang konfirmasi perubahan identitas terlebih dahulu.");
+        return false;
+      }
+      try {
+        const updated = await updateMyStudentProfile({
+          fullName: name, faculty, program, semester, bio,
+          acknowledgeVerificationReset: acknowledge,
+        });
+        if (file) updated.avatar_path = await uploadMyProfileAvatar(file);
+        else if (selectedAvatarPreset) updated.avatar_path = await setMyProfileAvatarPreset(selectedAvatarPreset);
+        state.profile = { ...state.profile, ...updated };
+        isVerified = state.profile.verification_status === "verified";
+        verificationStatus = state.profile.verification_status || "pending";
+        renderProfileSummary();
+        await Promise.all([loadForum(), loadMatching(), loadGroups(), loadVerification()]);
+        toast("Profil berhasil diperbarui.");
+        return true;
+      } catch (error) {
+        console.error("Profile update failed:", error);
+        toast(error?.message || "Profil belum berhasil disimpan.");
+        return false;
+      }
+    }, "Profil berhasil diperbarui.");
+    populateUTFacultyProgramSelects($("#profile-edit-faculty"), $("#profile-edit-program"), {
+      faculty: profile.faculty || "", program: profile.program || "",
+    });
+    $("#profile-avatar-file").addEventListener("change", event => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      if (file.size > 5 * 1024 * 1024) { toast("Ukuran foto profil maksimal 5 MB."); event.target.value = ""; return; }
+      selectedAvatarPreset = null;
+      $$("[data-profile-avatar-preset]").forEach(button => button.classList.remove("selected"));
+      const preview = $("#profile-edit-avatar-preview");
+      const url = URL.createObjectURL(file);
+      preview.innerHTML = '<img src="' + url + '" alt="Pratinjau foto profil">';
+    });
+    $$("[data-profile-avatar-preset]").forEach(button => button.addEventListener("click", () => {
+      selectedAvatarPreset = button.dataset.profileAvatarPreset;
+      $("#profile-avatar-file").value = "";
+      $$("[data-profile-avatar-preset]").forEach(item => item.classList.toggle("selected", item === button));
+      $("#profile-edit-avatar-preview").innerHTML = '<img src="/avatars/' + escapeText(selectedAvatarPreset) + '.svg" alt="Avatar pilihan">';
+    }));
+  }
+    function escapeText(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+  let modalAction=null,modalSuccessMessage='Perubahan berhasil diterapkan.';function openModal(title,content,confirm='Mengerti',action=null,successMessage='Perubahan berhasil diterapkan.'){ modalAction=action;modalSuccessMessage=successMessage;$('#modal-title').textContent=title;$('#modal-content').innerHTML=content;$('#modal-confirm').textContent=confirm;$('#modal-confirm').style.display='';$('#modal-confirm').disabled=false;$('#modal-cancel').textContent='Tutup';$('#modal-backdrop').classList.add('open'); }
   function closeModal(){
     closeGroupWorkspace().catch(error => console.warn("Group workspace cleanup failed:", error));
     if(state.activeChatChannel){
@@ -1834,12 +2159,16 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       state.activeChatChannel=null;
       unsubscribeFromDirectMessages(channel).catch(error=>console.warn("Chat channel cleanup failed:",error));
     }
+    stopDirectChatFallback();
     state.activeChatConnectionId=null;
     state.chatMessages=[];
     $('#modal-backdrop').classList.remove('open');
     if(activeVerificationPreviewUrl){URL.revokeObjectURL(activeVerificationPreviewUrl);activeVerificationPreviewUrl=null}
   }
   const guide=`<div style="display:grid;gap:14px"><div><b style="font-size:11px">01 · Lengkapi profil</b><p class="section-note">Daftar dengan data akademik yang diperlukan. Verifikasi identitas harus dilakukan melalui layanan yang sah pada versi produksi.</p></div><div><b style="font-size:11px">02 · Atur lokasi secara sadar</b><p class="section-note">Pilih lokasi perkiraan dan tentukan apakah ingin tampil di radar. Jangan tampilkan alamat rumah atau koordinat presisi kepada pengguna lain.</p></div><div><b style="font-size:11px">03 · Temukan teman belajar</b><p class="section-note">Gunakan radius dan preferensi mata kuliah untuk melihat rekomendasi yang relevan.</p></div><div><b style="font-size:11px">04 · Bangun koneksi</b><p class="section-note">Kirim permintaan connect. Chat hanya tersedia setelah kedua pihak menyetujui koneksi.</p></div><div><b style="font-size:11px">05 · Belajar bersama</b><p class="section-note">Gunakan forum untuk peer help atau bergabung dan membuat kelompok belajar.</p></div><p class="tiny muted" style="padding:10px;background:#f7f9fc;border-radius:9px">Catatan: Peta sekitar, matching, koneksi, dan chat personal memakai layanan Supabase dan hanya tersedia sesuai status verifikasi. Pin lokasi mahasiswa lain adalah perkiraan dan hanya tampil jika pemilik mengaktifkan radar.</p></div>`;
-  $$('[data-open-guide]').forEach(b=>b.addEventListener('click',()=>openModal('Panduan UT Connect',guide)));$('#modal-close').addEventListener('click',closeModal);$('#modal-cancel').addEventListener('click',closeModal);$('#modal-confirm').addEventListener('click',async()=>{if(modalAction){const confirmButton=$('#modal-confirm');confirmButton.disabled=true;try{const result=await modalAction();if(result===false)return;modalAction=null;closeModal();toast(modalSuccessMessage)}catch(error){console.error('Modal action failed:',error);toast(error.message||'Tindakan gagal. Silakan coba lagi.')}finally{confirmButton.disabled=false}return}closeModal();toast('Panduan ditutup.')});$('#modal-backdrop').addEventListener('click',e=>{if(e.target.id==='modal-backdrop')closeModal()});document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();$('#notification-panel').hidden=true;$('#notif-btn').setAttribute('aria-expanded','false')}});$('#edit-profile').addEventListener('click',()=>openModal('Edit profil',`<p class="section-note">Form edit profil ditampilkan sebagai rancangan UI. Penyimpanan dan verifikasi perubahan belum terhubung ke backend.</p><div class="field"><label>Nama tampilan</label><input class="text-input" value="Andi Bintang"></div><div class="field"><label>Program studi</label><input class="text-input" value="Sistem Informasi" disabled></div><div class="field"><label>Preferensi belajar</label><select class="select"><option>Online · Malam hari</option><option>Online · Akhir pekan</option><option>Offline</option></select></div>`,`Tutup`));
-  initMap();loadHomeMap();loadForum();loadGroups();loadInformation();loadVerification();loadNotifications().catch(()=>{});initNotificationRealtime();icons();
+  $$('[data-open-guide]').forEach(b=>b.addEventListener('click',()=>openModal('Panduan UT Connect',guide)));$('#modal-close').addEventListener('click',closeModal);$('#modal-cancel').addEventListener('click',closeModal);$('#modal-confirm').addEventListener('click',async()=>{if(modalAction){const confirmButton=$('#modal-confirm');confirmButton.disabled=true;try{const result=await modalAction();if(result===false)return;modalAction=null;closeModal();toast(modalSuccessMessage)}catch(error){console.error('Modal action failed:',error);toast(error.message||'Tindakan gagal. Silakan coba lagi.')}finally{confirmButton.disabled=false}return}closeModal();toast('Panduan ditutup.')});$('#modal-backdrop').addEventListener('click',e=>{if(e.target.id==='modal-backdrop')closeModal()});document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();$('#notification-panel').hidden=true;$('#notif-btn').setAttribute('aria-expanded','false')}});$('#edit-profile').addEventListener('click',openProfileEditor);
+  renderProfileSummary();
+  $("#message-room-placeholder").hidden = false;
+  $("#message-room-view").hidden = true;
+  initMap();loadHomeMap();loadForum();loadGroups();loadInformation();loadVerification();loadNotifications().catch(()=>{});initConnectionRealtime();initNotificationRealtime();icons();
 }
