@@ -1622,3 +1622,29 @@ begin
   return jsonb_populate_record(new, v_json);
 end
 $function$;
+
+
+-- Reset the bot idempotency ledger for one active visitor session only.
+create or replace function public.demo_reset_bot_events(p_session_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+begin
+  if p_session_id is null or not exists (
+    select 1 from private.demo_sessions s
+    where s.id = p_session_id
+      and s.status = 'active'
+      and s.expires_at > now()
+  ) then
+    raise exception 'Active demo session required' using errcode = '42501';
+  end if;
+
+  delete from private.demo_bot_events
+  where session_id = p_session_id;
+end
+$function$;
+
+revoke all on function public.demo_reset_bot_events(uuid) from public, anon, authenticated;
+grant execute on function public.demo_reset_bot_events(uuid) to service_role;
