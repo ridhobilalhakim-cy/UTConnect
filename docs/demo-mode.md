@@ -34,7 +34,7 @@ The demo migration assumes the complete UTConnect baseline schema. The first fiv
 
 ## Demo content
 
-A seeded visitor receives six fictional bot profiles, synthetic map points, matching preferences, an accepted chat connection, an incoming connection request, five groups (open, nearly full, full, approval, and private/invited), group messages, Agenda items, a poll, and a sample PDF material.
+A seeded visitor receives six fictional bot profiles, synthetic map points, matching preferences, an accepted chat connection, an incoming connection request, one Forum discussion with a simulated reply, five groups (open, nearly full, full, approval, and private/invited), group messages, Agenda items, a poll, and a sample PDF material.
 
 The login-page selector currently controls the focus label displayed in the demo banner; the seed remains comprehensive so the other features are still available during one continuous presentation.
 
