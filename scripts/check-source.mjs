@@ -198,6 +198,7 @@ for (const [description, condition] of [
   ['password recovery redirect marker', authSource.includes('mode=recovery')],
   ['password update request', authSource.includes('auth.updateUser({password})')],
   ['password recovery form', authHtml.includes('id="resetPasswordForm"')],
+  ['demo bootstrap suppresses normal signup navigation race', authSource.includes('demoSessionStarting') && authSource.includes('session?.user?.is_anonymous === true')],
 ]) {
   if (!condition) failures.push(`Auth recovery: missing ${description}`);
 }
