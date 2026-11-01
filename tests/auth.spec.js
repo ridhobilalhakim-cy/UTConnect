@@ -1908,3 +1908,25 @@ test('student can mark all notifications as read and clear the unread counter', 
   expect(state.notifications.every(item => item.read_at !== null)).toBe(true);
 });
 
+
+test('verified NIM lookup is independent from radius and location and offers a connection', async ({ page }) => {
+  const targetId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const state = await mockSupabase(page, {
+    profile: { ...PROFILE, verification_status: 'verified' },
+    homeMapLocation: null,
+    nearbyResults: [{ student_id: targetId, initials: 'RA', program: 'Manajemen' }],
+  });
+  await page.goto('/');
+  await page.locator('#loginEmail').fill(USER.email);
+  await page.locator('#loginPassword').fill('ContohPassword123!');
+  await page.getByRole('button', { name: 'Masuk', exact: true }).first().click();
+  await page.locator('#nim-search').fill('123456789');
+  await expect(page.locator('#nearby-list')).toContainText('Mahasiswa RA');
+  await expect(page.locator('[data-nim-connect="' + targetId + '"]')).toBeVisible();
+  expect(state.nearbyCalls).toHaveLength(1);
+  expect(state.nearbyCalls[0]).toEqual({ nim: '123456789' });
+  await page.locator('[data-nim-connect="' + targetId + '"]').click();
+  await expect(page.locator('#toast')).toContainText('Permintaan koneksi berhasil dikirim');
+  expect(state.connectionCreateCalls).toHaveLength(1);
+  expect(state.connectionCreateCalls[0].recipient_id).toBe(targetId);
+});

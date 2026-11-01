@@ -55,9 +55,6 @@ export async function findNearbyStudents(radius = 3000, nim = "") {
   if (normalizedNim && !/^\d{9}$/.test(normalizedNim)) {
     throw new Error("Masukkan NIM lengkap 9 digit.");
   }
-  const data = await invoke("nearby-students", {
-    radius,
-    ...(normalizedNim ? { nim: normalizedNim } : {}),
-  });
+  const data = await invoke("nearby-students", normalizedNim ? { nim: normalizedNim } : { radius });
   return Array.isArray(data.results) ? data.results : [];
 }

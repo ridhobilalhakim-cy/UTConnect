@@ -75,3 +75,17 @@ export async function respondConnectionRequest(connectionId, accept) {
   throwIfError(error);
   return data;
 }
+
+
+export function subscribeToMyConnections(userId, onChange, onStatus) {
+  if (!userId || typeof onChange !== "function") return null;
+  if (typeof window !== "undefined" && window.__UTCONNECT_DISABLE_REALTIME__) return null;
+  const channel = supabase.channel(`connections-${userId}-${crypto.randomUUID()}`);
+  for (const column of ["initiator_id", "recipient_id"]) {
+    channel.on("postgres_changes", {
+      event: "*", schema: "public", table: "connections",
+      filter: `${column}=eq.${userId}`,
+    }, payload => onChange(payload));
+  }
+  return channel.subscribe((status, error) => onStatus?.(status, error));
+}

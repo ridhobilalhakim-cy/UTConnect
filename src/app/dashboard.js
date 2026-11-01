@@ -27,6 +27,7 @@ import {
   saveMyMatchingPreferences,
   findMatchingStudents,
   listMyConnectionSummaries,
+  subscribeToMyConnections,
   sendConnectionRequest,
   respondConnectionRequest,
 } from "../services/matching.js";
@@ -86,7 +87,7 @@ export function initDashboard({ isAdmin = false, isVerified = false, verificatio
   window.L = L;
   const lucide = window.lucide;
 const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root.querySelectorAll(s)];
-  const state={page:'home',radius:3000,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,myMarker:null,center:null,myLocation:null,nearbyStudents:[],homeMapRequestId:0,connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumAuthors:new Map(),profile:{...currentProfile},chatRooms:[],activeChatRoom:null,groups:[],groupMemberships:new Map(),groupMembers:[],groupInvitations:[],activeGroupChannel:null,activeGroupId:null,groupWorkspace:{messages:[],materials:[],agenda:[],invites:[],pollResults:{}},matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredPrograms:[],matchRadius:3000};
+  const state={page:'home',radius:3000,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,myMarker:null,center:null,myLocation:null,nearbyStudents:[],homeMapRequestId:0,connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,activeChatPollTimer:null,connectionChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumAuthors:new Map(),profile:{...currentProfile},chatRooms:[],activeChatRoom:null,groups:[],groupMemberships:new Map(),groupMembers:[],groupInvitations:[],activeGroupChannel:null,activeGroupId:null,groupWorkspace:{messages:[],materials:[],agenda:[],invites:[],pollResults:{}},matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredPrograms:[],matchRadius:3000};
   const NOTIFICATION_META = {
     connection_request: { icon: "user-plus", page: "matching" },
     connection_accepted: { icon: "user-check", page: "matching" },
@@ -225,6 +226,26 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     }
   }
 
+  function initConnectionRealtime() {
+    if (!currentUserId || !isVerified) return;
+    try {
+      state.connectionChannel = subscribeToMyConnections(
+        currentUserId,
+        () => {
+          loadConnectionSummaries().catch(error => console.warn("Connection realtime refresh failed:", error));
+          if (state.page === "matching") searchMatchingStudents({ showLoading: false }).catch(() => {});
+        },
+        (status, error) => {
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            console.warn("Connection realtime status:", status, error);
+          }
+        }
+      );
+    } catch (error) {
+      console.warn("Connection realtime is unavailable:", error);
+    }
+  }
+
   function initNotificationRealtime() {
     if (!currentUserId) return;
     try {
@@ -266,6 +287,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     if(page!=="messages" && state.activeChatChannel){
       const channel=state.activeChatChannel;state.activeChatChannel=null;
       unsubscribeFromDirectMessages(channel).catch(error=>console.warn("Chat channel cleanup failed:",error));
+      if(state.activeChatPollTimer){clearInterval(state.activeChatPollTimer);state.activeChatPollTimer=null;}
       state.activeChatConnectionId=null;state.activeChatRoom=null;state.chatMessages=[];
     }
     state.page=page;
@@ -310,20 +332,48 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     const count = $("#nearby-list-count");
     if (!list) return;
     const items = state.nearbyStudents || [];
+    const nimLookup = state.search.length === 9;
+    if (!isVerified) {
+      if (count) count.textContent = "Akses terbatas";
+      list.innerHTML = '<div class="map-nearby-empty">Pencarian tersedia setelah status mahasiswa kamu terverifikasi.</div>';
+      return;
+    }
+    if (nimLookup) {
+      if (count) count.textContent = items.length ? "Hasil pencarian NIM" : "Pencarian NIM";
+      if (!items.length) {
+        list.innerHTML = '<div class="map-nearby-empty">NIM tidak ditemukan pada akun mahasiswa terverifikasi.</div>';
+        return;
+      }
+      list.innerHTML = items.map(student => {
+        const connection = getConnectionFor(student.student_id);
+        let action = `<button type="button" class="btn btn-primary btn-sm" data-nim-connect="${escapeText(student.student_id)}">Connect</button>`;
+        if (connection?.status === "accepted") {
+          action = `<button type="button" class="btn btn-secondary btn-sm" data-nim-chat="${escapeText(connection.connection_id)}">Chat</button>`;
+        } else if (connection?.status === "pending") {
+          action = `<span class="connection-state">${connection.is_incoming ? "Permintaan masuk" : "Menunggu jawaban"}</span>`;
+        } else if (connection?.status === "rejected" || connection?.status === "blocked") {
+          action = '<span class="connection-state">Tidak tersedia</span>';
+        }
+        return `
+          <div class="map-nearby-row">
+            <div class="person-avatar">${escapeText(student.initials || "UT")}</div>
+            <div class="person-meta"><strong>Mahasiswa ${escapeText(student.initials || "UT")}</strong><span>${escapeText(student.program || "Program studi tidak tersedia")}</span></div>
+            <span class="distance">${action}</span>
+          </div>`;
+      }).join("");
+      list.querySelectorAll("[data-nim-connect]").forEach(button =>
+        button.addEventListener("click", () => createConnection(button.dataset.nimConnect, button)));
+      list.querySelectorAll("[data-nim-chat]").forEach(button =>
+        button.addEventListener("click", () => openDirectChat(button.dataset.nimChat)));
+      return;
+    }
     if (count) count.textContent = items.length ? `${items.length} mahasiswa ditemukan` : "Hasil pencarian area";
     if (!state.myLocation) {
       list.innerHTML = '<div class="map-nearby-empty">Tentukan lokasi belajar untuk mulai mencari mahasiswa terdekat.</div>';
       return;
     }
-    if (!isVerified) {
-      list.innerHTML = '<div class="map-nearby-empty">Peta sekitar tersedia setelah status mahasiswa kamu terverifikasi.</div>';
-      return;
-    }
     if (!items.length) {
-      const message = state.search.length === 9
-        ? "NIM tidak ditemukan dalam radius aktif."
-        : "Belum ada mahasiswa terverifikasi yang memilih tampil di radar pada radius ini.";
-      list.innerHTML = `<div class="map-nearby-empty">${escapeText(message)}</div>`;
+      list.innerHTML = '<div class="map-nearby-empty">Belum ada mahasiswa terverifikasi yang memilih tampil di radar pada radius ini.</div>';
       return;
     }
     list.innerHTML = items.slice(0, 5).map(student => {
@@ -419,40 +469,42 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     if (state.circle) state.circle.setRadius(state.radius);
     const result = $("#map-result");
     if (result) {
-      if (!ownCoordinates) {
-        result.textContent = "Pilih atau perbarui lokasi belajar untuk memulai pencarian.";
-      } else if (!isVerified) {
-        result.textContent = "Pencarian mahasiswa sekitar akan tersedia setelah verifikasi mahasiswa.";
-      } else {
-        result.textContent = `${state.nearbyStudents.length} mahasiswa terverifikasi dalam radius ${state.radius / 1000} km · pin perkiraan.`;
-      }
+      if (!isVerified) result.textContent = "Pencarian mahasiswa tersedia setelah verifikasi mahasiswa.";
+      else if (state.search.length === 9) {
+        result.textContent = state.nearbyStudents.length
+          ? "Mahasiswa terverifikasi ditemukan dari NIM. Pencarian tidak dibatasi radius dan lokasi tidak ditampilkan."
+          : "NIM tidak ditemukan pada akun mahasiswa terverifikasi.";
+      } else if (!ownCoordinates) result.textContent = "Pilih atau perbarui lokasi belajar untuk memulai pencarian area.";
+      else result.textContent = `${state.nearbyStudents.length} mahasiswa terverifikasi dalam radius ${state.radius / 1000} km · pin perkiraan.`;
     }
     renderNearby();
   }
 
   async function refreshNearbyStudents() {
-    if (!state.myLocation || !mapCoordinates(state.myLocation) || !isVerified) {
+    const nimLookup = state.search.length === 9;
+    if (!isVerified || (!nimLookup && (!state.myLocation || !mapCoordinates(state.myLocation)))) {
       state.nearbyStudents = [];
       renderMapMarkers();
       return;
     }
     const requestId = ++state.homeMapRequestId;
     const result = $("#map-result");
-    if (result) result.textContent = state.search.length === 9 ? "Mencari NIM dalam radius aktif..." : "Memuat mahasiswa terdekat...";
+    if (result) result.textContent = nimLookup
+      ? "Memeriksa NIM pada akun mahasiswa terverifikasi..."
+      : "Memuat mahasiswa terdekat...";
     try {
-      const students = await findNearbyStudents(state.radius, state.search);
+      const students = await findNearbyStudents(state.radius, nimLookup ? state.search : "");
+      if (requestId !== state.homeMapRequestId) return;
+      if (nimLookup) await loadConnectionSummaries();
       if (requestId !== state.homeMapRequestId) return;
       state.nearbyStudents = students;
       renderMapMarkers();
-      if (state.search.length === 9 && !students.length) {
-        if (result) result.textContent = "NIM tidak ditemukan dalam radius aktif.";
-      }
     } catch (error) {
       if (requestId !== state.homeMapRequestId) return;
       state.nearbyStudents = [];
       renderMapMarkers();
-      console.error("Nearby students load failed:", error);
-      if (result) result.textContent = error?.message || "Mahasiswa sekitar belum dapat dimuat.";
+      console.error("Student lookup failed:", error);
+      if (result) result.textContent = error?.message || "Pencarian mahasiswa belum dapat dimuat.";
       setMapStatus(error?.message || "Pencarian mahasiswa belum tersedia.", "error");
     }
   }
@@ -1838,6 +1890,26 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     }
   }
 
+  function stopDirectChatFallback() {
+    if (state.activeChatPollTimer) {
+      clearInterval(state.activeChatPollTimer);
+      state.activeChatPollTimer = null;
+    }
+  }
+
+  function startDirectChatFallback(connectionId) {
+    stopDirectChatFallback();
+    state.activeChatPollTimer = setInterval(async () => {
+      if (state.activeChatConnectionId !== connectionId || document.visibilityState !== "visible") return;
+      try {
+        await refreshDirectChat();
+        await refreshMessageRooms();
+      } catch (error) {
+        console.warn("Direct chat fallback sync failed:", error);
+      }
+    }, 5000);
+  }
+
   async function openDirectChat(connectionId) {
     if (!isVerified) {
       toast("Verifikasi mahasiswa diperlukan untuk menggunakan chat.");
@@ -1856,6 +1928,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       state.activeChatChannel = null;
       await unsubscribeFromDirectMessages(previousChannel).catch(error => console.warn("Chat channel cleanup failed:", error));
     }
+    stopDirectChatFallback();
     state.activeChatConnectionId = connectionId;
     state.activeChatRoom = room;
     state.chatMessages = [];
@@ -1909,15 +1982,20 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
           const statusLabel = $("#message-room-status");
           if (!statusLabel || state.activeChatConnectionId !== connectionId) return;
           if (status === "SUBSCRIBED") {
-            statusLabel.textContent = "Terhubung · pesan diperbarui langsung";
+            stopDirectChatFallback();
+            statusLabel.textContent = "Terhubung · Supabase Realtime aktif";
             refreshDirectChat().catch(loadError => console.warn("Realtime chat refresh failed:", loadError));
           } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-            statusLabel.textContent = "Pembaruan langsung terputus. Gunakan Muat ulang.";
+            statusLabel.textContent = "Realtime terputus · sinkronisasi otomatis aktif.";
             if (error) console.warn("Realtime chat status:", status, error);
+            startDirectChatFallback(connectionId);
           }
         }
       );
-      if (!state.activeChatChannel) $("#message-room-status").textContent = "Pembaruan langsung tidak aktif. Gunakan Muat ulang.";
+      if (!state.activeChatChannel) {
+        $("#message-room-status").textContent = "Realtime tidak aktif · sinkronisasi otomatis aktif.";
+        startDirectChatFallback(connectionId);
+      }
     } catch (error) {
       console.error("Direct chat load failed:", error);
       $("#message-room-status").textContent = "Percakapan belum dapat dimuat.";
@@ -2046,6 +2124,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       state.activeChatChannel=null;
       unsubscribeFromDirectMessages(channel).catch(error=>console.warn("Chat channel cleanup failed:",error));
     }
+    stopDirectChatFallback();
     state.activeChatConnectionId=null;
     state.chatMessages=[];
     $('#modal-backdrop').classList.remove('open');
@@ -2056,5 +2135,5 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   renderProfileSummary();
   $("#message-room-placeholder").hidden = false;
   $("#message-room-view").hidden = true;
-  initMap();loadHomeMap();loadForum();loadGroups();loadInformation();loadVerification();loadNotifications().catch(()=>{});initNotificationRealtime();icons();
+  initMap();loadHomeMap();loadForum();loadGroups();loadInformation();loadVerification();loadNotifications().catch(()=>{});initConnectionRealtime();initNotificationRealtime();icons();
 }

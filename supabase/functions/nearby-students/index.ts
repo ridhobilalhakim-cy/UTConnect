@@ -99,13 +99,43 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Permintaan pencarian tidak valid." }, 400);
     }
 
-    const radius = payload.radius;
-    if (![1000, 3000, 5000].includes(radius as number)) {
-      return json({ error: "Radius pencarian harus 1, 3, atau 5 km." }, 400);
-    }
     const nim = payload.nim === undefined || payload.nim === null ? "" : String(payload.nim).trim();
     if (nim && !/^\d{9}$/.test(nim)) {
       return json({ error: "Masukkan NIM lengkap 9 digit." }, 400);
+    }
+
+    // NIM lookup ignores location, radar visibility, and map radius.
+    if (nim) {
+      const nimSecret = Deno.env.get("NIM_HMAC_SECRET");
+      if (!nimSecret || nimSecret.length < 32) {
+        return json({ error: "Pencarian NIM belum dikonfigurasi di server." }, 503);
+      }
+      const nimDigest = await hmacNim(nim, nimSecret);
+      const { data, error } = await admin.rpc("find_verified_student_by_nim", {
+        p_viewer_id: user.id,
+        p_nim_digest: nimDigest,
+      });
+      if (error) {
+        if (error.message?.toLowerCase().includes("rate limit")) {
+          return json({ error: "Batas pencarian NIM tercapai. Coba kembali beberapa saat lagi." }, 429);
+        }
+        console.error("Verified NIM lookup failed:", error);
+        return json({ error: "Pencarian NIM belum dapat dilakukan." }, 500);
+      }
+      const results = (Array.isArray(data) ? data : []).map((row: Record<string, unknown>) => ({
+        student_id: row.student_id, initials: row.initials, program: row.program,
+      }));
+      return json({
+        search_type: "nim",
+        results,
+        message: results.length ? null : "NIM tidak ditemukan pada akun mahasiswa terverifikasi.",
+        privacy: "NIM lengkap dan lokasi mahasiswa tidak dikirim ke browser.",
+      });
+    }
+
+    const radius = payload.radius;
+    if (![1000, 3000, 5000].includes(radius as number)) {
+      return json({ error: "Radius pencarian harus 1, 3, atau 5 km." }, 400);
     }
 
     const { error: limitError } = await admin.rpc("consume_nearby_search_limit", { p_viewer_id: user.id });
@@ -117,19 +147,10 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Layanan pencarian belum dapat digunakan." }, 503);
     }
 
-    let nimDigest: string | null = null;
-    if (nim) {
-      const nimSecret = Deno.env.get("NIM_HMAC_SECRET");
-      if (!nimSecret || nimSecret.length < 32) {
-        return json({ error: "Pencarian NIM belum dikonfigurasi di server." }, 503);
-      }
-      nimDigest = await hmacNim(nim, nimSecret);
-    }
-
     const { data, error } = await admin.rpc("find_nearby_students", {
       p_viewer_id: user.id,
       p_radius_m: radius,
-      p_nim_digest: nimDigest,
+      p_nim_digest: null,
     });
     if (error) {
       if (error.message?.includes("rate limit")) {
