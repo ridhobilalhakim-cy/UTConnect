@@ -342,11 +342,60 @@ function pdfBytes() {
   return encoder.encode(pdf);
 }
 
+async function seedDemoInformation(admin: SupabaseClient) {
+  // Shared read-only examples for the dedicated demo project. These are not real UT announcements.
+  const examples = [
+    {
+      category: "tips",
+      audience: "public",
+      title: "DEMO · Tips menyusun jadwal belajar mandiri",
+      body: "[SIMULASI DEMO] Pecah target belajar menjadi sesi singkat, tentukan prioritas modul, dan sisihkan waktu untuk mengulang materi. Konten ini hanya contoh tampilan kanal Informasi UT, bukan pengumuman resmi.",
+    },
+    {
+      category: "academic",
+      audience: "public",
+      title: "DEMO · Contoh pengingat kegiatan akademik",
+      body: "[SIMULASI DEMO] Ini contoh kartu informasi akademik. Periksa kalender akademik resmi Universitas Terbuka untuk tanggal, jadwal ujian, registrasi, dan ketentuan yang benar.",
+    },
+    {
+      category: "competition",
+      audience: "public",
+      title: "DEMO · Contoh informasi lomba mahasiswa",
+      body: "[SIMULASI DEMO] Contoh pengumuman lomba karya ilmiah untuk memperlihatkan kategori, ringkasan kegiatan, dan tampilan detail informasi. Nama penyelenggara, syarat, tautan pendaftaran, serta tenggat belum ditetapkan karena ini bukan lomba sungguhan.",
+    },
+    {
+      category: "seminar",
+      audience: "public",
+      title: "DEMO · Contoh webinar keterampilan akademik",
+      body: "[SIMULASI DEMO] Contoh informasi seminar daring tentang strategi belajar, literasi digital, dan kolaborasi. Jadwal, narasumber, dan tautan acara pada kartu ini tidak nyata.",
+    },
+  ] as const;
+
+  for (const example of examples) {
+    const { data: existing, error: lookupError } = await admin.from("information_posts")
+      .select("id")
+      .eq("title", example.title)
+      .maybeSingle();
+    if (lookupError) throw new Error("Pemeriksaan konten Informasi UT demo gagal: " + lookupError.message);
+    if (existing) continue;
+
+    unwrap(await admin.from("information_posts").insert({
+      ...example,
+      author_id: null,
+      source_url: null,
+      is_published: true,
+      published_at: new Date().toISOString(),
+    }), "Contoh Informasi UT demo gagal dibuat");
+  }
+}
+
 async function seedSession(ctx: DemoContext, scenario: string) {
   const { admin, visitorId, sessionId } = ctx;
   const bots: DemoBot[] = [];
   for (let i = 0; i < PROGRAMS.length; i += 1) bots.push(await createBot(admin, sessionId, PROGRAMS[i], i));
   const bot = Object.fromEntries(bots.map(item => [item.key, item])) as Record<string, DemoBot>;
+
+  await seedDemoInformation(admin);
 
   unwrap(await admin.rpc("save_my_location", {
     p_user_id: visitorId,
