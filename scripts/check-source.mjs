@@ -76,6 +76,66 @@ if (!pkg.devDependencies?.vite) failures.push('package.json: Vite must be declar
 if (!pkg.devDependencies?.['@playwright/test']) failures.push('package.json: Playwright Test must be declared in devDependencies');
 if (!pkg.scripts?.build || !pkg.scripts?.check || !pkg.scripts?.['test:e2e']) failures.push('package.json: build, check, and test:e2e scripts are required');
 
+const demoClientPath = join(root, 'src/lib/supabase.js');
+const demoServicePath = join(root, 'src/services/demo.js');
+const demoHtmlPath = join(root, 'index.html');
+const demoEdgePath = join(root, 'supabase/functions/demo-mode/index.ts');
+const demoMigrationPath = join(root, 'supabase/migrations/20261101110000_utconnect_demo_mode_isolation.sql');
+
+for (const [label, path] of [
+  ['Demo Mode browser client', demoClientPath],
+  ['Demo Mode client service', demoServicePath],
+  ['Demo Mode Edge Function', demoEdgePath],
+  ['Demo Mode isolation migration', demoMigrationPath],
+]) {
+  if (!existsSync(path)) failures.push(`${label}: required source file is missing`);
+}
+
+if (existsSync(demoClientPath) && existsSync(demoHtmlPath)) {
+  const demoClient = readFileSync(demoClientPath, 'utf8');
+  const demoHtml = readFileSync(demoHtmlPath, 'utf8');
+  for (const [description, condition] of [
+    ['environment flag defaults off', demoClient.includes('VITE_UTCONNECT_DEMO_MODE === "true"')],
+    ['demo project reference must match the Supabase URL', demoClient.includes('DEMO_PROJECT_REF !== SUPABASE_PROJECT_REF')],
+    ['shared Supabase project is blocked', demoClient.includes('hqyusbyndtlfypdbmatw') && demoClient.includes('lguqtplssimkwwyzmwzz')],
+    ['scenario chooser is hidden by default', /id="demoEntryPanel"[^>]*hidden/.test(demoHtml)],
+    ['demo entry button is hidden by default', /id="demoStartBtn"[^>]*hidden/.test(demoHtml)],
+  ]) {
+    if (!condition) failures.push(`Demo Mode guard: missing ${description}`);
+  }
+}
+
+if (existsSync(demoEdgePath)) {
+  const edge = readFileSync(demoEdgePath, 'utf8');
+  for (const [description, condition] of [
+    ['exact allowed Origin validation', edge.includes('DEMO_ALLOWED_ORIGIN') && edge.includes('origin !== allowedOrigin')],
+    ['server-owned visitor role validation', edge.includes('utconnect_demo_role') && edge.includes('role !== "visitor"')],
+    ['anonymous bootstrap validation', edge.includes('actor.is_anonymous === true')],
+    ['session-scoped seed records', edge.includes('demo_session_id')],
+    ['labeled simulated bot responses', edge.includes('[SIMULASI DEMO]')],
+    ['server-side reset validation', edge.includes('action === "reset"') && edge.includes('auth.admin.deleteUser')],
+    ['server-side active group counts', edge.includes('action === "list_groups"') && edge.includes('active_member_count')],
+  ]) {
+    if (!condition) failures.push(`Demo Mode Edge Function: missing ${description}`);
+  }
+  if (/VITE_SUPABASE|window\.localStorage|document\.cookie/.test(edge)) {
+    failures.push('Demo Mode Edge Function must not depend on browser-only state or Vite secrets');
+  }
+}
+
+if (existsSync(demoMigrationPath)) {
+  const migration = readFileSync(demoMigrationPath, 'utf8');
+  for (const [description, condition] of [
+    ['session-scoped RLS guard', migration.includes('demo_scope_guard') && migration.includes('can_access_demo_scope')],
+    ['server metadata authority', migration.includes('raw_app_meta_data') && !migration.includes('raw_user_meta_data')],
+    ['server-only demo RPC grants', migration.includes('to service_role') && migration.includes('from public, anon, authenticated')],
+    ['real student verification status is kept separate', migration.includes("verification_status = 'verified'::public.student_verification_status")],
+    ['group capacity is checked on the server', migration.includes('Group is full')],
+  ]) {
+    if (!condition) failures.push(`Demo Mode migration: missing ${description}`);
+  }
+}
+
 const authSource = readFileSync(join(root, 'src/auth/main.js'), 'utf8');
 const authHtml = readFileSync(join(root, 'index.html'), 'utf8');
 for (const [description, condition] of [
