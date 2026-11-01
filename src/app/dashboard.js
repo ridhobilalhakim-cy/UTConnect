@@ -2031,7 +2031,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
         if (file) updated.avatar_path = await uploadMyProfileAvatar(file);
         else if (selectedAvatarPreset) updated.avatar_path = await setMyProfileAvatarPreset(selectedAvatarPreset);
         state.profile = { ...state.profile, ...updated };
-        isVerified = state.profile.verification_status === "verified";
+        isVerified = isDemo || state.profile.verification_status === "verified";
         verificationStatus = state.profile.verification_status || "pending";
         renderProfileSummary();
         await Promise.all([loadForum(), loadMatching(), loadGroups(), loadVerification()]);
