@@ -146,7 +146,7 @@ if (existsSync(nearbyEdgePath)) {
   if (!nearbyEdge.includes('const demoModeEnabled = Deno.env.get("UTCONNECT_DEMO_MODE") === "true"')) {
     failures.push('Nearby Edge Function: demo-only profile columns must be enabled by an explicit server environment flag');
   }
-  if (!nearbyEdge.includes('select(demoModeEnabled ? "verification_status,is_demo" : "verification_status")')) {
+  if (!nearbyEdge.includes('if (demoModeEnabled)') || !nearbyEdge.includes('.select("verification_status,is_demo")') || !nearbyEdge.includes('.select("verification_status")')) {
     failures.push('Nearby Edge Function: normal deployments must not require the demo-only profile marker');
   }
 }
