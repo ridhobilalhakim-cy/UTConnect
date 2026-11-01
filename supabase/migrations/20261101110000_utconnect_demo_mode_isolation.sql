@@ -2082,6 +2082,14 @@ for all to authenticated
 using (private.can_access_demo_scope(is_demo, demo_session_id))
 with check (private.can_access_demo_scope(is_demo, demo_session_id));
 
+create index if not exists forum_posts_demo_session_created_idx
+  on public.forum_posts (demo_session_id, created_at desc)
+  where is_demo = true;
+
+create index if not exists forum_comments_demo_session_post_created_idx
+  on public.forum_comments (demo_session_id, post_id, created_at)
+  where is_demo = true;
+
 create or replace function public.get_forum_author_profiles(p_user_ids uuid[])
 returns table(user_id uuid, full_name text, avatar_path text)
 language plpgsql
