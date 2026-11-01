@@ -35,10 +35,18 @@ export async function startDemoSession() {
 }
 
 export async function resetDemoSession() {
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error) throw error;
+  if (user?.app_metadata?.utconnect_demo_role !== "visitor") {
+    throw new Error("Reset hanya tersedia untuk sesi pengunjung DEMO.");
+  }
   return invokeDemo("reset");
 }
 
 export async function runDemoAutomation(action, payload = {}) {
   if (!IS_DEMO_BUILD) return null;
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error) throw error;
+  if (user?.app_metadata?.utconnect_demo_role !== "visitor") return null;
   return invokeDemo(action, payload);
 }
