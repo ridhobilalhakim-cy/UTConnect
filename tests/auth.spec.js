@@ -1906,3 +1906,11 @@ test('student can mark all notifications as read and clear the unread counter', 
   expect(state.notifications.every(item => item.read_at !== null)).toBe(true);
 });
 
+
+
+test('Demo Mode controls stay hidden in a normal build', async ({ page }) => {
+  await mockSupabase(page);
+  await page.goto('/');
+  await expect(page.locator('#demoStartBtn')).toBeHidden();
+  await expect(page.locator('#demoEntryPanel')).toBeHidden();
+});
