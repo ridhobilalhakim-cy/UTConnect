@@ -133,7 +133,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
         <button type="button" class="notification-item ${item.read_at ? "" : "unread"}" data-notification-id="${escapeText(item.id)}">
           <span class="notification-icon"><i data-lucide="${escapeText(meta.icon)}"></i></span>
           <span class="notification-content">
-            <strong>${escapeText(item.title)}</strong>
+            <strong>${escapeText(item.title)} ${item.is_demo ? '<span class="demo-user-tag">DEMO</span>' : ""}</strong>
             <span>${escapeText(item.body)}</span>
             <small>${escapeText(notificationDate(item.created_at))}</small>
           </span>
