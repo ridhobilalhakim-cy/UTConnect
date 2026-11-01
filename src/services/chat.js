@@ -55,7 +55,7 @@ export async function sendDirectMessage(connectionId, body) {
       sender_id: userId,
       body: message,
     })
-    .select("id,connection_id,sender_id,body,created_at,read_at")
+    .select("id,connection_id,sender_id,body,created_at,read_at,is_demo")
     .single();
 
   throwIfError(error);
