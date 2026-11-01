@@ -328,17 +328,17 @@ function pdfBytes() {
   const offsets = [0];
   for (let index = 0; index < objects.length; index += 1) {
     offsets.push(encoder.encode(pdf).length);
-    pdf += (index + 1) + " 0 obj\\n" + objects[index] + "\\nendobj\\n";
+    pdf += (index + 1) + " 0 obj\n" + objects[index] + "\nendobj\n";
   }
 
   const xrefOffset = encoder.encode(pdf).length;
-  pdf += "xref\\n0 " + (objects.length + 1) + "\\n";
-  pdf += "0000000000 65535 f \\n";
+  pdf += "xref\n0 " + (objects.length + 1) + "\n";
+  pdf += "0000000000 65535 f \n";
   for (const offset of offsets.slice(1)) {
-    pdf += String(offset).padStart(10, "0") + " 00000 n \\n";
+    pdf += String(offset).padStart(10, "0") + " 00000 n \n";
   }
-  pdf += "trailer\\n<< /Size " + (objects.length + 1) + " /Root 1 0 R >>\\n";
-  pdf += "startxref\\n" + xrefOffset + "\\n%%EOF\\n";
+  pdf += "trailer\n<< /Size " + (objects.length + 1) + " /Root 1 0 R >>\n";
+  pdf += "startxref\n" + xrefOffset + "\n%%EOF\n";
   return encoder.encode(pdf);
 }
 
