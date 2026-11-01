@@ -30,7 +30,7 @@ export async function listDirectMessages(connectionId, { limit = MESSAGE_LIMIT, 
   const safeLimit = Math.max(1, Math.min(Number(limit) || MESSAGE_LIMIT, 100));
   let query = supabase
     .from("direct_messages")
-    .select(MESSAGE_SELECT)
+    .select(DIRECT_MESSAGE_SELECT)
     .eq("connection_id", connectionId)
     .order("created_at", { ascending: false })
     .limit(safeLimit);
@@ -58,7 +58,7 @@ export async function sendDirectMessage(connectionId, body) {
       sender_id: userId,
       body: message,
     })
-    .select(MESSAGE_SELECT)
+    .select(DIRECT_MESSAGE_SELECT)
     .single();
 
   throwIfError(error);
