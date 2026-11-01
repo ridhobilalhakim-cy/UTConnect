@@ -82,13 +82,14 @@ Deno.serve(async (req: Request) => {
     const user = authData?.user;
     if (authError || !user) return json({ error: "Sesi tidak valid. Silakan masuk kembali." }, 401);
 
+    const demoModeEnabled = Deno.env.get("UTCONNECT_DEMO_MODE") === "true";
     const { data: profile, error: profileError } = await admin
       .from("profiles")
-      .select("verification_status,is_demo")
+      .select(demoModeEnabled ? "verification_status,is_demo" : "verification_status")
       .eq("id", user.id)
       .maybeSingle();
     if (profileError) return json({ error: "Status verifikasi belum dapat diperiksa." }, 500);
-    if (profile?.verification_status !== "verified" && profile?.is_demo !== true) {
+    if (profile?.verification_status !== "verified" && !(demoModeEnabled && profile?.is_demo === true)) {
       return json({ error: "Peta mahasiswa sekitar hanya tersedia untuk mahasiswa terverifikasi." }, 403);
     }
 
@@ -145,7 +146,7 @@ Deno.serve(async (req: Request) => {
       approx_distance_m: row.approx_distance_m,
       marker_lat: row.marker_lat,
       marker_lng: row.marker_lng,
-      is_demo: row.is_demo === true,
+      is_demo: demoModeEnabled && row.is_demo === true,
     }));
     return json({
       radius,
