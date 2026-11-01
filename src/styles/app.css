@@ -431,6 +431,8 @@
 .demo-showcase-count{flex:none;padding:7px 9px;border-radius:8px;background:#fff2c8;border:1px solid #efdfad;color:#80621b;font-size:9px;font-weight:900;letter-spacing:.5px}
 .demo-showcase-bots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
 .demo-bot-card{display:flex;align-items:center;gap:10px;min-width:0;padding:10px;border:1px solid #ebeff4;border-radius:12px;background:#fff}
+.demo-bot-card .demo-bot-avatar{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex:none;color:#fff;font-size:12px;font-weight:900;box-shadow:inset 0 -3px 0 #00000012}
+.demo-bot-card .demo-bot-avatar.bot-a{background:#24649b}.demo-bot-card .demo-bot-avatar.bot-b{background:#a47720}.demo-bot-card .demo-bot-avatar.bot-c{background:#587b62}.demo-bot-card .demo-bot-avatar.bot-d{background:#7865a3}.demo-bot-card .demo-bot-avatar.bot-e{background:#b16e77}.demo-bot-card .demo-bot-avatar.bot-f{background:#417f88}
 .demo-bot-card>div{display:grid;gap:3px;min-width:0}
 .demo-bot-card strong{font-size:11px;color:#263e58}
 .demo-bot-card small{font-size:9px;color:#718096;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
