@@ -348,6 +348,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       attribution: "&copy; OpenStreetMap contributors",
     }).addTo(map);
     map.on("click", event => {
+      if (isDemo) { toast("Mode DEMO memakai lokasi simulasi di sekitar kampus UT. GPS dan pemilihan lokasi pribadi dinonaktifkan."); return; }
       const consent = $("#map-location-consent");
       if (!state.myLocation?.consented_at && !consent?.checked) {
         toast("Setujui penggunaan lokasi sebelum memilih titik pada peta.");
@@ -531,6 +532,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   }
 
   async function locateHomeMap() {
+    if (isDemo) { toast("Mode DEMO memakai titik lokasi simulasi sekitar kampus UT, bukan lokasi GPS perangkat."); return; }
     if (!navigator.geolocation) {
       toast("Browser ini tidak mendukung akses lokasi. Klik peta untuk menentukan titik secara manual.");
       return;
@@ -655,6 +657,16 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   }
 
   bindHomeMapControls();
+  if (isDemo) {
+    const nimInput = $("#nim-search");
+    if (nimInput) {
+      nimInput.disabled = true;
+      nimInput.placeholder = "Pencarian NIM asli tidak digunakan pada DEMO";
+      nimInput.title = "Akun DEMO tidak memiliki NIM mahasiswa sungguhan.";
+    }
+    const locateButton = $("#locate-btn");
+    if (locateButton) locateButton.title = "Demo memakai titik lokasi simulasi sekitar kampus UT.";
+  }
     function renderMatchingAccess() {
     const notice = $("#match-access-notice");
     const layout = $("#match-layout");
