@@ -350,9 +350,17 @@ async function seedSession(ctx: DemoContext, scenario: string) {
   const privateGroup = await insertGroup(admin, bot.f.userId, "Kelompok Diskusi Privat — Undangan", "Sains Data",
     "Grup privat yang hanya dapat dimasuki melalui undangan.", 5, "private",
     [{ userId: bot.f.userId, role: "admin" }, { userId: bot.a.userId }]);
-  unwrap(await admin.from("group_invites").upsert({
-    group_id: privateGroup.id, invited_user_id: visitorId, invited_by: bot.f.userId, accepted_at: null,
-  }, { onConflict: "group_id,invited_user_id" }), "Undangan grup privat demo gagal dibuat");
+  const { data: existingInvite, error: inviteLookupError } = await admin.from("group_invites")
+    .select("id")
+    .eq("group_id", privateGroup.id)
+    .eq("invited_user_id", visitorId)
+    .maybeSingle();
+  if (inviteLookupError) throw new Error("Pemeriksaan undangan privat demo gagal: " + inviteLookupError.message);
+  if (!existingInvite) {
+    unwrap(await admin.from("group_invites").insert({
+      group_id: privateGroup.id, invited_user_id: visitorId, invited_by: bot.f.userId, accepted_at: null,
+    }), "Undangan grup privat demo gagal dibuat");
+  }
 
   await addGroupMessage(admin, open.id, bot.a.userId, "[SIMULASI DEMO] Kita mulai diskusi analisis kebutuhan sistem.");
   await addGroupMessage(admin, nearlyFull.id, bot.b.userId, "[SIMULASI DEMO] Sisa satu tempat di kelompok ini.");
@@ -377,7 +385,7 @@ async function seedSession(ctx: DemoContext, scenario: string) {
   unwrap(await admin.from("group_materials").upsert({
     group_id: open.id, uploaded_by: bot.a.userId, title: "Materi Simulasi UTConnect",
     storage_path: filePath, content_type: "application/pdf", file_size_bytes: pdfBytes().length,
-  }, { onConflict: "group_id,storage_path" }), "Metadata materi contoh demo gagal dibuat");
+  }, { onConflict: "storage_path" }), "Metadata materi contoh demo gagal dibuat");
 
   return { seeded: true, bot_count: bots.length, groups: 5, scenario };
 }
