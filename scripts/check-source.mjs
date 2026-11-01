@@ -74,7 +74,12 @@ for (const required of ['@supabase/supabase-js', 'leaflet']) {
 }
 if (!pkg.devDependencies?.vite) failures.push('package.json: Vite must be declared in devDependencies');
 if (!pkg.devDependencies?.['@playwright/test']) failures.push('package.json: Playwright Test must be declared in devDependencies');
-if (!pkg.scripts?.build || !pkg.scripts?.check || !pkg.scripts?.['test:e2e']) failures.push('package.json: build, check, and test:e2e scripts are required');
+if (!pkg.scripts?.build || !pkg.scripts?.check || !pkg.scripts?.['test:e2e'] || !pkg.scripts?.['test:e2e:demo']) failures.push('package.json: build, check, test:e2e, and test:e2e:demo scripts are required');
+
+for (const required of ['playwright.demo.config.js', 'tests/demo-build/demo-entry.spec.js']) {
+  if (!existsSync(join(root, required))) failures.push(`Demo Mode browser test: required file "${required}" is missing`);
+}
+
 
 const demoClientPath = join(root, 'src/lib/supabase.js');
 const demoServicePath = join(root, 'src/services/demo.js');
