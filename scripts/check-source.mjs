@@ -170,7 +170,7 @@ if (existsSync(demoMigrationPath)) {
     ['group notifications work for pending demo profiles within their own session', migration.includes('private.is_verified_user(recipient.id)') && migration.includes('private.same_demo_session(new.created_by, recipient.id)')],
     ['connection response RPC respects demo session boundaries', migration.includes('create or replace function public.respond_connection_request') && migration.includes('private.same_demo_session(v_actor_id, v_connection.initiator_id)')],
     ['demo accounts cannot submit real verification evidence', migration.includes('Demo accounts cannot submit real student verification evidence') && migration.includes('create or replace function private.can_upload_student_verification_evidence')],
-    ['Forum posts and comments are session-scoped', migration.includes('forum_posts_demo_scope') && migration.includes('forum_comments_demo_scope') && migration.includes('demo_scope_guard on public.forum_posts') && migration.includes('demo_scope_guard on public.forum_comments')],
+    ['Forum posts and comments are session-scoped', migration.includes('forum_posts_demo_scope') && migration.includes('forum_comments_demo_scope') && migration.includes('demo_scope_guard on public.forum_posts') && migration.includes('demo_scope_guard on public.forum_comments') && migration.includes("'forum_posts')")],
     ['Forum comment notifications stay in the same demo session', migration.includes('private.notify_forum_comment_received()') && migration.includes('private.same_demo_session(new.author_id, v_post_author_id)')],
     ['Forum author lookup respects the viewer demo session', migration.includes('private.same_demo_session(v_actor_id, p.id)')],
   ]) {
