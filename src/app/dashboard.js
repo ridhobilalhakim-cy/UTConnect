@@ -1176,6 +1176,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       const pendingCount = isManager
         ? state.groupMembers.filter(member => member.group_id === group.id && member.status === "pending").length
         : 0;
+      const isFull = activeCount !== null && activeCount >= Number(group.capacity);
       const accessLabels = { open: "Terbuka", approval: "Perlu persetujuan", private: "Undangan pribadi" };
       const accessLabel = accessLabels[group.access_type] || "Akses terbatas";
       const capacityText = activeCount === null
@@ -1187,7 +1188,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
         ? (group.online_url ? `<a href="${escapeText(group.online_url)}" target="_blank" rel="noopener noreferrer">Buka tautan pertemuan</a>` : "Pertemuan online")
         : (group.offline_area_label ? escapeText(group.offline_area_label) : "Lokasi belum ditentukan");
       const status = isActiveMember
-        ? (isManager ? "Admin grup" : "Anggota")
+        ? (isFull ? (isManager ? "Penuh · Admin grup" : "Kapasitas penuh") : (isManager ? "Admin grup" : "Anggota"))
         : isPending
           ? "Menunggu persetujuan"
           : group.access_type === "approval"
