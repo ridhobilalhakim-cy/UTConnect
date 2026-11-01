@@ -1173,7 +1173,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       const isManager = isActiveMember && ["admin", "co_admin"].includes(membership.role);
       const activeCount = isActiveMember
         ? state.groupMembers.filter(member => member.group_id === group.id && member.status === "active").length
-        : null;
+        : (state.isDemo && Number.isFinite(Number(group.active_member_count)) ? Number(group.active_member_count) : null);
       const pendingCount = isManager
         ? state.groupMembers.filter(member => member.group_id === group.id && member.status === "pending").length
         : 0;
