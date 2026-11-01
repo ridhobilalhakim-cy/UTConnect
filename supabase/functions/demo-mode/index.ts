@@ -141,34 +141,46 @@ async function requestContext(req: Request, origin: string, action: string, scen
 
 async function createBot(admin: SupabaseClient, sessionId: string, spec: typeof PROGRAMS[number], index: number): Promise<DemoBot> {
   const { data: existing, error: existingError } = await admin.from("profiles")
-    .select("id,full_name,program").eq("is_demo", true).eq("demo_session_id", sessionId).eq("full_name", spec.name).maybeSingle();
+    .select("id,full_name,program")
+    .eq("is_demo", true)
+    .eq("demo_session_id", sessionId)
+    .eq("full_name", spec.name)
+    .maybeSingle();
   if (existingError) throw new Error("Pemeriksaan bot demo gagal: " + existingError.message);
-  if (existing) return { key: spec.key, userId: existing.id, name: existing.full_name, program: existing.program };
 
-  const { data: created, error: createError } = await admin.auth.admin.createUser({
-    email: "demo-" + sessionId + "-" + spec.key + "@utconnect.invalid",
-    password: randomPassword(),
-    email_confirm: true,
-    app_metadata: {
-      utconnect_demo_role: "bot",
-      utconnect_demo_session: sessionId,
-      utconnect_demo_bot_key: spec.key,
-    },
-    user_metadata: { full_name: spec.name },
-  });
-  if (createError || !created.user) throw new Error("Akun bot " + spec.key.toUpperCase() + " gagal dibuat: " + (createError?.message || "respons kosong"));
-  const id = created.user.id;
-  const digest = await sha256("UTCONNECT-DEMO-NOT-A-REAL-NIM:" + sessionId + ":" + spec.key + ":" + crypto.randomUUID());
-  unwrap(await admin.from("profiles").insert({
-    id,
-    full_name: spec.name,
-    nim_digest: digest,
-    faculty: spec.faculty,
-    program: spec.program,
-    semester: spec.semester,
-    verification_status: "pending",
-    bio: "Akun simulasi UTConnect. " + spec.name + " bukan mahasiswa sungguhan.",
-  }), "Profil bot gagal dibuat");
+  let id: string;
+  if (existing) {
+    id = existing.id;
+  } else {
+    const { data: created, error: createError } = await admin.auth.admin.createUser({
+      email: "demo-" + sessionId + "-" + spec.key + "@utconnect.invalid",
+      password: randomPassword(),
+      email_confirm: true,
+      app_metadata: {
+        utconnect_demo_role: "bot",
+        utconnect_demo_session: sessionId,
+        utconnect_demo_bot_key: spec.key,
+      },
+      user_metadata: { full_name: spec.name },
+    });
+    if (createError || !created.user) {
+      throw new Error("Akun bot " + spec.key.toUpperCase() + " gagal dibuat: " + (createError?.message || ""));
+    }
+    id = created.user.id;
+    const digest = await sha256("UTCONNECT-DEMO-NOT-A-REAL-NIM:" + sessionId + ":" + spec.key + ":" + crypto.randomUUID());
+    unwrap(await admin.from("profiles").insert({
+      id,
+      full_name: spec.name,
+      nim_digest: digest,
+      faculty: spec.faculty,
+      program: spec.program,
+      semester: spec.semester,
+      verification_status: "pending",
+      bio: "Akun simulasi UTConnect. " + spec.name + " bukan mahasiswa sungguhan.",
+    }), "Profil bot gagal dibuat");
+  }
+
+  // Re-apply these idempotently so a retry can recover from an interrupted first seed.
   const point = campusPoint(index);
   unwrap(await admin.rpc("save_my_location", {
     p_user_id: id,
@@ -177,16 +189,16 @@ async function createBot(admin: SupabaseClient, sessionId: string, spec: typeof 
     p_consent: true,
     p_show_in_radar: true,
   }), "Lokasi sintetis bot gagal dibuat");
-  unwrap(await admin.from("matching_preferences").insert({
+  unwrap(await admin.from("matching_preferences").upsert({
     user_id: id,
     topic_tags: [...spec.topics],
     interests: [...spec.interests],
     study_times: [...spec.times],
     preferred_programs: [spec.program],
-  }), "Preferensi bot gagal dibuat");
+  }, { onConflict: "user_id" }), "Preferensi bot gagal dibuat");
+
   return { key: spec.key, userId: id, name: spec.name, program: spec.program };
 }
-
 async function insertGroup(admin: SupabaseClient, creator: string, name: string, program: string,
   description: string, capacity: number, access: "open" | "approval" | "private",
   members: Array<{ userId: string; role?: "admin" | "co_admin" | "member" }>) {
