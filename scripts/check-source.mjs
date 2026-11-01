@@ -133,6 +133,7 @@ if (existsSync(demoMigrationPath)) {
     ['server-only demo RPC grants', migration.includes('to service_role') && migration.includes('from public, anon, authenticated')],
     ['real student verification status is kept separate', migration.includes("verification_status = 'verified'::public.student_verification_status")],
     ['group capacity is checked on the server', migration.includes('Group is full')],
+    ['group notifications work for pending demo profiles within their own session', migration.includes('private.is_verified_user(recipient.id)') && migration.includes('private.same_demo_session(new.created_by, recipient.id)')],
   ]) {
     if (!condition) failures.push(`Demo Mode migration: missing ${description}`);
   }
