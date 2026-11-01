@@ -730,6 +730,19 @@ Deno.serve(async (req: Request) => {
             if (error && !error.message.includes("Group is full")) throw new Error(error.message);
           }
         }
+        const { data: activeMember } = await ctx.admin.from("group_members").select("status")
+          .eq("group_id", groupId).eq("user_id", ctx.visitorId).maybeSingle();
+        if (activeMember?.status === "active" && await claimEvent(ctx.admin, ctx.sessionId, "welcome:" + groupId)) {
+          const { data: botMember } = await ctx.admin.from("group_members").select("user_id")
+            .eq("group_id", groupId).eq("status", "active").neq("user_id", ctx.visitorId).limit(1).maybeSingle();
+          if (botMember) {
+            unwrap(await ctx.admin.from("group_messages").insert({
+              group_id: groupId, sender_id: botMember.user_id,
+              body: "[SIMULASI DEMO] Selamat bergabung! Kita bisa mulai dengan perkenalan dan target belajar.",
+              mentioned_user_ids: [],
+            }), "Pesan sambutan bot gagal dikirim");
+          }
+        }
       } else if (action === "group_message") {
         const messageId = String(payload.message_id || "");
         const { data: message } = await ctx.admin.from("group_messages").select("id,sender_id")
