@@ -42,7 +42,7 @@ References:
 In a separate disposable copy of `feat/utconnect-demo-mode`:
 
 1. Archive the existing incremental SQL files outside the active `supabase/migrations` directory. Do not delete them from the normal feature branch.
-2. Put the reviewed schema snapshot first in the active migration directory. Keep its generated timestamp earlier than `20261101110000_utconnect_demo_mode_isolation.sql`.
+2. Put the reviewed schema snapshot first in the active migration directory. Keep its generated timestamp earlier than `20261101110000_utconnect_demo_mode_isolation.sql`. If the generated timestamp sorts later, rename the Demo Mode migration in this disposable workspace to a later timestamp while preserving its SQL body; do not change the normal feature branch just to force ordering.
 3. Add `20261101110000_utconnect_demo_mode_isolation.sql` immediately after the baseline.
 4. Do **not** put the old incremental migrations back into this active migration directory. Their changes are already represented by the current-state baseline; replaying them after the baseline can fail on duplicate or already-altered objects.
 5. Keep the Edge Function source files and application code from the feature branch.
