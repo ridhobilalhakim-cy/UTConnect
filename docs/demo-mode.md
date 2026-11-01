@@ -6,7 +6,7 @@ Demo Mode is implemented on the isolated feature branch `feat/utconnect-demo-mod
 
 Do not merge, deploy, or apply the demo migration to either existing UTConnect Supabase project. The branch is only a source-code implementation until a separate Supabase project and a separate hosting project are provisioned.
 
-The demo migration assumes the complete UTConnect baseline schema. The first five baseline migration bodies are still missing from this repository; see `supabase/migrations/REMOTE_MIGRATIONS.md`. Reconstruct and review those migrations before creating an empty demo database.
+The first five baseline migration bodies are missing from this repository and do not appear in the Git history of the current, base, or main branches. Do not reconstruct them by guessing from their names. For a separate Demo project, use the reviewed squashed-baseline procedure in [demo-mode-baseline-recovery.md](./demo-mode-baseline-recovery.md). That procedure snapshots the current staging schema for the demo-only migration chain; it does not recreate the original historical migration sequence, and it has **not yet been executed**.
 
 ## Isolation model
 
@@ -21,7 +21,7 @@ The demo migration assumes the complete UTConnect baseline schema. The first fiv
 ## Provisioning requirements
 
 1. Provision a **new, dedicated Supabase project** for Demo Mode. Do not reuse the Netlify/shared staging project, the current Cloudflare Pages Preview project, or the current Cloudflare Pages Production project.
-2. Reconstruct and review the missing baseline migration bodies referenced by `REMOTE_MIGRATIONS.md`. Apply the complete baseline to the new project, then review and apply `20261101110000_utconnect_demo_mode_isolation.sql` there only.
+2. Create and verify a demo-only squashed baseline by following [demo-mode-baseline-recovery.md](./demo-mode-baseline-recovery.md). The baseline and `20261101110000_utconnect_demo_mode_isolation.sql` must be the only migrations in that demo workspace's active migration directory. Do not replay the old incremental migrations on top of the current-state baseline.
 3. Enable Anonymous Sign-Ins in the dedicated project's Supabase Auth settings. The normal login/register flows can remain available, but the Demo Mode button itself uses Anonymous Sign-In.
 4. Deploy `supabase/functions/demo-mode/index.ts` and the updated `supabase/functions/nearby-students/index.ts` to the dedicated project with JWT verification enabled. Set `UTCONNECT_DEMO_MODE=true` for the dedicated project's Edge Function environment so Nearby can read the demo marker; leave it unset on normal UTConnect projects. Set the exact browser origin in the Edge Function secret `DEMO_ALLOWED_ORIGIN` (scheme + host, no path). The function uses the project's server-side Auth/API variables and a server-only service-role/secret key. Never put a service-role or `sb_secret_` key in a Vite/browser variable.
 5. Create a separate hosting project for the demo build. Set these build variables there:
