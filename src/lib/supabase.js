@@ -12,8 +12,8 @@ if (IS_DEMO_BUILD) {
   if (!DEMO_PROJECT_REF || DEMO_PROJECT_REF !== SUPABASE_PROJECT_REF) {
     throw new Error("UTConnect Demo Mode requires a matching, dedicated Supabase demo project.");
   }
-  if (SUPABASE_PROJECT_REF === "hqyusbyndtlfypdbmatw") {
-    throw new Error("Demo Mode is blocked from using the shared UTConnect database.");
+  if (["hqyusbyndtlfypdbmatw", "lguqtplssimkwwyzmwzz"].includes(SUPABASE_PROJECT_REF)) {
+    throw new Error("Demo Mode is blocked from using an existing UTConnect database. Use a newly provisioned demo-only project.");
   }
 }
 export const AUTH_STORAGE_KEY = `utconnect-${SUPABASE_PROJECT_REF}-auth`;
