@@ -79,6 +79,10 @@ if (!pkg.scripts?.build || !pkg.scripts?.check || !pkg.scripts?.['test:e2e'] || 
 for (const required of ['playwright.demo.config.js', 'tests/demo-build/demo-entry.spec.js']) {
   if (!existsSync(join(root, required))) failures.push(`Demo Mode browser test: required file "${required}" is missing`);
 }
+const normalPlaywrightConfigPath = join(root, 'playwright.config.js');
+if (existsSync(normalPlaywrightConfigPath) && !readFileSync(normalPlaywrightConfigPath, 'utf8').includes("testIgnore: ['**/demo-build/**']")) {
+  failures.push('Normal Playwright config must exclude the separate demo-build test suite');
+}
 
 
 const demoClientPath = join(root, 'src/lib/supabase.js');
