@@ -30,7 +30,9 @@ function json(origin: string, value: Record<string, unknown>, status = 200) {
 }
 
 function randomPassword() {
-  return Array.from(crypto.getRandomValues(new Uint8Array(40)), b => b.toString(16).padStart(2, "0")).join("");
+  const random = Array.from(crypto.getRandomValues(new Uint8Array(40)), b => b.toString(16).padStart(2, "0")).join("");
+  // The prefix guarantees mixed case, digits, and symbols for stricter Auth password policies.
+  return "UTc!9-" + random + "Z";
 }
 
 async function sha256(value: string) {
@@ -197,10 +199,15 @@ async function insertGroup(admin: SupabaseClient, creator: string, name: string,
     is_archived: false,
   }).select("id,name").single();
   if (error || !group) throw new Error("Kelompok demo gagal dibuat: " + (error?.message || "respons kosong"));
-  unwrap(await admin.from("group_members").insert(members.map(item => ({
-    group_id: group.id, user_id: item.userId, role: item.role || "member",
-    status: "active", joined_at: new Date().toISOString(),
-  }))), "Anggota kelompok demo gagal dibuat");
+  // study_groups has an AFTER INSERT trigger that already creates the creator as admin.
+  // Insert only the remaining members to avoid a duplicate (group_id, user_id) primary key.
+  const additionalMembers = members.filter(item => item.userId !== creator);
+  if (additionalMembers.length) {
+    unwrap(await admin.from("group_members").insert(additionalMembers.map(item => ({
+      group_id: group.id, user_id: item.userId, role: item.role || "member",
+      status: "active", joined_at: new Date().toISOString(),
+    }))), "Anggota kelompok demo gagal dibuat");
+  }
   return group;
 }
 
