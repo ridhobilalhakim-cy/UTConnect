@@ -579,6 +579,31 @@ Deno.serve(async (req: Request) => {
       }
       return json(allowedOrigin, { success: true });
     }
+    if (action === "connection_response") {
+      const id = String(payload.connection_id || "");
+      const accepted = payload.accepted === true;
+      const { data: connection } = await ctx.admin.from("connections")
+        .select("id,initiator_id,recipient_id,status")
+        .eq("id", id)
+        .eq("is_demo", true)
+        .eq("demo_session_id", ctx.sessionId)
+        .maybeSingle();
+      if (connection?.recipient_id === ctx.visitorId && connection.status === "accepted" && accepted) {
+        const { data: bot } = await ctx.admin.from("profiles")
+          .select("id,is_demo,demo_session_id")
+          .eq("id", connection.initiator_id)
+          .maybeSingle();
+        if (bot?.is_demo && bot.demo_session_id === ctx.sessionId
+          && await claimEvent(ctx.admin, ctx.sessionId, "connection-accepted:" + id)) {
+          unwrap(await ctx.admin.from("direct_messages").insert({
+            connection_id: id,
+            sender_id: connection.initiator_id,
+            body: "[SIMULASI DEMO] Terima kasih sudah menerima permintaan koneksiku. Yuk mulai belajar bersama!",
+          }), "Balasan setelah koneksi diterima gagal dikirim");
+        }
+      }
+      return json(allowedOrigin, { success: true });
+    }
     if (action === "direct_message") {
       const id = String(payload.message_id || "");
       const { data: message } = await ctx.admin.from("direct_messages").select("id,connection_id,sender_id,body")
