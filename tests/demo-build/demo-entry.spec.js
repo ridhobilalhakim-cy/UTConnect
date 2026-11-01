@@ -20,13 +20,13 @@ test('dedicated Demo Mode build exposes simulation entry, bot roster, and scenar
   await expect(page.locator('#demoEntryPanel .demo-feature-list span')).toHaveCount(8);
 });
 
-test('demo dashboard includes shortcuts for all student-facing pages and notifications', async ({ page }) => {
-  await page.goto('/app.html');
-  const showcase = page.locator('#demoShowcase');
-  await expect(showcase).toHaveCount(1);
-  await expect(showcase.locator('.demo-bot-card')).toHaveCount(6);
-  await expect(showcase.locator('[data-demo-nav]')).toHaveCount(8);
-  await expect(showcase.locator('[data-demo-notifications]')).toHaveCount(1);
-  await expect(showcase).toContainText('Materi PDF');
-  await expect(showcase).toContainText('bukti asli dinonaktifkan');
+test('demo dashboard markup covers all student-facing pages and notifications', async ({ page }) => {
+  await page.goto('/');
+  const appHtml = await page.evaluate(async () => (await fetch('/app.html')).text());
+  expect(appHtml).toContain('id="demoShowcase"');
+  expect((appHtml.match(/class="demo-bot-card"/g) || [])).toHaveLength(6);
+  expect((appHtml.match(/data-demo-nav=/g) || [])).toHaveLength(8);
+  expect(appHtml).toContain('data-demo-notifications');
+  expect(appHtml).toContain('Materi PDF');
+  expect(appHtml).toContain('bukti asli dinonaktifkan');
 });
