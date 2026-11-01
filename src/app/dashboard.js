@@ -87,7 +87,7 @@ export function initDashboard({ isAdmin = false, isVerified = false, verificatio
   window.L = L;
   const lucide = window.lucide;
 const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root.querySelectorAll(s)];
-  const state={page:'home',radius:3000,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,myMarker:null,center:null,myLocation:null,nearbyStudents:[],homeMapRequestId:0,connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,activeChatPollTimer:null,connectionChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumAuthors:new Map(),profile:{...currentProfile},chatRooms:[],activeChatRoom:null,groups:[],groupMemberships:new Map(),groupMembers:[],groupInvitations:[],activeGroupChannel:null,activeGroupId:null,groupWorkspace:{messages:[],materials:[],agenda:[],invites:[],pollResults:{}},matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredPrograms:[],matchRadius:3000};
+  const state={page:'home',radius:3000,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,myMarker:null,center:null,myLocation:null,nearbyStudents:[],homeMapRequestId:0,lastNearbyRequestKey:null,lastNearbyRequestAt:0,connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,activeChatPollTimer:null,connectionChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumAuthors:new Map(),profile:{...currentProfile},chatRooms:[],activeChatRoom:null,groups:[],groupMemberships:new Map(),groupMembers:[],groupInvitations:[],activeGroupChannel:null,activeGroupId:null,groupWorkspace:{messages:[],materials:[],agenda:[],invites:[],pollResults:{}},matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredPrograms:[],matchRadius:3000};
   const NOTIFICATION_META = {
     connection_request: { icon: "user-plus", page: "matching" },
     connection_accepted: { icon: "user-check", page: "matching" },
@@ -489,6 +489,11 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       renderMapMarkers();
       return;
     }
+    const requestKey = nimLookup ? `nim:${state.search}` : `radar:${state.radius}`;
+    const requestNow = Date.now();
+    if (state.lastNearbyRequestKey === requestKey && requestNow - state.lastNearbyRequestAt < 1500) return;
+    state.lastNearbyRequestKey = requestKey;
+    state.lastNearbyRequestAt = requestNow;
     const requestId = ++state.homeMapRequestId;
     const result = $("#map-result");
     if (result) result.textContent = nimLookup
@@ -505,6 +510,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       if (requestId !== state.homeMapRequestId) return;
       state.nearbyStudents = [];
       renderMapMarkers();
+      if (state.homeMapRequestId === requestId) state.lastNearbyRequestKey = null;
       console.error("Student lookup failed:", error);
       if (result) result.textContent = error?.message || "Pencarian mahasiswa belum dapat dimuat.";
       setMapStatus(error?.message || "Pencarian mahasiswa belum tersedia.", "error");

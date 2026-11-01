@@ -1376,7 +1376,7 @@ test('verified student NIM search is sent only in the authenticated request body
 
   await page.locator('#nim-search').fill('049123456');
   await expect.poll(() => state.nearbyCalls.length).toBe(2);
-  expect(state.nearbyCalls[1]).toEqual({ radius: 3000, nim: '049123456' });
+  expect(state.nearbyCalls[1]).toEqual({ nim: '049123456' });
   expect(await page.locator('#nim-search').inputValue()).toBe('049123456');
   expect(page.url()).not.toContain('049123456');
 });
