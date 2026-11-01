@@ -170,12 +170,33 @@ if (existsSync(demoEdgePath)) {
     ['retry-safe group/message seed helpers', edge.includes('async function ensureConnection') && edge.includes('async function addGroupMessage')],
     ['all seeded groups carry the demo session scope', (edge.match(/insertGroup\(admin, sessionId, bot\./g) || []).length === 5],
     ['Forum discussion and comment are seeded with simulated text', edge.includes('Diskusi DEMO: Strategi belajar Basis Data') && edge.includes('[SIMULASI DEMO]')],
+    ['Information UT contains idempotent simulated sample posts', edge.includes('async function seedDemoInformation') && edge.includes('DEMO · Tips menyusun jadwal belajar mandiri') && edge.includes('DEMO · Contoh informasi lomba mahasiswa')],
     ['Forum rows are included in session reset', edge.includes('"forum_comments"') && edge.includes('"forum_posts"')],
   ]) {
     if (!condition) failures.push(`Demo Mode Edge Function: missing ${description}`);
   }
   if (/VITE_SUPABASE|window\.localStorage|document\.cookie/.test(edge)) {
     failures.push('Demo Mode Edge Function must not depend on browser-only state or Vite secrets');
+  }
+}
+
+const demoAppHtmlPath = join(root, 'app.html');
+const demoAppMainPath = join(root, 'src/app/main.js');
+const demoDashboardPath = join(root, 'src/app/dashboard.js');
+if (existsSync(demoAppHtmlPath) && existsSync(demoAppMainPath) && existsSync(demoDashboardPath)) {
+  const appHtml = readFileSync(demoAppHtmlPath, 'utf8');
+  const appMain = readFileSync(demoAppMainPath, 'utf8');
+  const dashboard = readFileSync(demoDashboardPath, 'utf8');
+  const botCards = appHtml.match(/class="demo-bot-card"/g) || [];
+  if (!appHtml.includes('id="demoShowcase"')) failures.push('Demo showcase: dashboard panel is missing');
+  if (botCards.length !== 6) failures.push('Demo showcase: exactly six visible bot profile cards must be present');
+  for (const target of ['home', 'matching', 'messages', 'forum', 'groups', 'info', 'profile', 'verification']) {
+    if (!appHtml.includes(`data-demo-nav="${target}"`)) failures.push(`Demo showcase: shortcut for ${target} is missing`);
+  }
+  if (!appHtml.includes('data-demo-notifications')) failures.push('Demo showcase: notification shortcut is missing');
+  if (!appMain.includes('demoShowcase.hidden = !isDemo')) failures.push('Demo showcase must only be revealed for an authenticated demo profile');
+  if (!dashboard.includes('$("#demoShowcase [data-demo-nav]")') || !dashboard.includes('$("#notif-btn")?.click()')) {
+    failures.push('Demo showcase: navigation and notification shortcuts must be wired');
   }
 }
 
