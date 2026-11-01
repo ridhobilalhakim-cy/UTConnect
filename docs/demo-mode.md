@@ -34,9 +34,11 @@ The first five baseline migration bodies are missing from this repository and do
 
 ## Demo content
 
-A seeded visitor receives six fictional bot profiles, synthetic map points, matching preferences, an accepted chat connection, an incoming connection request, one Forum discussion with a simulated reply, five groups (open, nearly full, full, approval, and private/invited), group messages, Agenda items, a poll, and a sample PDF material.
+A seeded visitor receives six fictional bot profiles, synthetic map points, matching preferences, an accepted chat connection, an incoming connection request, one Forum discussion with a simulated reply, five groups (open, nearly full, full, approval, and private/invited), group messages, Agenda items, a poll, and a sample PDF material. The dedicated demo project also receives four clearly labeled sample Information UT cards; they are illustrative content, not official UT announcements.
 
-The login-page selector currently controls the focus label displayed in the demo banner; the seed remains comprehensive so the other features are still available during one continuous presentation.
+The login page visualizes all six bot profiles before a demo session starts. After authentication, the dashboard shows a Demo Showcase with quick links to Home Map, Matching and Connections, Messages, Forum, Groups, Information UT, Profile, Verification, Notifications, and the in-app guide. The group shortcut covers its workspace tabs for chat, materials, agenda/polls, members, and invitations.
+
+The login-page selector controls the focus label displayed in the demo banner; the seed remains comprehensive so all sample features stay available during one continuous presentation. Student verification evidence submission and administrator review remain deliberately unavailable to demo identities.
 
 ## Validation limits
 
