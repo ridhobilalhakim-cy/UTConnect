@@ -50,3 +50,8 @@ export async function runDemoAutomation(action, payload = {}) {
   if (user?.app_metadata?.utconnect_demo_role !== "visitor") return null;
   return invokeDemo(action, payload);
 }
+
+export async function listDemoGroups(limit = 100) {
+  const result = await invokeDemo("list_groups", { limit });
+  return Array.isArray(result?.groups) ? result.groups : [];
+}
