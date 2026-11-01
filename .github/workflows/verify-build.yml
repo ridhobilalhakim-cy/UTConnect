@@ -40,7 +40,7 @@ jobs:
           deno-version: v2.x
 
       - name: Type-check Demo Mode Edge Function
-        run: deno check supabase/functions/demo-mode/index.ts
+        run: deno check supabase/functions/demo-mode/index.ts supabase/functions/nearby-students/index.ts
 
       - name: Build production site
         run: npm run build
@@ -51,6 +51,17 @@ jobs:
       - name: Run browser end-to-end tests
         run: npm run test:e2e
 
+      - name: Build isolated Demo Mode browser bundle
+        env:
+          VITE_SUPABASE_URL: https://utconnect-demo-e2e.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_demo_e2e_placeholder
+          VITE_UTCONNECT_DEMO_MODE: "true"
+          VITE_UTCONNECT_DEMO_PROJECT_REF: utconnect-demo-e2e
+        run: npm run build -- --outDir dist-demo
+
+      - name: Run Demo Mode browser smoke tests
+        run: npm run test:e2e:demo
+
       - name: Upload build, lockfile, and browser test report
         if: always()
         uses: actions/upload-artifact@v4
@@ -58,6 +69,7 @@ jobs:
           name: utconnect-build-${{ github.run_number }}
           path: |
             dist/
+            dist-demo/
             package-lock.json
             playwright-report/
             test-results/
