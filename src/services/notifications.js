@@ -1,6 +1,9 @@
-import { supabase } from "../lib/supabase.js";
+import { supabase, IS_DEMO_BUILD } from "../lib/supabase.js";
 
 const DEFAULT_LIMIT = 40;
+const NOTIFICATION_SELECT = IS_DEMO_BUILD
+  ? "id,user_id,notification_type,title,body,reference_id,read_at,created_at,is_demo"
+  : "id,user_id,notification_type,title,body,reference_id,read_at,created_at";
 
 function throwIfError(error) {
   if (error) throw error;
@@ -19,7 +22,7 @@ export async function listMyNotifications({ limit = DEFAULT_LIMIT } = {}) {
   const safeLimit = Math.max(1, Math.min(Number(limit) || DEFAULT_LIMIT, 100));
   const { data, error } = await supabase
     .from("notifications")
-    .select("id,user_id,notification_type,title,body,reference_id,read_at,created_at,is_demo")
+    .select(NOTIFICATION_SELECT)
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(safeLimit);
