@@ -127,6 +127,8 @@ if (existsSync(demoMigrationPath)) {
   const migration = readFileSync(demoMigrationPath, 'utf8');
   for (const [description, condition] of [
     ['session-scoped RLS guard', migration.includes('demo_scope_guard') && migration.includes('can_access_demo_scope')],
+    ['session checks inside privileged group RPCs', migration.includes('private.same_demo_session(p_actor_id, v_group.created_by)') && migration.includes('Group belongs to a different demo session')],
+    ['expired demo identity remains marked and isolated', migration.includes('private.demo_identity_session_id') && migration.includes("raw_app_meta_data ->> 'utconnect_demo_role'")],
     ['server metadata authority', migration.includes('raw_app_meta_data') && !migration.includes('raw_user_meta_data')],
     ['server-only demo RPC grants', migration.includes('to service_role') && migration.includes('from public, anon, authenticated')],
     ['real student verification status is kept separate', migration.includes("verification_status = 'verified'::public.student_verification_status")],
