@@ -195,7 +195,7 @@ if (existsSync(demoAppHtmlPath) && existsSync(demoAppMainPath) && existsSync(dem
   }
   if (!appHtml.includes('data-demo-notifications')) failures.push('Demo showcase: notification shortcut is missing');
   if (!appMain.includes('demoShowcase.hidden = !isDemo')) failures.push('Demo showcase must only be revealed for an authenticated demo profile');
-  if (!dashboard.includes('$("#demoShowcase [data-demo-nav]")') || !dashboard.includes('$("#demoShowcase [data-demo-notifications]")') || !dashboard.includes('$("#notif-btn")?.click()')) {
+  if (!dashboard.includes('$$("#demoShowcase [data-demo-nav]")') || !dashboard.includes('$$("#demoShowcase [data-demo-notifications]")') || !dashboard.includes('$("#notif-btn")?.click()')) {
     failures.push('Demo showcase: navigation and notification shortcuts must be wired');
   }
 }
