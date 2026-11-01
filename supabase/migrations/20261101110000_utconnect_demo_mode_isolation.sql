@@ -1635,7 +1635,7 @@ begin
     raise exception 'Unsupported demo scope trigger table: %', tg_table_name;
   end if;
 
-  if tg_table_name in ('profiles', 'user_locations', 'matching_preferences', 'notifications', 'study_groups', 'connections') then
+  if tg_table_name in ('profiles', 'user_locations', 'matching_preferences', 'notifications', 'study_groups', 'connections', 'forum_posts') then
     v_is_demo := v_session_id is not null;
   end if;
 
