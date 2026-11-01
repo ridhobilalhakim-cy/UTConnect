@@ -443,10 +443,10 @@ for all to authenticated
 using (private.can_access_demo_scope(is_demo, demo_session_id))
 with check (private.can_access_demo_scope(is_demo, demo_session_id));
 
-grant execute on function private.demo_session_for_user(uuid) to authenticated;
-grant execute on function private.is_demo_user(uuid) to authenticated;
+revoke all on function private.demo_session_for_user(uuid) from public, anon, authenticated;
+revoke all on function private.is_demo_user(uuid) from public, anon, authenticated;
+revoke all on function private.same_demo_session(uuid, uuid) from public, anon, authenticated;
 grant execute on function private.can_access_demo_scope(boolean, uuid) to authenticated;
-grant execute on function private.same_demo_session(uuid, uuid) to authenticated;
 
 -- Nearby search keeps the original radius, distance rounding, jitter, radar consent, and NIM rules.
 drop function if exists public.find_matching_students(integer);
@@ -605,6 +605,7 @@ begin
 end
 $function$;
 
+drop function if exists public.get_my_connection_summaries();
 create or replace function public.get_my_connection_summaries()
 returns table (
   connection_id uuid,
@@ -1612,6 +1613,16 @@ begin
     v_is_demo := v_session_id is not null;
   end if;
 
+  -- Demo profiles must never claim real-student verification, even through direct table updates.
+  if tg_table_name = 'profiles' and v_is_demo then
+    v_json := jsonb_set(
+      v_json,
+      '{verification_status}',
+      to_jsonb('pending'::public.student_verification_status),
+      true
+    );
+  end if;
+
   v_json := jsonb_set(v_json, '{is_demo}', to_jsonb(v_is_demo), true);
   v_json := jsonb_set(
     v_json,
@@ -1623,6 +1634,9 @@ begin
 end
 $function$;
 
+
+-- Reset the bot idempotency ledger for one active visitor session only.
+revoke all on function private.demo_identity_session_id(uuid) from public, anon, authenticated;
 
 -- Reset the bot idempotency ledger for one active visitor session only.
 create or replace function public.demo_reset_bot_events(p_session_id uuid)
