@@ -82,11 +82,11 @@ import {
 import { listMyChatRooms, updateMyStudentProfile, uploadMyProfileAvatar, setMyProfileAvatarPreset, getProfileAvatarUrl } from "../services/profile.js";
 import { UT_PROGRAMS, populateUTFacultyProgramSelects, resolveUTFaculty, resolveUTProgram } from "../data/ut-programs.js";
 
-export function initDashboard({ isAdmin = false, isVerified = false, verificationStatus = "pending", currentUserId = null, currentUserName = "Mahasiswa UT", currentProfile = {} } = {}) {
+export function initDashboard({ isAdmin = false, isDemo = false, isVerified = false, verificationStatus = "pending", currentUserId = null, currentUserName = "Mahasiswa UT", currentProfile = {} } = {}) {
   window.L = L;
   const lucide = window.lucide;
 const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root.querySelectorAll(s)];
-  const state={page:'home',radius:3000,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,myMarker:null,center:null,myLocation:null,nearbyStudents:[],homeMapRequestId:0,connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumAuthors:new Map(),profile:{...currentProfile},chatRooms:[],activeChatRoom:null,groups:[],groupMemberships:new Map(),groupMembers:[],groupInvitations:[],activeGroupChannel:null,activeGroupId:null,groupWorkspace:{messages:[],materials:[],agenda:[],invites:[],pollResults:{}},matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredPrograms:[],matchRadius:3000};
+  const state={isDemo,page:'home',radius:3000,groupFilter:'Semua',infoFilter:'all',search:'',map:null,markers:[],circle:null,myMarker:null,center:null,myLocation:null,nearbyStudents:[],homeMapRequestId:0,connected:new Set(),messages:{},chatMessages:[],activeChatConnectionId:null,activeChatChannel:null,notifications:[],notificationChannel:null,infoItems:[],forumPosts:[],forumAuthors:new Map(),profile:{...currentProfile},chatRooms:[],activeChatRoom:null,groups:[],groupMemberships:new Map(),groupMembers:[],groupInvitations:[],activeGroupChannel:null,activeGroupId:null,groupWorkspace:{messages:[],materials:[],agenda:[],invites:[],pollResults:{}},matchCandidates:[],connectionSummaries:[],matchingPreferences:null,preferredPrograms:[],matchRadius:3000};
   const NOTIFICATION_META = {
     connection_request: { icon: "user-plus", page: "matching" },
     connection_accepted: { icon: "user-check", page: "matching" },
@@ -332,7 +332,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       return `
         <div class="map-nearby-row">
           <div class="person-avatar">${escapeText(student.initials || "UT")}</div>
-          <div class="person-meta"><strong>Mahasiswa ${escapeText(student.initials || "UT")}</strong><span>${escapeText(student.program || "Program studi tidak tersedia")}</span></div>
+          <div class="person-meta"><strong>${student.is_demo ? "Akun simulasi" : "Mahasiswa"} ${escapeText(student.initials || "UT")} ${student.is_demo ? '<span class="demo-user-tag">DEMO</span>' : ""}</strong><span>${escapeText(student.program || "Program studi tidak tersedia")}</span></div>
           <span class="distance">${distanceLabel}</span>
         </div>`;
     }).join("");
@@ -408,11 +408,11 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       const marker = L.marker([lat, lng], {
         icon: L.divIcon({
           className: "",
-          html: `<div class="map-marker">${initialsLabel}</div>`,
+          html: `<div class="map-marker ${student.is_demo ? "demo" : ""}">${student.is_demo ? "D·" : ""}${initialsLabel}</div>`,
           iconSize: [31, 31],
           iconAnchor: [15, 15],
         }),
-      }).addTo(state.map).bindPopup(`<b>Mahasiswa ${initialsLabel}</b><br><small>${programLabel} · ${distanceLabel}</small>`);
+      }).addTo(state.map).bindPopup(`<b>${student.is_demo ? "Akun simulasi DEMO" : `Mahasiswa ${initialsLabel}`}</b><br><small>${programLabel} · ${distanceLabel}</small>`);
       state.markers.push(marker);
     });
 
@@ -739,7 +739,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       return;
     }
     list.innerHTML = rows.map(connection => {
-      const identity = `Mahasiswa UT · ${escapeText(connection.initials || "UT")}`;
+      const identity = connection.is_demo ? `Akun simulasi · ${escapeText(connection.initials || "DEMO")}` : `Mahasiswa UT · ${escapeText(connection.initials || "UT")}`;
       const incoming = connection.is_incoming && connection.status === "pending";
       const labels = {
         pending: connection.is_incoming ? "Permintaan masuk" : "Menunggu jawaban",
@@ -755,7 +755,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       return `
         <article class="connection-row">
           <div class="person-avatar">${escapeText(connection.initials || "UT")}</div>
-          <div class="connection-person"><strong>${identity}</strong><span>${escapeText(connection.program || "Program studi tidak tersedia")}</span><small>${escapeText(forumDate(connection.created_at))}</small></div>
+          <div class="connection-person"><strong>${identity}${connection.is_demo ? '<span class="demo-user-tag">DEMO</span>' : ""}</strong><span>${escapeText(connection.program || "Program studi tidak tersedia")}</span><small>${escapeText(forumDate(connection.created_at))}</small></div>
           ${actions}
         </article>`;
     }).join("");
@@ -801,8 +801,8 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
         <article class="surface match-card">
           <div class="match-top">
             <div class="person-avatar">${escapeText(student.initials || "UT")}</div>
-            <div class="person-meta"><strong>Mahasiswa UT · ${escapeText(student.initials || "UT")}</strong><span>${escapeText(student.program || "Program studi tidak tersedia")} · ${escapeText(matchingDistance(student.approx_distance_m))}</span></div>
-            <span class="match-score">Relevan</span>
+            <div class="person-meta"><strong>${student.is_demo ? "Akun simulasi · " : "Mahasiswa UT · "}${escapeText(student.initials || "UT")} ${student.is_demo ? '<span class="demo-user-tag">DEMO</span>' : ""}</strong><span>${escapeText(student.program || "Program studi tidak tersedia")} · ${escapeText(matchingDistance(student.approx_distance_m))}</span></div>
+            <span class="match-score">${student.is_demo ? "DEMO" : "Relevan"}</span>
           </div>
           <div class="match-tags">${tags.length ? tags.map(tag => `<span class="tag">${escapeText(tag)}</span>`).join("") : '<span class="tiny muted">Belum mengisi program studi atau topik.</span>'}</div>
           <div class="match-card-foot"><span class="tiny muted">${escapeText((student.study_times || []).join(", ") || label)}</span>${action}</div>
@@ -1166,6 +1166,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
     ).join("");
     $("#group-list").innerHTML = invitationHtml + (filtered.map(group => {
       const courseName = group.program || group.course?.course_name || "Kelompok umum";
+      const demoBadge = group.is_demo ? '<span class="demo-user-tag">DEMO · SIMULASI</span>' : "";
       const membership = state.groupMemberships.get(group.id);
       const isActiveMember = membership?.status === "active";
       const isPending = membership?.status === "pending";
@@ -1202,7 +1203,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
           : `<button type="button" class="btn btn-primary btn-sm" data-group-join="${escapeText(group.id)}">${group.access_type === "approval" ? "Minta bergabung" : group.access_type === "private" ? "Terima undangan" : "Gabung grup"}</button>`;
       return `
         <article class="surface group-card">
-          <div class="group-head"><div><h3>${escapeText(group.name)}</h3><div class="group-sub">${escapeText(courseName)}</div></div><span class="mode ${escapeText(group.mode)}">${group.mode === "online" ? "Online" : "Offline"}</span></div>
+          <div class="group-head"><div><h3>${escapeText(group.name)}</h3><div class="group-sub">${escapeText(courseName)}</div>${demoBadge}</div><span class="mode ${escapeText(group.mode)}">${group.mode === "online" ? "Online" : "Offline"}</span></div>
           <p class="group-card-description">${escapeText(group.description || "Belum ada deskripsi kelompok.")}</p>
           <div class="group-sub group-detail-line"><i data-lucide="calendar-days"></i>${schedule}</div>
           <div class="group-sub group-detail-line"><i data-lucide="${group.mode === "online" ? "video" : "map-pin"}"></i>${place}</div>
