@@ -285,10 +285,10 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
   }
   $('[data-page]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));$('[data-go]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.go)));
   if (isDemo) {
-    $("#demoShowcase [data-demo-nav]").forEach(button => {
+    $$("#demoShowcase [data-demo-nav]").forEach(button => {
       button.addEventListener("click", () => navigate(button.dataset.demoNav));
     });
-    $("#demoShowcase [data-demo-notifications]").forEach(button => {
+    $$("#demoShowcase [data-demo-notifications]").forEach(button => {
       button.addEventListener("click", () => $("#notif-btn")?.click());
     });
     const shareInfoButton = $("#share-info");
