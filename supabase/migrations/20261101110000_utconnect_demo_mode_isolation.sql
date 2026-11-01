@@ -1464,3 +1464,161 @@ begin
   return true;
 end
 $function$;
+
+
+-- Preserve immutable demo identity markers after expiry, while access checks still require an active session.
+create or replace function private.demo_identity_session_id(p_user_id uuid)
+returns uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $function$
+  select case
+    when u.raw_app_meta_data ->> 'utconnect_demo_role' in ('visitor', 'bot')
+      and coalesce(u.raw_app_meta_data ->> 'utconnect_demo_session', '') ~*
+        '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    then (u.raw_app_meta_data ->> 'utconnect_demo_session')::uuid
+    else null
+  end
+  from auth.users u
+  where u.id = p_user_id
+$function$;
+
+create or replace function private.sync_demo_scope()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_json jsonb := to_jsonb(new);
+  v_user_id uuid;
+  v_other_user_id uuid;
+  v_group_id uuid;
+  v_connection_id uuid;
+  v_agenda_item_id uuid;
+  v_is_demo boolean := false;
+  v_session_id uuid;
+  v_other_session_id uuid;
+  v_group_demo boolean;
+  v_group_session uuid;
+  v_connection_demo boolean;
+  v_connection_session uuid;
+begin
+  if tg_table_name = 'profiles' then
+    v_user_id := (v_json ->> 'id')::uuid;
+    v_session_id := private.demo_identity_session_id(v_user_id);
+
+  elsif tg_table_name in ('user_locations', 'matching_preferences', 'notifications') then
+    v_user_id := (v_json ->> 'user_id')::uuid;
+    v_session_id := private.demo_identity_session_id(v_user_id);
+
+  elsif tg_table_name = 'study_groups' then
+    v_user_id := (v_json ->> 'created_by')::uuid;
+    v_session_id := private.demo_identity_session_id(v_user_id);
+
+  elsif tg_table_name = 'connections' then
+    v_user_id := (v_json ->> 'initiator_id')::uuid;
+    v_other_user_id := (v_json ->> 'recipient_id')::uuid;
+    v_session_id := private.demo_identity_session_id(v_user_id);
+    v_other_session_id := private.demo_identity_session_id(v_other_user_id);
+    if (v_session_id is null) <> (v_other_session_id is null)
+      or (v_session_id is not null and v_session_id is distinct from v_other_session_id) then
+      raise exception 'A demo account can connect only inside its own demo session'
+        using errcode = '42501';
+    end if;
+
+  elsif tg_table_name = 'direct_messages' then
+    v_connection_id := (v_json ->> 'connection_id')::uuid;
+    v_user_id := (v_json ->> 'sender_id')::uuid;
+    select c.is_demo, c.demo_session_id, c.initiator_id, c.recipient_id
+      into v_connection_demo, v_connection_session, v_other_user_id, v_group_id
+    from public.connections c where c.id = v_connection_id;
+    if not found or v_user_id not in (v_other_user_id, v_group_id) then
+      raise exception 'Message sender is not a connection participant' using errcode = '42501';
+    end if;
+    v_session_id := private.demo_identity_session_id(v_user_id);
+    if v_connection_demo and v_session_id is distinct from v_connection_session then
+      raise exception 'Demo message session mismatch' using errcode = '42501';
+    end if;
+    if not v_connection_demo and v_session_id is not null then
+      raise exception 'Demo account cannot message a non-demo connection' using errcode = '42501';
+    end if;
+    v_is_demo := v_connection_demo;
+    v_session_id := v_connection_session;
+
+  elsif tg_table_name in (
+    'group_members', 'group_invites', 'group_messages',
+    'group_agenda_items', 'group_materials'
+  ) then
+    v_group_id := (v_json ->> 'group_id')::uuid;
+    if tg_table_name = 'group_members' then
+      v_user_id := (v_json ->> 'user_id')::uuid;
+    elsif tg_table_name = 'group_invites' then
+      v_user_id := (v_json ->> 'invited_user_id')::uuid;
+      v_other_user_id := (v_json ->> 'invited_by')::uuid;
+    elsif tg_table_name = 'group_messages' then
+      v_user_id := (v_json ->> 'sender_id')::uuid;
+    elsif tg_table_name = 'group_agenda_items' then
+      v_user_id := (v_json ->> 'created_by')::uuid;
+    else
+      v_user_id := (v_json ->> 'uploaded_by')::uuid;
+    end if;
+
+    select g.is_demo, g.demo_session_id
+      into v_group_demo, v_group_session
+    from public.study_groups g where g.id = v_group_id;
+    if not found then raise exception 'Demo group does not exist'; end if;
+
+    v_session_id := private.demo_identity_session_id(v_user_id);
+    if v_group_demo <> (v_session_id is not null)
+      or (v_group_demo and v_session_id is distinct from v_group_session) then
+      raise exception 'Group activity is outside the account demo session'
+        using errcode = '42501';
+    end if;
+    if tg_table_name = 'group_invites' and v_other_user_id is not null
+      and private.demo_identity_session_id(v_other_user_id) is distinct from v_group_session then
+      raise exception 'Invitation sender is outside the group demo session'
+        using errcode = '42501';
+    end if;
+    v_is_demo := v_group_demo;
+    v_session_id := v_group_session;
+
+  elsif tg_table_name = 'group_agenda_votes' then
+    v_agenda_item_id := (v_json ->> 'agenda_item_id')::uuid;
+    v_user_id := (v_json ->> 'user_id')::uuid;
+    select g.is_demo, g.demo_session_id
+      into v_group_demo, v_group_session
+    from public.group_agenda_items a
+    join public.study_groups g on g.id = a.group_id
+    where a.id = v_agenda_item_id;
+    if not found then raise exception 'Agenda item does not exist'; end if;
+
+    v_session_id := private.demo_identity_session_id(v_user_id);
+    if v_group_demo <> (v_session_id is not null)
+      or (v_group_demo and v_session_id is distinct from v_group_session) then
+      raise exception 'Poll vote is outside the account demo session'
+        using errcode = '42501';
+    end if;
+    v_is_demo := v_group_demo;
+    v_session_id := v_group_session;
+
+  else
+    raise exception 'Unsupported demo scope trigger table: %', tg_table_name;
+  end if;
+
+  if tg_table_name in ('profiles', 'user_locations', 'matching_preferences', 'notifications', 'study_groups', 'connections') then
+    v_is_demo := v_session_id is not null;
+  end if;
+
+  v_json := jsonb_set(v_json, '{is_demo}', to_jsonb(v_is_demo), true);
+  v_json := jsonb_set(
+    v_json,
+    '{demo_session_id}',
+    coalesce(to_jsonb(v_session_id), 'null'::jsonb),
+    true
+  );
+  return jsonb_populate_record(new, v_json);
+end
+$function$;
