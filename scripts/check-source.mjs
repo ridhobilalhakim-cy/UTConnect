@@ -113,6 +113,26 @@ if (existsSync(demoClientPath) && existsSync(demoHtmlPath)) {
   }
 }
 
+for (const [relativePath, selectorName] of [
+  ['src/services/groups.js', 'GROUP_SELECT'],
+  ['src/services/chat.js', 'DIRECT_MESSAGE_SELECT'],
+  ['src/services/notifications.js', 'IS_DEMO_BUILD'],
+]) {
+  const absolutePath = join(root, relativePath);
+  if (!existsSync(absolutePath)) {
+    failures.push(`Demo Mode compatibility: ${relativePath} is missing`);
+    continue;
+  }
+  const service = readFileSync(absolutePath, 'utf8');
+  if (!service.includes('IS_DEMO_BUILD')) failures.push(`Demo Mode compatibility: ${relativePath} must conditionally select demo-only columns`);
+  if (relativePath.endsWith('groups.js') && (!service.includes('GROUP_MESSAGE_SELECT') || !service.includes('GROUP_AGENDA_SELECT'))) {
+    failures.push('Group service: messages and agenda must use shared conditional selectors');
+  }
+  if (relativePath.endsWith('chat.js') && !service.includes(`.select(${selectorName})`)) {
+    failures.push('Chat service: list and send must use the conditional message selector');
+  }
+}
+
 if (existsSync(demoEdgePath)) {
   const edge = readFileSync(demoEdgePath, 'utf8');
   for (const [description, condition] of [
@@ -123,6 +143,10 @@ if (existsSync(demoEdgePath)) {
     ['labeled simulated bot responses', edge.includes('[SIMULASI DEMO]')],
     ['server-side reset validation', edge.includes('action === "reset"') && edge.includes('auth.admin.deleteUser')],
     ['server-side active group counts', edge.includes('action === "list_groups"') && edge.includes('active_member_count')],
+    ['retry-safe Auth bot recovery', edge.includes('admin.auth.admin.listUsers') && edge.includes('existingAuthUser')],
+    ['retry-safe synthetic locations', edge.includes('admin.rpc("save_my_location"')],
+    ['retry-safe group/message seed helpers', edge.includes('async function ensureConnection') && edge.includes('async function addGroupMessage')],
+    ['all seeded groups carry the demo session scope', (edge.match(/insertGroup\(admin, sessionId, bot\./g) || []).length === 5],
   ]) {
     if (!condition) failures.push(`Demo Mode Edge Function: missing ${description}`);
   }
@@ -142,6 +166,8 @@ if (existsSync(demoMigrationPath)) {
     ['real student verification status is kept separate', migration.includes("verification_status = 'verified'::public.student_verification_status")],
     ['group capacity is checked on the server', migration.includes('Group is full')],
     ['group notifications work for pending demo profiles within their own session', migration.includes('private.is_verified_user(recipient.id)') && migration.includes('private.same_demo_session(new.created_by, recipient.id)')],
+    ['connection response RPC respects demo session boundaries', migration.includes('create or replace function public.respond_connection_request') && migration.includes('private.same_demo_session(v_actor_id, v_connection.initiator_id)')],
+    ['demo accounts cannot submit real verification evidence', migration.includes('Demo accounts cannot submit real student verification evidence') && migration.includes('create or replace function private.can_upload_student_verification_evidence')],
   ]) {
     if (!condition) failures.push(`Demo Mode migration: missing ${description}`);
   }
