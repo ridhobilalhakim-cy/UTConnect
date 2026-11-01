@@ -75,7 +75,7 @@ async function adminClient() {
   return createClient(url, secret, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
-async function requestContext(req: Request, origin: string, action: string): Promise<DemoContext> {
+async function requestContext(req: Request, origin: string, action: string, scenario = "all"): Promise<DemoContext> {
   const url = Deno.env.get("SUPABASE_URL");
   const anon = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY");
   if (!url || !anon) throw new Error("Konfigurasi Auth Demo Mode belum lengkap.");
@@ -118,6 +118,12 @@ async function requestContext(req: Request, origin: string, action: string): Pro
     } else if (profile.is_demo !== true || profile.demo_session_id !== sessionId) {
       throw new Error("Profil yang terhubung ke sesi ini bukan profil DEMO.");
     }
+    const { data: refreshedActor } = await admin.auth.admin.getUserById(visitorId);
+    const metadata = refreshedActor?.user?.app_metadata || {};
+    const { error: scenarioError } = await admin.auth.admin.updateUserById(visitorId, {
+      app_metadata: { ...metadata, utconnect_demo_scenario: scenario },
+    });
+    if (scenarioError) throw new Error("Pilihan skenario demo belum berhasil disimpan.");
     return { admin, actor, visitorId, sessionId, origin };
   }
 
@@ -608,7 +614,7 @@ Deno.serve(async (req: Request) => {
   catch { return json(allowedOrigin, { error: "Payload demo tidak valid." }, 400); }
   const action = String(payload.action || "");
   try {
-    const ctx = await requestContext(req, allowedOrigin, action);
+    const ctx = await requestContext(req, allowedOrigin, action, String(payload.scenario || "all"));
     if (action === "bootstrap") {
       const scenario = String(payload.scenario || "all");
       const result = await seedSession(ctx, scenario);
