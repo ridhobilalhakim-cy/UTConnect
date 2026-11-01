@@ -1976,6 +1976,7 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
       if (state.activeChatConnectionId !== connectionId) return;
       // Start a short polling safety net while the WebSocket joins; it stops on SUBSCRIBED.
       startDirectChatFallback(connectionId);
+      let postgresChangesReady = false;
       state.activeChatChannel = subscribeToDirectMessages(
         connectionId,
         payload => {
@@ -1992,12 +1993,36 @@ const $=(s,root=document)=>root.querySelector(s), $$=(s,root=document)=>[...root
           const statusLabel = $("#message-room-status");
           if (!statusLabel || state.activeChatConnectionId !== connectionId) return;
           if (status === "SUBSCRIBED") {
-            stopDirectChatFallback();
-            statusLabel.textContent = "Terhubung · Supabase Realtime aktif";
-            refreshDirectChat().catch(loadError => console.warn("Realtime chat refresh failed:", loadError));
+            if (postgresChangesReady) {
+              stopDirectChatFallback();
+              statusLabel.textContent = "Terhubung · Supabase Realtime aktif";
+              refreshDirectChat().catch(loadError => console.warn("Realtime chat refresh failed:", loadError));
+            } else {
+              statusLabel.textContent = "WebSocket terhubung · menyiapkan aliran pesan...";
+              startDirectChatFallback(connectionId);
+            }
           } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            postgresChangesReady = false;
             statusLabel.textContent = "Realtime terputus · sinkronisasi otomatis aktif.";
             if (error) console.warn("Realtime chat status:", status, error);
+            startDirectChatFallback(connectionId);
+          }
+        },
+        systemPayload => {
+          if (state.activeChatConnectionId !== connectionId) return;
+          if (systemPayload?.extension !== "postgres_changes") return;
+          const statusLabel = $("#message-room-status");
+          if (systemPayload.status === "ok") {
+            postgresChangesReady = true;
+            stopDirectChatFallback();
+            if (statusLabel) statusLabel.textContent = "Terhubung · Supabase Realtime aktif";
+            refreshDirectChat()
+              .then(() => refreshMessageRooms())
+              .catch(loadError => console.warn("Realtime-ready chat refresh failed:", loadError));
+          } else {
+            postgresChangesReady = false;
+            if (statusLabel) statusLabel.textContent = "Realtime belum siap · sinkronisasi otomatis aktif.";
+            console.warn("Postgres Changes subscription is not ready:", systemPayload.message || systemPayload.status);
             startDirectChatFallback(connectionId);
           }
         }

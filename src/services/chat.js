@@ -76,12 +76,13 @@ export async function markDirectMessagesRead(connectionId) {
   return data || [];
 }
 
-export function subscribeToDirectMessages(connectionId, onChange, onStatus) {
+export function subscribeToDirectMessages(connectionId, onChange, onStatus, onSystem) {
   assertConnectionId(connectionId);
   if (typeof window !== "undefined" && window.__UTCONNECT_DISABLE_REALTIME__) return null;
 
   return supabase
     .channel(`direct-messages-${connectionId}-${crypto.randomUUID()}`)
+    .on("system", "*", payload => onSystem?.(payload))
     .on(
       "postgres_changes",
       {
