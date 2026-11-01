@@ -19,19 +19,31 @@ async function invokeDemo(action, payload = {}) {
 
 export async function startDemoSession(scenario = "all") {
   requireDemoBuild();
-  const { data, error } = await supabase.auth.signInAnonymously();
-  if (error) throw error;
-  if (!data?.user) throw new Error("Sesi demo belum berhasil dibuat.");
+  const { data: currentData, error: currentError } = await supabase.auth.getUser();
+  if (currentError) throw currentError;
 
-  try {
-    const result = await invokeDemo("bootstrap", { scenario });
-    const { error: refreshError } = await supabase.auth.refreshSession();
-    if (refreshError) throw refreshError;
-    return result;
-  } catch (error) {
-    await supabase.auth.signOut().catch(() => {});
-    throw error;
+  let user = currentData?.user || null;
+  const reusableDemoUser = user?.is_anonymous === true
+    || user?.app_metadata?.utconnect_demo_role === "visitor";
+
+  if (user && !reusableDemoUser) {
+    const { error: signOutError } = await supabase.auth.signOut();
+    if (signOutError) throw signOutError;
+    user = null;
   }
+
+  if (!user) {
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if (error) throw error;
+    user = data?.user || null;
+  }
+  if (!user) throw new Error("Sesi demo belum berhasil dibuat.");
+
+  // Keep the visitor session on bootstrap failure so the same session can retry idempotently.
+  const result = await invokeDemo("bootstrap", { scenario });
+  const { error: refreshError } = await supabase.auth.refreshSession();
+  if (refreshError) throw refreshError;
+  return result;
 }
 
 export async function resetDemoSession() {
