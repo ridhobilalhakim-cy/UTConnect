@@ -53,10 +53,6 @@ function campusPoint(index: number) {
   };
 }
 
-function geoPoint(lat: number, lng: number) {
-  return { type: "Point", coordinates: [lng, lat] };
-}
-
 function unwrap<T>(result: { data: T; error: { message: string } | null }, label: string): T {
   if (result.error) throw new Error(label + ": " + result.error.message);
   return result.data;
@@ -174,11 +170,12 @@ async function createBot(admin: SupabaseClient, sessionId: string, spec: typeof 
     bio: "Akun simulasi UTConnect. " + spec.name + " bukan mahasiswa sungguhan.",
   }), "Profil bot gagal dibuat");
   const point = campusPoint(index);
-  unwrap(await admin.from("user_locations").insert({
-    user_id: id,
-    location: geoPoint(point.lat, point.lng),
-    show_in_radar: true,
-    consented_at: new Date().toISOString(),
+  unwrap(await admin.rpc("save_my_location", {
+    p_user_id: id,
+    p_lat: point.lat,
+    p_lng: point.lng,
+    p_consent: true,
+    p_show_in_radar: true,
   }), "Lokasi sintetis bot gagal dibuat");
   unwrap(await admin.from("matching_preferences").insert({
     user_id: id,
@@ -247,12 +244,13 @@ async function seedSession(ctx: DemoContext, scenario: string) {
   for (let i = 0; i < PROGRAMS.length; i += 1) bots.push(await createBot(admin, sessionId, PROGRAMS[i], i));
   const bot = Object.fromEntries(bots.map(item => [item.key, item])) as Record<string, DemoBot>;
 
-  unwrap(await admin.from("user_locations").upsert({
-    user_id: visitorId,
-    location: geoPoint(-6.3429, 106.7428),
-    show_in_radar: true,
-    consented_at: new Date().toISOString(),
-  }, { onConflict: "user_id" }), "Lokasi sintetis pengunjung demo gagal disimpan");
+  unwrap(await admin.rpc("save_my_location", {
+    p_user_id: visitorId,
+    p_lat: -6.3429,
+    p_lng: 106.7428,
+    p_consent: true,
+    p_show_in_radar: true,
+  }), "Lokasi sintetis pengunjung demo gagal disimpan");
   unwrap(await admin.from("matching_preferences").upsert({
     user_id: visitorId,
     topic_tags: ["basis data", "analisis sistem", "persiapan UAS"],
